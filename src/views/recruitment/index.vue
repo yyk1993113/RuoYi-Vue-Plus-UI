@@ -304,7 +304,7 @@ import {
 } from '@/api/recruitment';
 import type { RecruitmentOverview, ApplyTrend, JobTypeDistribution, HotJobVO, ExceptionApplyVO } from '@/api/recruitment';
 import { ElMessage } from 'element-plus';
-import { formatDate as formatDateUtil } from '@/utils/ruoyi';
+import { formatDate as formatDateUtil } from '@/utils';
 
 const router = useRouter();
 const route = useRoute();
@@ -514,9 +514,11 @@ async function loadAllData() {
     jobTypeDist.value = jobTypeRes.data || [];
     hotJobs.value = hotJobsRes.data || [];
     Object.assign(exchangeStat, exchangeRes.data || {});
-    exceptionApplies.value = exceptionRes.data?.rows || exceptionRes.data || [];
-    recentJobs.value = recentJobsRes.data?.rows || recentJobsRes.data || [];
-    recentApplies.value = recentAppliesRes.data?.rows || recentAppliesRes.data || [];
+    // 解包修正：拦截器已返回响应体，标准 RuoYi 列表 rows 在顶层(res.rows)，
+    // 原 res.data?.rows 取不到、再 || res.data 会把整个对象误当列表。统一 res.rows ?? res.data?.rows。
+    exceptionApplies.value = exceptionRes.rows ?? exceptionRes.data?.rows ?? [];
+    recentJobs.value = recentJobsRes.rows ?? recentJobsRes.data?.rows ?? [];
+    recentApplies.value = recentAppliesRes.rows ?? recentAppliesRes.data?.rows ?? [];
     applyStatusDist.value = applyStatusRes.data || [];
 
     renderAllCharts();
