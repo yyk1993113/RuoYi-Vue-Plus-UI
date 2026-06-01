@@ -410,7 +410,7 @@ async function loadData() {
     const totalCount = (res as any).total ?? (res as any).data?.total ?? 0;
     tableData.value = Array.isArray(rows) ? rows : [];
     total.value = typeof totalCount === 'number' ? totalCount : 0;
-    console.log('[求职者管理] loadData 返回:', res);
+    // 安全：移除打印整包响应的 console.log（会把求职者手机号/邮箱/登录IP 等 PII 暴露到浏览器控制台）
   } catch (e) {
     tableData.value = [];
     total.value = 0;
