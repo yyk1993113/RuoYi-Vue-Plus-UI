@@ -14,7 +14,7 @@
         <el-card shadow="hover" class="stat-mini-card success">
           <div class="stat-mini">
             <span class="label">累计金额</span>
-            <span class="value success">?{{ formatMoney(statistics.totalAmount) }}</span>
+            <span class="value success">¥{{ formatMoney(statistics.totalAmount) }}</span>
           </div>
         </el-card>
       </el-col>
@@ -22,7 +22,7 @@
         <el-card shadow="hover" class="stat-mini-card primary">
           <div class="stat-mini">
             <span class="label">今日金额</span>
-            <span class="value primary">?{{ formatMoney(statistics.todayAmount) }}</span>
+            <span class="value primary">¥{{ formatMoney(statistics.todayAmount) }}</span>
           </div>
         </el-card>
       </el-col>
@@ -65,7 +65,7 @@
         </el-table-column>
         <el-table-column label="结算金额" width="120" align="right">
           <template #default="{ row }">
-            <span class="amount">?{{ formatMoney(row.amount) }}</span>
+            <span class="amount">¥{{ formatMoney(row.amount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="不可篡改时间" prop="timestamp" width="180" align="center" />
@@ -96,7 +96,7 @@
         <el-descriptions-item label="企业">{{ currentLedger.companyName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="用户">{{ currentLedger.userName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="结算金额">
-          <span class="amount-lg">?{{ formatMoney(currentLedger.amount) }}</span>
+          <span class="amount-lg">¥{{ formatMoney(currentLedger.amount) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="任务ID">{{ currentLedger.taskId }}</el-descriptions-item>
         <el-descriptions-item label="不可篡改时间" :span="2">{{ currentLedger.timestamp }}</el-descriptions-item>
