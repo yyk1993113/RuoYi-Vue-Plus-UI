@@ -182,55 +182,92 @@
       />
     </el-card>
 
-    <!-- 岗位详情对话框 -->
-    <el-dialog v-model="detailVisible" title="岗位详情" width="700px" append-to-body>
-      <el-descriptions :column="2" border v-if="currentJob">
-        <el-descriptions-item label="岗位ID">{{ currentJob.jobId }}</el-descriptions-item>
-        <el-descriptions-item label="岗位状态">
-          <el-tag v-if="currentJob.status === '0'" type="warning">待审核</el-tag>
-          <el-tag v-else-if="currentJob.status === '1'" type="success">已上架</el-tag>
-          <el-tag v-else type="info">已下架</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="岗位名称" :span="2">{{ currentJob.jobName }}</el-descriptions-item>
-        <el-descriptions-item label="岗位类型">
-          <el-tag v-if="currentJob.jobType === '0'" type="success">全职</el-tag>
-          <el-tag v-else-if="currentJob.jobType === '1'" type="warning">兼职</el-tag>
-          <el-tag v-else-if="currentJob.jobType === '2'" type="danger">临时工</el-tag>
-          <el-tag v-else>项目制</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="薪资范围">{{ currentJob.salary }}</el-descriptions-item>
-        <el-descriptions-item label="工作地点" :span="2">{{ currentJob.location || '未知' }}</el-descriptions-item>
-        <el-descriptions-item label="经验要求">
-          <span v-if="currentJob.experience === '0'">经验不限</span>
-          <span v-else-if="currentJob.experience === '1'">1年以下</span>
-          <span v-else-if="currentJob.experience === '2'">1-3年</span>
-          <span v-else-if="currentJob.experience === '3'">3-5年</span>
-          <span v-else-if="currentJob.experience === '4'">5年以上</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="投递人数">{{ currentJob.applyCount || 0 }}</el-descriptions-item>
-        <el-descriptions-item label="企业名称">{{ currentJob.companyName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="发布时间">{{ currentJob.publishTime }}</el-descriptions-item>
-        <el-descriptions-item label="岗位描述" :span="2">
-          <div style="white-space: pre-wrap">{{ currentJob.description || '暂无描述' }}</div>
-        </el-descriptions-item>
-        <el-descriptions-item label="备注" :span="2">{{ currentJob.remark || '暂无' }}</el-descriptions-item>
-      </el-descriptions>
+    <!-- 岗位详情对话框：完整字段（数据来源 GET /admin/recruitment/jobDetail/{jobId} → JobFullVO，枚举译名由后端 *Name 提供） -->
+    <el-dialog v-model="detailVisible" title="岗位详情" width="760px" append-to-body>
+      <div v-loading="detailLoading">
+        <el-descriptions v-if="currentJob" :column="2" border>
+          <!-- 基本信息 -->
+          <el-descriptions-item label="岗位ID">{{ currentJob.jobId }}</el-descriptions-item>
+          <el-descriptions-item label="岗位状态">
+            <el-tag v-if="currentJob.status === '0'" type="warning">待审核</el-tag>
+            <el-tag v-else-if="currentJob.status === '1'" type="success">已上架</el-tag>
+            <el-tag v-else type="info">已下架</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="岗位名称" :span="2">{{ currentJob.jobName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="企业名称" :span="2">{{ currentJob.companyName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="用工性质">
+            <el-tag v-if="currentJob.jobType === '0'" type="success">{{ currentJob.jobTypeName || '全职' }}</el-tag>
+            <el-tag v-else-if="currentJob.jobType === '1'" type="warning">{{ currentJob.jobTypeName || '兼职' }}</el-tag>
+            <el-tag v-else-if="currentJob.jobType === '2'" type="danger">{{ currentJob.jobTypeName || '临时工' }}</el-tag>
+            <el-tag v-else>{{ currentJob.jobTypeName || '项目制' }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="职位类目">{{ currentJob.category || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="薪资范围">{{ currentJob.salary || '面议' }}</el-descriptions-item>
+          <el-descriptions-item label="招聘人数">{{ currentJob.recruitNumber != null ? currentJob.recruitNumber + ' 人' : '-' }}</el-descriptions-item>
+          <el-descriptions-item label="经验要求">{{ currentJob.experienceName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="学历要求">{{ currentJob.educationName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="期望到岗时间">{{ formatStartDate(currentJob.expectedStartDate) }}</el-descriptions-item>
+          <el-descriptions-item label="工作地点" :span="2">{{ currentJob.workAddress || currentJob.location || '未知' }}</el-descriptions-item>
+
+          <!-- 兼职工作时间（仅在有数据时展示，benefits/workTime 为 JSON，已在 computed 中解析） -->
+          <el-descriptions-item v-if="workTimeList.length" label="兼职工作时间" :span="2">
+            <div class="detail-tags">
+              <el-tag v-for="(wt, i) in workTimeList" :key="i" type="info" effect="plain" class="mr-1 mb-1">{{ wt }}</el-tag>
+            </div>
+          </el-descriptions-item>
+
+          <!-- 岗位福利 -->
+          <el-descriptions-item label="岗位福利" :span="2">
+            <div v-if="benefitsList.length" class="detail-tags">
+              <el-tag v-for="(b, i) in benefitsList" :key="i" type="success" effect="plain" class="mr-1 mb-1">{{ b }}</el-tag>
+            </div>
+            <span v-else>暂无</span>
+          </el-descriptions-item>
+
+          <!-- 详细文本 -->
+          <el-descriptions-item label="职位亮点" :span="2">
+            <div style="white-space: pre-wrap">{{ currentJob.highlights || '暂无' }}</div>
+          </el-descriptions-item>
+          <el-descriptions-item label="岗位描述" :span="2">
+            <div style="white-space: pre-wrap">{{ currentJob.description || '暂无描述' }}</div>
+          </el-descriptions-item>
+          <el-descriptions-item label="团队介绍" :span="2">
+            <div style="white-space: pre-wrap">{{ currentJob.teamIntro || '暂无' }}</div>
+          </el-descriptions-item>
+          <el-descriptions-item label="附加条件" :span="2">
+            <div style="white-space: pre-wrap">{{ currentJob.additionalConditions || '暂无' }}</div>
+          </el-descriptions-item>
+
+          <!-- 运营信息 -->
+          <el-descriptions-item label="投递人数">{{ currentJob.applyCount || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="浏览人数">{{ currentJob.browseCount || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="发布时间">{{ currentJob.publishTime || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间">{{ currentJob.createTime || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="备注" :span="2">{{ currentJob.remark || '暂无' }}</el-descriptions-item>
+        </el-descriptions>
+        <el-empty v-else-if="!detailLoading" description="暂无详情数据" />
+      </div>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
       </template>
     </el-dialog>
 
-    <!-- 审核对话框 -->
+    <!-- 审核对话框：通过即上架（status=1），驳回需填原因（status=2，写入 remark） -->
     <el-dialog v-model="auditVisible" title="岗位审核" width="500px" append-to-body>
       <el-form ref="auditFormRef" :model="auditForm" label-width="80px">
         <el-form-item label="审核结果">
           <el-radio-group v-model="auditForm.status">
-            <el-radio label="1">审核通过（上架）</el-radio>
-            <el-radio label="2">审核拒绝（下架）</el-radio>
+            <el-radio label="1">通过（上架）</el-radio>
+            <el-radio label="2">驳回</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="auditForm.remark" type="textarea" :rows="3" placeholder="请输入审核备注" />
+        <el-form-item :label="auditForm.status === '2' ? '驳回原因' : '备注'" :required="auditForm.status === '2'">
+          <el-input
+            v-model="auditForm.remark"
+            type="textarea"
+            :rows="3"
+            :placeholder="auditForm.status === '2' ? '请填写驳回原因（必填，将告知企业）' : '请输入审核备注（选填）'"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -245,7 +282,9 @@
 <script setup name="JobManagement" lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { listJob, getJobStatistics, getJob, auditJob, changeJobStatus, delJob, updateJob } from '@/api/recruitment';
+import { computed } from 'vue';
+import { listJob, getJobStatistics, getJobFullDetail, auditJob, changeJobStatus, delJob, updateJob } from '@/api/recruitment';
+import type { JobFullVO } from '@/api/recruitment';
 import { download } from '@/utils/request';
 
 const loading = ref(false);
@@ -253,9 +292,50 @@ const total = ref(0);
 const tableData = ref<any[]>([]);
 const detailVisible = ref(false);
 const auditVisible = ref(false);
-const currentJob = ref<any>(null);
+// 当前查看的岗位完整字段（数据来源：GET /admin/recruitment/jobDetail/{jobId} → JobFullVO）
+const currentJob = ref<JobFullVO | null>(null);
+const detailLoading = ref(false);
 const queryFormRef = ref();
 const auditFormRef = ref();
+
+// 兼职工作时间：后端 workTime 为 JSON 字符串，解析为可读的时段文本数组供详情渲染。
+// 兼容两种常见结构：字符串数组，或对象数组（取 start/end、day/time、label 等常见键拼装）。
+const workTimeList = computed<string[]>(() => {
+  const raw = currentJob.value?.workTime;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [String(raw)];
+    return parsed.map((it: any) => {
+      if (it == null) return '';
+      if (typeof it === 'string') return it;
+      const day = it.day ?? it.week ?? it.date ?? it.label ?? '';
+      const start = it.start ?? it.startTime ?? it.from ?? '';
+      const end = it.end ?? it.endTime ?? it.to ?? '';
+      const range = start || end ? `${start}${start && end ? '-' : ''}${end}` : '';
+      const text = `${day}${day && range ? ' ' : ''}${range}`.trim();
+      return text || JSON.stringify(it);
+    }).filter(Boolean);
+  } catch {
+    // 非合法 JSON 时原样展示，避免详情空白
+    return [String(raw)];
+  }
+});
+
+// 岗位福利：后端 benefits 为 JSON 数组字符串，解析为标签数组渲染。非法 JSON 时按逗号兜底切分。
+const benefitsList = computed<string[]>(() => {
+  const raw = currentJob.value?.benefits;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((it: any) => (typeof it === 'string' ? it : it?.label ?? it?.name ?? JSON.stringify(it))).filter(Boolean);
+    }
+    return [String(parsed)];
+  } catch {
+    return String(raw).split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+  }
+});
 
 const queryParams = reactive({
   pageNum: 1,
@@ -342,13 +422,18 @@ async function handleHotChange(row: any) {
   }
 }
 
+// 打开详情：调用完整字段详情接口（jobDetail），展示类目/学历/招聘人数/到岗时间/工作时间/福利/团队介绍/附加条件等全量字段
 async function handleDetail(row: any) {
+  detailVisible.value = true;
+  detailLoading.value = true;
+  currentJob.value = null;
   try {
-    const res = await getJob(row.jobId);
+    const res = await getJobFullDetail(row.jobId);
     currentJob.value = res.data;
-    detailVisible.value = true;
   } catch (error) {
     ElMessage.error('获取岗位详情失败');
+  } finally {
+    detailLoading.value = false;
   }
 }
 
@@ -360,9 +445,14 @@ function handleAudit(row: any, status: string) {
 }
 
 async function submitAudit() {
+  // 驳回（status=2）必须填写原因，写入 Job.remark 一并提交（后端 /job/audit 取 status + remark）
+  if (auditForm.status === '2' && !auditForm.remark.trim()) {
+    ElMessage.warning('驳回岗位请填写驳回原因');
+    return;
+  }
   try {
-    await auditJob(auditForm);
-    ElMessage.success('审核成功');
+    await auditJob({ jobId: auditForm.jobId, status: auditForm.status, remark: auditForm.remark.trim() || undefined });
+    ElMessage.success(auditForm.status === '1' ? '已通过并上架' : '已驳回');
     auditVisible.value = false;
     loadData();
     loadStatistics();
@@ -415,6 +505,16 @@ onMounted(() => {
 
 function handleExport() {
   download('/admin/recruitment/job/export', queryParams, `岗位数据_${new Date().getTime()}.xlsx`);
+}
+
+// 期望到岗时间：后端 expectedStartDate 为 Date（序列化为时间戳/ISO 字符串），仅展示到日期即可
+function formatStartDate(val?: string | number): string {
+  if (!val) return '随时到岗';
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return String(val);
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
 }
 </script>
 
@@ -486,5 +586,19 @@ function handleExport() {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* 详情弹窗内福利/工作时间标签的换行排布 */
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.mr-1 {
+  margin-right: 6px;
+}
+
+.mb-1 {
+  margin-bottom: 6px;
 }
 </style>

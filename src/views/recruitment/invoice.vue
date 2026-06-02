@@ -1,6 +1,6 @@
 <template>
   <div class="p-4">
-    <!-- 统计卡片 -->
+    <!-- 统计卡片：数据来源 getInvoiceStatistics(/admin/recruitment/invoice/statistics) -->
     <el-row :gutter="20" class="mb-4">
       <el-col :span="6">
         <el-card shadow="hover" class="stat-mini-card">
@@ -42,6 +42,9 @@
         <el-form-item label="企业" prop="companyId">
           <el-input v-model="queryParams.companyId" placeholder="企业ID" clearable @keyup.enter="handleQuery" style="width: 120px" />
         </el-form-item>
+        <el-form-item label="台账" prop="ledgerId">
+          <el-input v-model="queryParams.ledgerId" placeholder="台账ID" clearable @keyup.enter="handleQuery" style="width: 120px" />
+        </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 120px">
             <el-option label="未开票" value="0" />
@@ -56,10 +59,13 @@
       </el-form>
     </el-card>
 
-    <!-- 数据表格 -->
+    <!-- 数据表格：列表数据来源 listInvoiceManage(/admin/invoice-manage/list)，含金额/上传人/绑定台账号 -->
     <el-card shadow="hover">
       <template #header>
         <el-row :gutter="10">
+          <el-col :span="1.5">
+            <el-button type="primary" icon="Upload" @click="handleUploadOpen">上传发票</el-button>
+          </el-col>
           <el-col :span="1.5">
             <el-button type="primary" plain icon="Refresh" @click="loadData">刷新</el-button>
           </el-col>
@@ -67,9 +73,28 @@
       </template>
 
       <el-table v-loading="loading" :data="tableData" border stripe>
-        <el-table-column label="发票ID" prop="invoiceId" width="200" align="center" />
-        <el-table-column label="企业" prop="companyName" min-width="150" />
-        <el-table-column label="台账ID" prop="ledgerId" width="100" align="center" />
+        <el-table-column label="发票ID" prop="invoiceId" width="180" align="center" />
+        <el-table-column label="企业ID" prop="companyId" width="100" align="center" />
+        <el-table-column label="金额(元)" width="120" align="right">
+          <template #default="{ row }">
+            <span v-if="row.amount != null" class="amount-text">{{ formatAmount(row.amount) }}</span>
+            <span v-else class="text-secondary">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="绑定台账" min-width="150" align="center">
+          <template #default="{ row }">
+            <div v-if="row.ledgerId">
+              <div>{{ row.ledgerOrderNo || ('台账#' + row.ledgerId) }}</div>
+              <el-button link type="primary" size="small" @click="handleBindOpen(row)">改绑</el-button>
+            </div>
+            <el-button v-else link type="primary" @click="handleBindOpen(row)">绑定台账</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="上传人" prop="createByName" width="120" align="center">
+          <template #default="{ row }">
+            <span>{{ row.createByName || '-' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.status === '0'" type="warning">未开票</el-tag>
@@ -77,16 +102,14 @@
             <el-tag v-else type="danger">已作废</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="发票文件" min-width="120">
+        <el-table-column label="发票文件" min-width="120" align="center">
           <template #default="{ row }">
             <el-button v-if="row.filePath" link type="primary" @click="previewFile(row.filePath)">查看文件</el-button>
             <span v-else class="text-secondary">暂无文件</span>
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" prop="createTime" width="160" align="center" />
-        <el-table-column label="更新时间" prop="updateTime" width="160" align="center" />
-        <el-table-column label="备注" prop="remark" min-width="150" show-overflow-tooltip />
-        <el-table-column label="操作" width="150" fixed="right" align="center">
+        <el-table-column label="上传时间" prop="createTime" width="160" align="center" />
+        <el-table-column label="操作" width="180" fixed="right" align="center">
           <template #default="{ row }">
             <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
               <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
@@ -115,7 +138,7 @@
       />
     </el-card>
 
-    <!-- 发票详情对话框 -->
+    <!-- 发票详情对话框：详情走 getInvoice(/admin/recruitment/invoice/{id})，含企业名/备注等 -->
     <el-dialog v-model="detailVisible" title="发票详情" width="600px" append-to-body>
       <el-descriptions :column="2" border v-if="currentInvoice">
         <el-descriptions-item label="发票ID">{{ currentInvoice.invoiceId }}</el-descriptions-item>
@@ -138,26 +161,105 @@
         <el-button @click="detailVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 上传发票对话框：提交 uploadInvoiceManage(/admin/invoice-manage/upload)。
+         发票文件先传 OSS(/resource/oss/upload) 拿到 url 作为 filePath；
+         若填台账ID，后端会以台账金额/归属企业为准（amount/companyId 仅作展示与留痕）。 -->
+    <el-dialog v-model="uploadVisible" title="上传发票" width="560px" append-to-body @closed="resetUploadForm">
+      <el-form ref="uploadFormRef" :model="uploadForm" :rules="uploadRules" label-width="100px">
+        <el-form-item label="发票文件" prop="filePath">
+          <el-upload
+            ref="invoiceUploadRef"
+            :action="ossUploadUrl"
+            :headers="uploadHeaders"
+            :limit="1"
+            :accept="invoiceAccept"
+            :show-file-list="true"
+            :file-list="uploadFileList"
+            :before-upload="beforeInvoiceUpload"
+            :on-success="onInvoiceUploadSuccess"
+            :on-error="onInvoiceUploadError"
+            :on-remove="onInvoiceFileRemove"
+            :on-exceed="onInvoiceFileExceed"
+          >
+            <el-button type="primary" icon="Upload">选取文件</el-button>
+            <template #tip>
+              <div class="el-upload__tip">支持 pdf/jpg/png/jpeg，单个不超过 10MB</div>
+            </template>
+          </el-upload>
+        </el-form-item>
+        <el-form-item label="关联台账ID" prop="ledgerId">
+          <el-input v-model="uploadForm.ledgerId" placeholder="可空，填写后金额/企业以台账为准" clearable style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="企业ID" prop="companyId">
+          <el-input v-model="uploadForm.companyId" placeholder="可空，绑定台账时自动派生" clearable style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="金额(元)" prop="amount">
+          <el-input-number v-model="uploadForm.amount" :min="0" :precision="2" :controls="false" placeholder="可空" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-select v-model="uploadForm.status" placeholder="默认未开票" style="width: 100%">
+            <el-option label="未开票" value="0" />
+            <el-option label="已开票" value="1" />
+            <el-option label="已作废" value="2" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="备注" prop="remark">
+          <el-input v-model="uploadForm.remark" type="textarea" :rows="2" placeholder="可空，写入操作审计明细" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="uploadVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitUpload">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 绑定/改绑台账对话框：提交 bindInvoiceManage(/admin/invoice-manage/bind)，后端同步发票归属企业为台账企业 -->
+    <el-dialog v-model="bindVisible" title="绑定台账" width="460px" append-to-body @closed="resetBindForm">
+      <el-form ref="bindFormRef" :model="bindForm" :rules="bindRules" label-width="100px">
+        <el-form-item label="发票ID">
+          <span>{{ bindForm.invoiceId }}</span>
+        </el-form-item>
+        <el-form-item label="台账ID" prop="ledgerId">
+          <el-input v-model="bindForm.ledgerId" placeholder="请输入要绑定的台账ID" clearable style="width: 100%" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="bindVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitBind">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup name="InvoiceManagement" lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { listInvoice, getInvoiceStatistics, getInvoice, updateInvoiceStatus } from '@/api/recruitment';
+import type { FormInstance, UploadInstance, UploadProps, UploadUserFile } from 'element-plus';
+import { globalHeaders } from '@/utils/request';
+import {
+  getInvoiceStatistics,
+  getInvoice,
+  listInvoiceManage,
+  uploadInvoiceManage,
+  bindInvoiceManage,
+  markInvoiceManageStatus
+} from '@/api/recruitment';
+import type { InvoiceManageVO, InvoiceUploadForm } from '@/api/recruitment';
 
 const loading = ref(false);
+const submitting = ref(false);
 const total = ref(0);
-const tableData = ref<any[]>([]);
+const tableData = ref<InvoiceManageVO[]>([]);
 const detailVisible = ref(false);
 const currentInvoice = ref<any>(null);
-const queryFormRef = ref();
+const queryFormRef = ref<FormInstance>();
 
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
-  companyId: undefined,
-  ledgerId: undefined,
+  companyId: undefined as string | undefined,
+  ledgerId: undefined as string | undefined,
   status: ''
 });
 
@@ -168,10 +270,56 @@ const statistics = reactive({
   cancelledCount: 0
 });
 
+// ===== OSS 上传配置（发票文件先传 OSS 拿到 url 作为 filePath）=====
+const ossUploadUrl = import.meta.env.VITE_APP_BASE_API + '/resource/oss/upload';
+const uploadHeaders = ref(globalHeaders());
+const invoiceAccept = '.pdf,.jpg,.jpeg,.png';
+
+// ===== 上传发票对话框 =====
+const uploadVisible = ref(false);
+const uploadFormRef = ref<FormInstance>();
+const invoiceUploadRef = ref<UploadInstance>();
+const uploadFileList = ref<UploadUserFile[]>([]);
+const uploadForm = reactive<InvoiceUploadForm>({
+  filePath: '',
+  ledgerId: undefined,
+  companyId: undefined,
+  amount: undefined,
+  status: '0',
+  remark: ''
+});
+const uploadRules = {
+  filePath: [{ required: true, message: '请先上传发票文件', trigger: 'change' }]
+};
+
+// ===== 绑定台账对话框 =====
+const bindVisible = ref(false);
+const bindFormRef = ref<FormInstance>();
+const bindForm = reactive<{ invoiceId?: number; ledgerId?: string }>({
+  invoiceId: undefined,
+  ledgerId: undefined
+});
+const bindRules = {
+  ledgerId: [{ required: true, message: '请输入台账ID', trigger: 'blur' }]
+};
+
+// 金额展示：保留两位小数千分位
+function formatAmount(amount: number) {
+  return Number(amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 async function loadData() {
   loading.value = true;
   try {
-    const res = await listInvoice(queryParams);
+    // 仅提交有值的查询条件，避免空字符串污染后端 LambdaQueryWrapper
+    const params: any = {
+      pageNum: queryParams.pageNum,
+      pageSize: queryParams.pageSize
+    };
+    if (queryParams.companyId) params.companyId = queryParams.companyId;
+    if (queryParams.ledgerId) params.ledgerId = queryParams.ledgerId;
+    if (queryParams.status) params.status = queryParams.status;
+    const res = await listInvoiceManage(params);
     tableData.value = res.rows || [];
     total.value = res.total || 0;
   } catch (error) {
@@ -204,9 +352,9 @@ function resetQuery() {
   loadData();
 }
 
-async function handleDetail(row: any) {
+async function handleDetail(row: InvoiceManageVO) {
   try {
-    const res = await getInvoice(row.invoiceId);
+    const res = await getInvoice(row.invoiceId as number);
     currentInvoice.value = res.data;
     detailVisible.value = true;
   } catch (error) {
@@ -218,7 +366,126 @@ function previewFile(filePath: string) {
   window.open(filePath, '_blank');
 }
 
-async function handleStatusChange(row: any, status: string) {
+// ===== 上传发票流程 =====
+function handleUploadOpen() {
+  uploadVisible.value = true;
+}
+
+function resetUploadForm() {
+  uploadFormRef.value?.resetFields();
+  uploadForm.filePath = '';
+  uploadForm.ledgerId = undefined;
+  uploadForm.companyId = undefined;
+  uploadForm.amount = undefined;
+  uploadForm.status = '0';
+  uploadForm.remark = '';
+  uploadFileList.value = [];
+}
+
+// OSS 上传前校验：类型 + 大小（<10MB）
+const beforeInvoiceUpload: UploadProps['beforeUpload'] = (file) => {
+  const ext = file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase();
+  const okType = ['pdf', 'jpg', 'jpeg', 'png'].includes(ext);
+  if (!okType) {
+    ElMessage.error('文件格式不正确，仅支持 pdf/jpg/png/jpeg');
+    return false;
+  }
+  const isLt = file.size / 1024 / 1024 < 10;
+  if (!isLt) {
+    ElMessage.error('上传文件大小不能超过 10MB');
+    return false;
+  }
+  return true;
+};
+
+// OSS 上传成功：取返回 url 作为发票 filePath（与列表/详情的 filePath 直链语义一致）
+const onInvoiceUploadSuccess: UploadProps['onSuccess'] = (res: any) => {
+  if (res.code === 200) {
+    uploadForm.filePath = res.data.url;
+    // 触发表单校验，清掉「请先上传发票文件」提示
+    uploadFormRef.value?.validateField('filePath');
+    ElMessage.success('文件上传成功');
+  } else {
+    ElMessage.error(res.msg || '文件上传失败');
+  }
+};
+
+const onInvoiceUploadError: UploadProps['onError'] = () => {
+  ElMessage.error('文件上传失败');
+};
+
+function onInvoiceFileRemove() {
+  uploadForm.filePath = '';
+}
+
+function onInvoiceFileExceed() {
+  ElMessage.warning('仅允许上传 1 个发票文件，请先移除已选文件');
+}
+
+async function submitUpload() {
+  if (!uploadFormRef.value) return;
+  await uploadFormRef.value.validate(async (valid) => {
+    if (!valid) return;
+    submitting.value = true;
+    try {
+      // 组装请求体：仅提交有值字段，数值型字段做转换，避免空串传给后端
+      const payload: InvoiceUploadForm = {
+        filePath: uploadForm.filePath,
+        status: uploadForm.status
+      };
+      if (uploadForm.ledgerId) payload.ledgerId = Number(uploadForm.ledgerId);
+      if (uploadForm.companyId) payload.companyId = Number(uploadForm.companyId);
+      if (uploadForm.amount != null) payload.amount = Number(uploadForm.amount);
+      if (uploadForm.remark) payload.remark = uploadForm.remark;
+      await uploadInvoiceManage(payload);
+      ElMessage.success('上传成功');
+      uploadVisible.value = false;
+      loadData();
+      loadStatistics();
+    } catch (error) {
+      console.error('上传发票失败:', error);
+    } finally {
+      submitting.value = false;
+    }
+  });
+}
+
+// ===== 绑定/改绑台账流程 =====
+function handleBindOpen(row: InvoiceManageVO) {
+  bindForm.invoiceId = row.invoiceId;
+  bindForm.ledgerId = row.ledgerId != null ? String(row.ledgerId) : undefined;
+  bindVisible.value = true;
+}
+
+function resetBindForm() {
+  bindFormRef.value?.resetFields();
+  bindForm.invoiceId = undefined;
+  bindForm.ledgerId = undefined;
+}
+
+async function submitBind() {
+  if (!bindFormRef.value) return;
+  await bindFormRef.value.validate(async (valid) => {
+    if (!valid) return;
+    submitting.value = true;
+    try {
+      await bindInvoiceManage({
+        invoiceId: bindForm.invoiceId as number,
+        ledgerId: Number(bindForm.ledgerId)
+      });
+      ElMessage.success('绑定成功');
+      bindVisible.value = false;
+      loadData();
+    } catch (error) {
+      console.error('绑定台账失败:', error);
+    } finally {
+      submitting.value = false;
+    }
+  });
+}
+
+// ===== 标记开票状态：走 markInvoiceManageStatus(/admin/invoice-manage/markStatus) =====
+async function handleStatusChange(row: InvoiceManageVO, status: string) {
   const statusText = status === '1' ? '已开票' : '已作废';
   try {
     await ElMessageBox.confirm(`确认要将该发票标记为"${statusText}"吗？`, '提示', {
@@ -226,7 +493,7 @@ async function handleStatusChange(row: any, status: string) {
       cancelButtonText: '取消',
       type: 'warning'
     });
-    await updateInvoiceStatus({ invoiceId: row.invoiceId, status });
+    await markInvoiceManageStatus({ invoiceId: row.invoiceId as number, status });
     ElMessage.success('更新成功');
     loadData();
     loadStatistics();
@@ -280,15 +547,20 @@ onMounted(() => {
 }
 
 .stat-mini .value.success {
-  color: #67C23A;
+  color: #67c23a;
 }
 
 .stat-mini .value.danger {
-  color: #F56C6C;
+  color: #f56c6c;
 }
 
 .stat-mini .value.warning {
-  color: #E6A23C;
+  color: #e6a23c;
+}
+
+.amount-text {
+  color: #2b7fff;
+  font-weight: 600;
 }
 
 .text-secondary {

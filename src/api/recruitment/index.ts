@@ -16,11 +16,19 @@ export interface CompanyVO {
   description?: string;
   contactPerson?: string;
   contactPhone?: string;
+  // 联系人微信（后端 company.contact_wechat），详情主体信息展示用
+  contactWechat?: string;
   logoUrl?: string;
+  // 营业执照图片地址（后端 company.business_license），资质图片预览用
   businessLicense?: string;
   status?: string;
+  // 平台禁言状态 0:未禁言 1:禁言中（后端 company.is_silenced）
+  isSilenced?: string;
+  silenceReason?: string;
+  silenceTime?: string;
   userId?: number;
   createTime?: string;
+  updateTime?: string;
   remark?: string;
   jobCount?: number;
   applyCount?: number;
@@ -55,6 +63,68 @@ export interface JobVO {
   remark?: string;
   isRecommend?: string;
   isHot?: string;
+}
+
+// 岗位完整字段 VO（运营台审核详情用）。
+// 数据来源：后端 AdminJobDetailController.getJobFullDetail
+//   (GET /admin/recruitment/jobDetail/{jobId}) → com.ruoyi.project.domain.vo.JobFullVO。
+// 字段与 JobFullVO 一一对应；所有枚举后端已附带 *Name 中文译名，前端可直接渲染无需再硬编码映射。
+// 注意：workTime / benefits 为 JSON 字符串（后端原样透传），前端需自行 JSON.parse 后渲染。
+export interface JobFullVO {
+  tenantId?: string;
+  jobId?: number;
+  companyId?: number;
+  companyName?: string;
+  jobName?: string;
+  // 用工性质 0:全职 1:兼职 2:临时工 3:项目制
+  jobType?: string;
+  jobTypeName?: string;
+  // 用工性质（兼容旧字段）0:全职 1:兼职
+  employmentType?: string;
+  employmentTypeName?: string;
+  // 薪资
+  salary?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryUnit?: string;
+  salaryUnitName?: string;
+  location?: string;
+  // 职位所属类目
+  category?: string;
+  // 岗位实际工作地点
+  workAddress?: string;
+  experience?: string;
+  experienceName?: string;
+  // 学历要求 0:不限 1:初中 2:高中 3:中专 4:大专 5:本科 6:硕士 7:博士
+  education?: string;
+  educationName?: string;
+  // 招聘人数
+  recruitNumber?: number;
+  // 兼职工作时间类型 0:固定时段 1:时间区间
+  workTimeType?: string;
+  // 兼职工作时间（JSON 字符串，需前端解析）
+  workTime?: string;
+  // 期望到岗时间
+  expectedStartDate?: string;
+  description?: string;
+  // 岗位福利（JSON 数组字符串，需前端解析）
+  benefits?: string;
+  // 团队介绍
+  teamIntro?: string;
+  // 任职附加条件
+  additionalConditions?: string;
+  // 职位亮点
+  highlights?: string;
+  status?: string;
+  statusName?: string;
+  publishTime?: string;
+  applyCount?: number;
+  browseCount?: number;
+  isRecommend?: string;
+  isHot?: string;
+  createTime?: string;
+  updateTime?: string;
+  remark?: string;
 }
 
 // ========== 投递相关 ==========
@@ -170,6 +240,32 @@ export interface InvoiceVO {
   status?: string;
   statusName?: string;
   createTime?: string;
+  remark?: string;
+}
+
+// 运营台-发票上传/绑定管理列表 VO（对应后端 InvoiceManageVO）。
+// 金额 amount / 绑定台账号 ledgerOrderNo 派生自绑定台账 ledger；createByName 为上传人昵称。
+export interface InvoiceManageVO {
+  invoiceId?: number;
+  ledgerId?: number;
+  ledgerOrderNo?: string;
+  companyId?: number;
+  filePath?: string;
+  status?: string;
+  amount?: number;
+  createBy?: number;
+  createByName?: string;
+  createTime?: string;
+}
+
+// 运营台-发票上传请求体（对应后端 InvoiceUploadRequest）。
+// filePath 必填；其余可空，绑定台账时金额与归属企业以台账为准。
+export interface InvoiceUploadForm {
+  filePath?: string;
+  ledgerId?: number;
+  companyId?: number;
+  amount?: number;
+  status?: string;
   remark?: string;
 }
 
@@ -327,6 +423,78 @@ export interface DashboardQuery {
   type?: string;
 }
 
+// ========== 审计日志相关 ==========
+// 数据来源：后端 AdminAuditLogController(/admin/auditLog)，读取 rec_audit_log 表。
+// 字段与 com.ruoyi.project.domain.RecAuditLog 一一对应（operName/operTime/action/targetType/targetNo 等）。
+
+export interface AuditLogVO {
+  logId?: number;
+  operId?: number;
+  operName?: string;
+  operTime?: string;
+  action?: string;
+  targetType?: string;
+  targetNo?: string;
+  beforeStatus?: string;
+  afterStatus?: string;
+  detail?: string;
+  remark?: string;
+  createTime?: string;
+}
+
+// 审计日志检索条件。beginTime/endTime 基于 oper_time 过滤（后端 ge/le），
+// 由前端日期范围控件拆分后下发；operName 模糊匹配，其余精确匹配。
+export interface AuditLogQuery {
+  pageNum?: number;
+  pageSize?: number;
+  operName?: string;
+  operId?: number;
+  action?: string;
+  targetType?: string;
+  targetNo?: string;
+  beginTime?: string;
+  endTime?: string;
+}
+
+// ========== 企业审核历史相关 ==========
+// 数据来源：后端 AdminJobDetailController.getCompanyAuditHistory
+//   (GET /admin/recruitment/company/{companyId}/auditHistory) → CompanyAuditHistoryVO。
+// 聚合两份原始列表：auditLogs（rec_audit_log 操作留痕，复用 AuditLogVO 形状）
+// 与 certHistory（company_cert 历次认证材料与审核结论）。前端按时间渲染时间线 / 历史卡片。
+
+// company_cert 历次认证材料与审核结论，字段与后端 CompanyCert 实体一一对应。
+export interface CompanyCertVO {
+  certId?: number;
+  companyId?: number;
+  companyName?: string;
+  creditCode?: string;
+  legalPersonName?: string;
+  legalPersonPhone?: string;
+  registeredAddress?: string;
+  officeAddress?: string;
+  businessLicense?: string;
+  legalPersonIdFront?: string;
+  legalPersonIdBack?: string;
+  bankAccountProof?: string;
+  authLetter?: string;
+  // 办公场地实景照片，可能为逗号分隔的多图地址
+  officePhotos?: string;
+  // 认证状态 0:待审核 1:已通过 2:已拒绝
+  status?: string;
+  auditRemark?: string;
+  auditUserId?: number;
+  auditTime?: string;
+  createTime?: string;
+}
+
+export interface CompanyAuditHistoryVO {
+  companyId?: number;
+  // 操作留痕，后端已按 operTime 倒序
+  auditLogs?: AuditLogVO[];
+  // 认证历史，后端已按审核/创建时间倒序
+  certHistory?: CompanyCertVO[];
+}
+
 // ========== API 方法 ==========
 
 const baseUrl = '/admin/recruitment';
@@ -341,11 +509,19 @@ export function getCompany(companyId: number) {
   return request.get<any>(`${baseUrl}/company/${companyId}`);
 }
 
+// 企业审核历史（聚合 rec_audit_log 操作留痕 + company_cert 认证历史）。
+// 对应后端 AdminJobDetailController.getCompanyAuditHistory，供详情弹窗的「历史审核记录」展示。
+export function getCompanyAuditHistory(companyId: number) {
+  return request.get<CompanyAuditHistoryVO>(`${baseUrl}/company/${companyId}/auditHistory`);
+}
+
 export function auditCompany(data: { companyId: number; status: string; remark?: string }) {
   return request.post(`${baseUrl}/company/audit`, data);
 }
 
-export function changeCompanyStatus(data: { companyId: number; status: string }) {
+// 启用/禁用企业。后端将请求体反序列化为 Company 并 updateById，
+// 因此可携带可选 remark（驳回场景用作审核意见，随企业状态一并落库）。
+export function changeCompanyStatus(data: { companyId: number; status: string; remark?: string }) {
   return request.post(`${baseUrl}/company/changeStatus`, data);
 }
 
@@ -440,6 +616,12 @@ export function getJob(jobId: number) {
   return request.get<any>(`${baseUrl}/job/${jobId}`);
 }
 
+// 岗位完整字段详情（运营台审核用，含类目/学历/招聘人数/期望到岗时间/兼职工作时间/福利/团队介绍/附加条件）。
+// 对应后端 AdminJobDetailController.getJobFullDetail → GET /admin/recruitment/jobDetail/{jobId}，返回 R<JobFullVO>（数据走 res.data）。
+export function getJobFullDetail(jobId: number) {
+  return request.get<JobFullVO>(`${baseUrl}/jobDetail/${jobId}`);
+}
+
 export function auditJob(data: { jobId: number; status: string; remark?: string }) {
   return request.post(`${baseUrl}/job/audit`, data);
 }
@@ -480,6 +662,139 @@ export function markApplyRead(data: { applyId: number; isRead: string }) {
 
 export function getApplyStatistics() {
   return request.get<any>(`${baseUrl}/apply/statistics`);
+}
+
+// ---------- 运营台·投递查询增强（AdminApplyQueryController，路由 /admin/recruitment/apply2） ----------
+// 责任：在不动既有 /apply/** 的前提下，提供「多条件精确检索」与「单条投递全景详情」。
+// 与 /apply/list 区别：apply2/list 返回原始 Apply 实体（不含联表展示名），按编号/时间区间精确过滤。
+
+// 多条件精确检索入参（投递编号/企业编号/时间区间等，均可选）
+export interface Apply2Query {
+  pageNum?: number;
+  pageSize?: number;
+  applyId?: number; // 投递编号
+  companyId?: number; // 企业编号
+  userId?: number;
+  jobId?: number;
+  status?: string;
+  beginTime?: string; // 投递时间起，yyyy-MM-dd（后端按当天 00:00:00 闭区间）
+  endTime?: string; // 投递时间止，yyyy-MM-dd（后端按当天 23:59:59 闭区间）
+}
+
+// 投递全景详情 VO，结构与后端 ApplyDetailVO 对齐
+export interface ApplyDetailJobSeeker {
+  userId?: number;
+  userName?: string;
+  nickName?: string;
+  realName?: string;
+  phonenumber?: string;
+  email?: string;
+  sex?: string;
+  age?: number;
+  city?: string;
+  education?: string;
+  workYears?: number;
+  expectPosition?: string;
+  skills?: string;
+  summary?: string;
+  isRecruitmentSilenced?: string; // 0正常 1禁言
+}
+
+export interface ApplyDetailCompany {
+  companyId?: number;
+  companyName?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  status?: string; // 0待审核 1已认证 2已禁用
+  isSilenced?: string; // 0正常 1禁言中
+}
+
+export interface ApplyDetailJob {
+  jobId?: number;
+  jobName?: string;
+  jobType?: string; // 0全职 1兼职 2临时工 3项目制
+  salaryText?: string;
+  location?: string;
+  status?: string; // 0审核中 1已上架 2已下架
+}
+
+export interface ApplyStatusFlowItem {
+  node?: string; // applied/interview/result/exchange/notification
+  title?: string;
+  content?: string;
+  source?: string; // apply / notification
+  time?: string;
+}
+
+export interface ApplyInterviewItem {
+  notificationId?: number;
+  type?: string; // 2面试邀请 3面试结果
+  typeName?: string;
+  title?: string;
+  content?: string;
+  isRead?: string;
+  time?: string;
+}
+
+export interface ApplyExchangeItem {
+  id?: number;
+  exchangeType?: string; // phone / wechat
+  initiator?: string; // B招聘者发起 / C求职者发起
+  status?: string; // pending_request/accepted/rejected/exchanged/failed
+  statusName?: string;
+  recruiterId?: number;
+  jobSeekerId?: number;
+  recruiterContact?: string;
+  jobSeekerContact?: string;
+  isRead?: string;
+  createTime?: string;
+}
+
+export interface ApplyTaskItem {
+  taskId?: number;
+  status?: string; // 0进行中 1待核验 2已核验 3已驳回 4已结算
+  statusName?: string;
+  workTime?: string;
+  address?: string;
+  remark?: string;
+}
+
+export interface ApplySelectionResult {
+  selectionType?: string; // 1仅选用自行联系 2确认选用自行结算 3确认选用并签约
+  selectionTypeName?: string;
+  selected?: boolean;
+  tasks?: ApplyTaskItem[];
+}
+
+export interface ApplyDetailVO {
+  applyId?: number;
+  jobId?: number;
+  companyId?: number;
+  userId?: number;
+  applyTime?: string;
+  status?: string;
+  statusName?: string;
+  isRead?: string;
+  message?: string;
+  selectionType?: string;
+  selectionTypeName?: string;
+  jobSeeker?: ApplyDetailJobSeeker;
+  company?: ApplyDetailCompany;
+  job?: ApplyDetailJob;
+  statusFlow?: ApplyStatusFlowItem[];
+  interviews?: ApplyInterviewItem[];
+  exchangeRecords?: ApplyExchangeItem[];
+  selection?: ApplySelectionResult;
+}
+
+// 多条件精确分页查询（投递编号/企业编号/时间区间）→ TableDataInfo<Apply> 原始实体
+export function listApply2(query: Apply2Query) {
+  return request.get<any>(`${baseUrl}/apply2/list`, { params: query });
+}
+
+// 单条投递全景详情（状态流水/面试/交换/选用结果）→ R<ApplyDetailVO>
+export function getApply2Detail(applyId: number) {
+  return request.get<ApplyDetailVO>(`${baseUrl}/apply2/detail`, { params: { applyId } });
 }
 
 // ---------- 任务管理 ----------
@@ -532,6 +847,32 @@ export function getInvoiceStatistics() {
   return request.get<any>(`${baseUrl}/invoice/statistics`);
 }
 
+// ---------- 运营台·发票上传/绑定管理 ----------
+// 后端独立控制器 AdminInvoiceManageController，路由 /admin/invoice-manage（与上方 /admin/recruitment/invoice 区分）。
+// 责任：上传发票文件并关联台账、绑定/改绑台账、变更开票状态、分页查看（含金额/上传人/绑定台账号）。
+
+const invoiceManageBaseUrl = '/admin/invoice-manage';
+
+// 分页查询发票（含金额/上传人/上传时间/绑定台账号）
+export function listInvoiceManage(query: InvoiceQuery) {
+  return request.get<any>(`${invoiceManageBaseUrl}/list`, { params: query });
+}
+
+// 上传发票文件并关联台账，返回新发票ID
+export function uploadInvoiceManage(data: InvoiceUploadForm) {
+  return request.post<any>(`${invoiceManageBaseUrl}/upload`, data);
+}
+
+// 绑定（或改绑）发票到台账
+export function bindInvoiceManage(data: { invoiceId: number; ledgerId: number }) {
+  return request.post<any>(`${invoiceManageBaseUrl}/bind`, data);
+}
+
+// 变更发票开票状态（0未开票/1已开票/2已作废）
+export function markInvoiceManageStatus(data: { invoiceId: number; status: string }) {
+  return request.post<any>(`${invoiceManageBaseUrl}/markStatus`, data);
+}
+
 // ---------- 仪表盘 ----------
 
 export function getOverview() {
@@ -576,4 +917,137 @@ export function getUserTrend(params: { days?: number }) {
 
 export function getApplyStatusDistribution() {
   return request.get<any>(`${baseUrl}/dashboard/applyStatusDistribution`);
+}
+
+// ---------- 审计日志 ----------
+// 注意：审计日志接口挂在 /admin/auditLog 之下（不在 /admin/recruitment 下），故单独写绝对路径。
+
+const auditLogBaseUrl = '/admin/auditLog';
+
+// 列表：GET /admin/auditLog/list，返回 TableDataInfo(rows/total)
+export function listAuditLog(query: AuditLogQuery) {
+  return request.get<any>(`${auditLogBaseUrl}/list`, { params: query });
+}
+
+// 对象历史：GET /admin/auditLog/auditHistory，按 目标类型 + 目标编号 回溯
+export function getAuditHistory(params: { targetType: string; targetNo: string }) {
+  return request.get<any>(`${auditLogBaseUrl}/auditHistory`, { params });
+}
+
+// 导出 URL（POST /admin/auditLog/export，配合 utils/request 的 download 使用）
+export const auditLogExportUrl = `${auditLogBaseUrl}/export`;
+
+// ========== 运营台·内容配置（单例 / KV 配置中心）==========
+// 后端: AdminConfigController @RequestMapping("/admin/config")，@SaCheckRole("admin")。
+// 单例配置以 configKey 为唯一锚点 upsert；字典（行业/职位类目/福利标签）透传 sys_dict，不另建表。
+// 不在 /admin/recruitment 之下，故单独写绝对路径。
+
+const configBaseUrl = '/admin/config';
+
+// rec_config 表对象（与后端 com.ruoyi.project.domain.RecConfig 字段对齐）
+export interface RecConfigVO {
+  configId?: number;
+  // 业务唯一键，如 nav.c.home / popup.newcomer / msg.remind.early
+  configKey?: string;
+  // 配置值（纯文本或 JSON 字符串）
+  configValue?: string;
+  // 分组归类，如 nav / popup / message / template
+  configGroup?: string;
+  // 值类型提示：text 纯文本 / json JSON 字符串（仅前端渲染用）
+  valueType?: string;
+  // 配置名称 / 备注说明
+  remark?: string;
+  tenantId?: string;
+  createTime?: string;
+  updateTime?: string;
+}
+
+// 透传字典项（复用系统模块 sys_dict 的 SysDictDataVo 关键字段）
+export interface ConfigDictDataVO {
+  dictCode?: number;
+  dictSort?: number;
+  dictLabel?: string;
+  dictValue?: string;
+  dictType?: string;
+  cssClass?: string;
+  listClass?: string;
+  remark?: string;
+}
+
+// 按 key 读取单条配置：GET /admin/config/get?key=xxx，返回 R<RecConfig>，命中走 res.data（未命中为 null）
+export function getRecConfig(key: string) {
+  return request.get<RecConfigVO>(`${configBaseUrl}/get`, { params: { key } });
+}
+
+// 按 key upsert 写入配置：POST /admin/config/update，body=RecConfig（tenantId/configId 由后端兜底，前端无需传）
+export function updateRecConfig(data: RecConfigVO) {
+  return request.post<RecConfigVO>(`${configBaseUrl}/update`, data);
+}
+
+// 配置列表（分页，支持 configKey 模糊 / configGroup 过滤）：GET /admin/config/list，返回 TableDataInfo（rows/total）
+export function listRecConfig(query: { pageNum?: number; pageSize?: number; configKey?: string; configGroup?: string }) {
+  return request.get<RecConfigVO[]>(`${configBaseUrl}/list`, { params: query });
+}
+
+// 透传字典数据（按 dictType 读取：行业/职位类目/福利标签等）：GET /admin/config/dict/{dictType}，返回 R<List<SysDictDataVo>>
+export function listConfigDictData(dictType: string) {
+  return request.get<ConfigDictDataVO[]>(`${configBaseUrl}/dict/${dictType}`);
+}
+
+// ==================== 运营台·数据导出中心 — 各业务域导出端点 ====================
+// 说明：以下均为后端 POST 导出接口（blob 下载），供 views/recruitment/export.vue 配合
+//       utils/request 的全局 download(url, params, fileName) 使用。审计导出 URL
+//       auditLogExportUrl 已在上方审计日志段定义，此处不重复。
+//
+// 企业：POST /admin/recruitment/company/exportData（AdminRecruitmentController）
+export const companyExportUrl = `${baseUrl}/company/exportData`;
+// 岗位：POST /admin/recruitment/job/export
+export const jobExportUrl = `${baseUrl}/job/export`;
+// 投递：POST /admin/recruitment/apply/export
+export const applyExportUrl = `${baseUrl}/apply/export`;
+// 用户（求职者）：POST /admin/recruitment/user/export
+export const userExportUrl = `${baseUrl}/user/export`;
+// 任务（履约）：POST /admin/recruitment/export/task（AdminExportController）
+export const taskExportUrl = `${baseUrl}/export/task`;
+// 台账：POST /admin/recruitment/export/ledger
+export const ledgerExportUrl = `${baseUrl}/export/ledger`;
+// 发票：POST /admin/recruitment/export/invoice
+export const invoiceExportUrl = `${baseUrl}/export/invoice`;
+// ========== 运营台 · 运营统计聚合 ==========
+// 数据来源：后端 AdminOperationStatsController#statistics
+//   GET /admin/recruitment/operation/statistics?windowDays=30
+// 返回 R<OperationStatsVO>（项目 request 拦截器已解到响应体，业务载荷在 res.data）。
+// 字段口径见后端 OperationStatsVO：复访率 / 30 天留存率为基于 login_date 的活跃近似估算，
+// estimated=true 时应向用户提示为近似值，remark 给出口径说明。
+
+export interface OperationStatsVO {
+  // 新增主体（近 windowDays 天）
+  newJobSeekerCount: number; // 新增求职者数（sys_user user_type=C）
+  newCompanyCount: number; // 新增企业数
+  windowDays: number; // 新增主体的统计窗口天数（默认 30）
+  // 企业 / 岗位审核通过率（通过 / (通过 + 驳回)，百分比；无独立驳回态时以禁用/下架近似）
+  companyApprovedCount: number;
+  companyRejectedCount: number;
+  companyApprovalRate: number; // 百分比，如 66.67
+  jobApprovedCount: number;
+  jobRejectedCount: number;
+  jobApprovalRate: number; // 百分比
+  // 业务漏斗计数
+  applyCount: number; // 投递数
+  interviewInviteCount: number; // 面试邀请数（apply.status=1）
+  partTimeSelectionCount: number; // 兼职选用数（apply.selection_type 非空）
+  fulfillmentCompletedCount: number; // 履约完成数（task.status in 2,4）
+  ledgerGeneratedCount: number; // 台账生成数
+  invoiceUploadedCount: number; // 发票上传数（invoice.file_path 非空）
+  // 估算指标（非精确，依赖缺失的行为埋点）
+  revisitRate: number; // 复访率（估算，百分比）
+  retentionRate: number; // 30 天留存率（估算，百分比）
+  // 元信息
+  estimated: boolean; // 是否包含估算值（revisitRate / retentionRate 估算时为 true）
+  remark: string; // 口径与估算说明
+}
+
+// 运营统计聚合查询：windowDays 控制「新增主体」统计窗口，后端默认 30。
+export function getOperationStatistics(params?: { windowDays?: number }) {
+  return request.get<OperationStatsVO>(`${baseUrl}/operation/statistics`, { params });
 }

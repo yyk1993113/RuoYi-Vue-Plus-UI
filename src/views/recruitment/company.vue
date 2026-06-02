@@ -172,56 +172,182 @@
       />
     </el-card>
 
-    <!-- 企业详情对话框 -->
-    <el-dialog v-model="detailVisible" title="企业详情" width="700px" append-to-body>
-      <el-descriptions :column="2" border v-if="currentCompany">
-        <el-descriptions-item label="企业ID">{{ currentCompany.companyId }}</el-descriptions-item>
-        <el-descriptions-item label="企业状态">
-          <el-tag v-if="currentCompany.status === '0'" type="warning">待审核</el-tag>
-          <el-tag v-else-if="currentCompany.status === '1'" type="success">已认证</el-tag>
-          <el-tag v-else type="danger">已禁用</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="企业名称" :span="2">{{ currentCompany.companyName }}</el-descriptions-item>
-        <el-descriptions-item label="企业描述" :span="2">{{ currentCompany.description || '无' }}</el-descriptions-item>
-        <el-descriptions-item label="联系人">{{ currentCompany.contactPerson || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="联系电话">{{ currentCompany.contactPhone || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="职位数量">{{ currentCompany.jobCount || 0 }}</el-descriptions-item>
-        <el-descriptions-item label="投递总数">{{ currentCompany.applyCount || 0 }}</el-descriptions-item>
-        <el-descriptions-item label="禁言状态">
-          <el-tag v-if="currentCompany.isSilenced === '1'" type="danger">已禁言</el-tag>
-          <el-tag v-else type="info">正常</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="禁言原因" v-if="currentCompany.isSilenced === '1'">
-          {{ currentCompany.silenceReason || '无' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="禁言时间" v-if="currentCompany.isSilenced === '1'">
-          {{ currentCompany.silenceTime || '-' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="注册时间">{{ currentCompany.createTime }}</el-descriptions-item>
-        <el-descriptions-item label="更新时间">{{ currentCompany.updateTime }}</el-descriptions-item>
-        <el-descriptions-item label="备注" :span="2">{{ currentCompany.remark || '无' }}</el-descriptions-item>
-      </el-descriptions>
+    <!-- 企业详情对话框：主体信息 + 资质图片 + 历史审核记录 -->
+    <el-dialog v-model="detailVisible" title="企业详情" width="820px" append-to-body>
+      <div v-if="currentCompany">
+        <!-- 主体信息 -->
+        <el-descriptions title="主体信息" :column="2" border>
+          <el-descriptions-item label="企业ID">{{ currentCompany.companyId }}</el-descriptions-item>
+          <el-descriptions-item label="企业状态">
+            <el-tag v-if="currentCompany.status === '0'" type="warning">待审核</el-tag>
+            <el-tag v-else-if="currentCompany.status === '1'" type="success">已认证</el-tag>
+            <el-tag v-else type="danger">已禁用</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="企业名称" :span="2">{{ currentCompany.companyName }}</el-descriptions-item>
+          <el-descriptions-item label="企业描述" :span="2">{{ currentCompany.description || '无' }}</el-descriptions-item>
+          <el-descriptions-item label="联系人">{{ currentCompany.contactPerson || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="联系电话">{{ currentCompany.contactPhone || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="联系微信">{{ currentCompany.contactWechat || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="创建人ID">{{ currentCompany.userId || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="职位数量">{{ currentCompany.jobCount || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="投递总数">{{ currentCompany.applyCount || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="禁言状态">
+            <el-tag v-if="currentCompany.isSilenced === '1'" type="danger">已禁言</el-tag>
+            <el-tag v-else type="info">正常</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="禁言时间" v-if="currentCompany.isSilenced === '1'">
+            {{ currentCompany.silenceTime || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="禁言原因" :span="2" v-if="currentCompany.isSilenced === '1'">
+            {{ currentCompany.silenceReason || '无' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="注册时间">{{ currentCompany.createTime }}</el-descriptions-item>
+          <el-descriptions-item label="更新时间">{{ currentCompany.updateTime }}</el-descriptions-item>
+          <el-descriptions-item label="备注/审核意见" :span="2">{{ currentCompany.remark || '无' }}</el-descriptions-item>
+        </el-descriptions>
+
+        <!-- 资质图片：企业 Logo 与营业执照（来自 company 表，点击可放大预览） -->
+        <div class="section-title">资质图片</div>
+        <div class="cert-images">
+          <div class="cert-item">
+            <div class="cert-label">企业 Logo</div>
+            <el-image
+              v-if="currentCompany.logoUrl"
+              :src="currentCompany.logoUrl"
+              :preview-src-list="[currentCompany.logoUrl]"
+              :preview-teleported="true"
+              fit="cover"
+              class="cert-img"
+            />
+            <div v-else class="cert-empty">未上传</div>
+          </div>
+          <div class="cert-item">
+            <div class="cert-label">营业执照</div>
+            <el-image
+              v-if="currentCompany.businessLicense"
+              :src="currentCompany.businessLicense"
+              :preview-src-list="[currentCompany.businessLicense]"
+              :preview-teleported="true"
+              fit="cover"
+              class="cert-img"
+            />
+            <div v-else class="cert-empty">未上传</div>
+          </div>
+        </div>
+
+        <!-- 历史审核记录：聚合 rec_audit_log 操作留痕 + company_cert 认证历史 -->
+        <div class="section-title">历史审核记录</div>
+        <el-tabs v-model="historyTab" v-loading="historyLoading">
+          <!-- 操作留痕时间线（运营端审核/状态变更/禁言等关键操作） -->
+          <el-tab-pane label="操作留痕" name="logs">
+            <el-empty v-if="!auditHistory.auditLogs || auditHistory.auditLogs.length === 0" description="暂无操作留痕" :image-size="80" />
+            <el-timeline v-else>
+              <el-timeline-item
+                v-for="log in auditHistory.auditLogs"
+                :key="log.logId"
+                :timestamp="log.operTime"
+                placement="top"
+                :type="auditLogDotType(log.action)"
+              >
+                <div class="log-line">
+                  <el-tag size="small" :type="auditLogDotType(log.action)">{{ log.action || '操作' }}</el-tag>
+                  <span class="log-oper">{{ log.operName || '系统' }}</span>
+                  <span v-if="log.beforeStatus || log.afterStatus" class="log-status">
+                    {{ log.beforeStatus || '-' }} → {{ log.afterStatus || '-' }}
+                  </span>
+                </div>
+                <div v-if="log.detail" class="log-detail">{{ log.detail }}</div>
+                <div v-if="log.remark" class="log-detail">备注：{{ log.remark }}</div>
+              </el-timeline-item>
+            </el-timeline>
+          </el-tab-pane>
+
+          <!-- 认证历史：历次提交的认证材料与审核结论 -->
+          <el-tab-pane label="认证历史" name="certs">
+            <el-empty v-if="!auditHistory.certHistory || auditHistory.certHistory.length === 0" description="暂无认证记录" :image-size="80" />
+            <el-card v-for="cert in auditHistory.certHistory" :key="cert.certId" shadow="never" class="cert-card">
+              <div class="cert-card-header">
+                <span class="cert-card-title">认证 #{{ cert.certId }}</span>
+                <el-tag v-if="cert.status === '0'" type="warning" size="small">待审核</el-tag>
+                <el-tag v-else-if="cert.status === '1'" type="success" size="small">已通过</el-tag>
+                <el-tag v-else type="danger" size="small">已拒绝</el-tag>
+                <span class="cert-card-time">{{ cert.auditTime || cert.createTime || '' }}</span>
+              </div>
+              <el-descriptions :column="2" border size="small">
+                <el-descriptions-item label="企业全称">{{ cert.companyName || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="统一社会信用代码">{{ cert.creditCode || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="法定代表人">{{ cert.legalPersonName || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="法人手机号">{{ cert.legalPersonPhone || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="注册地址" :span="2">{{ cert.registeredAddress || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="办公地址" :span="2">{{ cert.officeAddress || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="审核意见" :span="2">{{ cert.auditRemark || '-' }}</el-descriptions-item>
+              </el-descriptions>
+              <!-- 认证材料图片：营业执照 / 法人身份证正反面 / 对公账户凭证 / 授权书 / 办公实景（可多图） -->
+              <div class="cert-images cert-images-wrap">
+                <div v-for="img in certImageList(cert)" :key="img.label + img.url" class="cert-item">
+                  <div class="cert-label">{{ img.label }}</div>
+                  <el-image
+                    :src="img.url"
+                    :preview-src-list="certPreviewList(cert)"
+                    :initial-index="img.index"
+                    :preview-teleported="true"
+                    fit="cover"
+                    class="cert-img cert-img-sm"
+                  />
+                </div>
+                <div v-if="certImageList(cert).length === 0" class="cert-empty">未上传认证材料</div>
+              </div>
+            </el-card>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
       </template>
     </el-dialog>
 
-    <!-- 审核对话框 -->
+    <!-- 审核对话框：通过走 /company/audit（后端固定置为已认证并生成企业编号）；驳回走 /company/changeStatus（status=2，原因写入 remark） -->
     <el-dialog v-model="auditVisible" title="企业审核" width="500px" append-to-body>
-      <el-form ref="auditFormRef" :model="auditForm" label-width="80px">
-        <el-form-item label="审核结果">
+      <el-form ref="auditFormRef" :model="auditForm" :rules="auditRules" label-width="80px">
+        <el-form-item label="企业名称">
+          <el-input :model-value="auditForm.companyName" disabled />
+        </el-form-item>
+        <el-form-item label="审核结果" prop="status">
           <el-radio-group v-model="auditForm.status">
             <el-radio label="1">审核通过</el-radio>
             <el-radio label="2">审核拒绝</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="auditForm.remark" type="textarea" :rows="3" placeholder="请输入审核备注" />
+        <!-- 通过提示：认证通过后系统将为该企业生成正式企业编号 -->
+        <el-alert
+          v-if="auditForm.status === '1'"
+          type="success"
+          :closable="false"
+          show-icon
+          title="审核通过后，系统将自动为该企业生成企业编号并标记为已认证。"
+          style="margin-bottom: 16px"
+        />
+        <!-- 驳回必填原因：原因将作为审核意见记录到企业备注，便于企业端查看整改 -->
+        <el-form-item v-if="auditForm.status === '2'" label="驳回原因" prop="remark">
+          <el-input
+            v-model="auditForm.remark"
+            type="textarea"
+            :rows="3"
+            placeholder="请填写驳回原因，将同步告知企业用于整改"
+            maxlength="200"
+            show-word-limit
+          />
+        </el-form-item>
+        <!-- 通过时备注选填 -->
+        <el-form-item v-else label="备注">
+          <el-input v-model="auditForm.remark" type="textarea" :rows="3" placeholder="可填写审核备注（选填）" maxlength="200" show-word-limit />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="auditVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitAudit">确认</el-button>
+        <el-button :type="auditForm.status === '2' ? 'danger' : 'primary'" :loading="auditSubmitting" @click="submitAudit">
+          {{ auditForm.status === '2' ? '确认驳回' : '确认通过' }}
+        </el-button>
       </template>
     </el-dialog>
 
@@ -255,9 +381,20 @@
 
 <script setup name="CompanyManagement" lang="ts">
 import { ref, reactive, onMounted } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, type FormRules } from 'element-plus';
 import { Download } from '@element-plus/icons-vue';
-import { listCompany, getCompanyStatistics, getCompany, auditCompany, changeCompanyStatus, silenceCompany, unsilenceCompany } from '@/api/recruitment';
+import {
+  listCompany,
+  getCompanyStatistics,
+  getCompany,
+  getCompanyAuditHistory,
+  auditCompany,
+  changeCompanyStatus,
+  silenceCompany,
+  unsilenceCompany,
+  type CompanyAuditHistoryVO,
+  type CompanyCertVO,
+} from '@/api/recruitment';
 import { download } from '@/utils/request';
 
 const loading = ref(false);
@@ -270,6 +407,15 @@ const currentCompany = ref<any>(null);
 const queryFormRef = ref();
 const auditFormRef = ref();
 const silenceFormRef = ref();
+
+// 审核提交中标志，防止重复提交（通过/驳回均复用）
+const auditSubmitting = ref(false);
+
+// ===== 历史审核记录（详情弹窗）=====
+// 数据来源：getCompanyAuditHistory → CompanyAuditHistoryVO，聚合 rec_audit_log 与 company_cert。
+const historyTab = ref('logs');
+const historyLoading = ref(false);
+const auditHistory = ref<CompanyAuditHistoryVO>({ auditLogs: [], certHistory: [] });
 
 const queryParams = reactive({
   pageNum: 1,
@@ -289,8 +435,26 @@ const statistics = reactive({
 
 const auditForm = reactive({
   companyId: 0,
+  companyName: '',
   status: '1',
   remark: '',
+});
+
+// 审核校验：驳回时原因必填（status==='2' 才校验 remark），通过时备注选填。
+const auditRules = reactive<FormRules>({
+  status: [{ required: true, message: '请选择审核结果', trigger: 'change' }],
+  remark: [
+    {
+      validator: (_rule, value, callback) => {
+        if (auditForm.status === '2' && !String(value || '').trim()) {
+          callback(new Error('驳回时必须填写驳回原因'));
+        } else {
+          callback();
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
 });
 
 const silenceForm = reactive({
@@ -338,28 +502,96 @@ async function handleDetail(row: any) {
   try {
     const res = await getCompany(row.companyId);
     currentCompany.value = res.data;
+    historyTab.value = 'logs';
     detailVisible.value = true;
+    // 并行加载历史审核记录（操作留痕 + 认证历史），失败不阻断详情展示
+    loadAuditHistory(row.companyId);
   } catch (error) {
     ElMessage.error('获取企业详情失败');
   }
 }
 
+// 加载企业审核历史；后端已分别按时间倒序，前端直接渲染。
+async function loadAuditHistory(companyId: number) {
+  historyLoading.value = true;
+  auditHistory.value = { auditLogs: [], certHistory: [] };
+  try {
+    const res = await getCompanyAuditHistory(companyId);
+    auditHistory.value = res.data || { auditLogs: [], certHistory: [] };
+  } catch (error) {
+    console.error('审核历史加载失败:', error);
+  } finally {
+    historyLoading.value = false;
+  }
+}
+
+// 按操作动作给时间线节点上色：审核/通过=绿，驳回/拒绝/禁言/禁用=红，其余=主色蓝。
+function auditLogDotType(action?: string): 'primary' | 'success' | 'warning' | 'danger' | 'info' {
+  const a = action || '';
+  if (/拒绝|驳回|禁言|禁用|删除/.test(a)) return 'danger';
+  if (/通过|认证|启用|解禁/.test(a)) return 'success';
+  if (/导出|状态/.test(a)) return 'warning';
+  return 'primary';
+}
+
+// 认证材料图片清单（带标签 + 在合并预览列表中的索引）。officePhotos 可能为逗号分隔多图。
+function certImageList(cert: CompanyCertVO): { label: string; url: string; index: number }[] {
+  const list: { label: string; url: string }[] = [];
+  const push = (label: string, url?: string) => {
+    if (url && String(url).trim()) list.push({ label, url: String(url).trim() });
+  };
+  push('营业执照', cert.businessLicense);
+  push('法人身份证(正)', cert.legalPersonIdFront);
+  push('法人身份证(反)', cert.legalPersonIdBack);
+  push('对公账户凭证', cert.bankAccountProof);
+  push('招聘授权书', cert.authLetter);
+  (cert.officePhotos ? String(cert.officePhotos).split(',') : [])
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .forEach((url, i) => push(`办公实景${i + 1}`, url));
+  return list.map((item, index) => ({ ...item, index }));
+}
+
+// 单条认证记录的预览图地址列表（与 certImageList 顺序一致，供 el-image 放大轮播）。
+function certPreviewList(cert: CompanyCertVO): string[] {
+  return certImageList(cert).map((i) => i.url);
+}
+
 function handleAudit(row: any, status: string) {
   auditForm.companyId = row.companyId;
+  auditForm.companyName = row.companyName;
   auditForm.status = status;
   auditForm.remark = '';
   auditVisible.value = true;
+  // 清除上一次的校验态，避免残留红框
+  auditFormRef.value?.clearValidate?.();
 }
 
 async function submitAudit() {
+  // 通过/驳回均先过表单校验（驳回原因必填由 auditRules 兜底）
   try {
-    await auditCompany(auditForm);
-    ElMessage.success('审核成功');
+    await auditFormRef.value?.validate?.();
+  } catch {
+    return;
+  }
+  auditSubmitting.value = true;
+  try {
+    if (auditForm.status === '2') {
+      // 驳回：/company/audit 后端固定置为已认证，不能用于驳回；改走 changeStatus 置为已禁用(2)，原因写入 remark。
+      await changeCompanyStatus({ companyId: auditForm.companyId, status: '2', remark: auditForm.remark });
+      ElMessage.success('已驳回该企业认证');
+    } else {
+      // 通过：/company/audit 后端置为已认证并生成企业编号
+      await auditCompany({ companyId: auditForm.companyId, status: '1', remark: auditForm.remark });
+      ElMessage.success('审核通过，已生成企业编号');
+    }
     auditVisible.value = false;
     loadData();
     loadStatistics();
   } catch (error) {
-    ElMessage.error('审核失败');
+    ElMessage.error('审核提交失败');
+  } finally {
+    auditSubmitting.value = false;
   }
 }
 
@@ -493,5 +725,111 @@ function handleExport() {
   color: var(--el-color-primary);
   display: flex;
   align-items: center;
+}
+
+/* 详情弹窗：分区标题，主色贴近 #2b7fff */
+.section-title {
+  margin: 20px 0 12px;
+  padding-left: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  border-left: 4px solid #2b7fff;
+}
+
+/* 资质图片网格（企业 Logo / 营业执照 / 认证材料） */
+.cert-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.cert-images-wrap {
+  margin-top: 12px;
+}
+
+.cert-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cert-label {
+  font-size: 12px;
+  color: #909399;
+}
+
+.cert-img {
+  width: 140px;
+  height: 100px;
+  border-radius: 6px;
+  border: 1px solid #ebeef5;
+  background: #f5f7fa;
+}
+
+.cert-img-sm {
+  width: 110px;
+  height: 80px;
+}
+
+.cert-empty {
+  width: 140px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #c0c4cc;
+  border: 1px dashed #dcdfe6;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+/* 认证历史卡片 */
+.cert-card {
+  margin-bottom: 12px;
+  border: 1px solid #ebeef5;
+}
+
+.cert-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cert-card-title {
+  font-weight: 600;
+  color: #303133;
+}
+
+.cert-card-time {
+  margin-left: auto;
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 操作留痕时间线 */
+.log-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.log-oper {
+  font-weight: 600;
+  color: #303133;
+}
+
+.log-status {
+  font-size: 12px;
+  color: #909399;
+}
+
+.log-detail {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.5;
 }
 </style>
