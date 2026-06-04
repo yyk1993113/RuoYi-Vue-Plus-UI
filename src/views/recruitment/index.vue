@@ -120,6 +120,80 @@
       </el-col>
     </el-row>
 
+    <!-- ========== 区块一·补：今日待办 + 风险提醒（文档2 §四 工作台）========== -->
+    <el-row :gutter="16" class="mb-4">
+      <!-- 今日待办：三张可点卡片，点击跳对应审核/发票页 -->
+      <el-col :xs="24" :lg="12">
+        <el-card shadow="hover" class="worklist-card">
+          <template #header>
+            <div class="card-header">
+              <span>今日待办</span>
+            </div>
+          </template>
+          <el-row :gutter="12">
+            <!-- 待审核企业 → 企业管理（默认筛待审核 status=0） -->
+            <el-col :span="8">
+              <div class="todo-cell" @click="navigateTo('/recruitment/company?status=0')">
+                <div class="todo-value primary">{{ worklist.pendingCompanies || 0 }}</div>
+                <div class="todo-label"><el-icon><OfficeBuilding /></el-icon> 待审核企业</div>
+              </div>
+            </el-col>
+            <!-- 待审核岗位 → 岗位管理（默认筛待审核 status=0） -->
+            <el-col :span="8">
+              <div class="todo-cell" @click="navigateTo('/recruitment/job?status=0')">
+                <div class="todo-value warning">{{ worklist.pendingJobs || 0 }}</div>
+                <div class="todo-label"><el-icon><Briefcase /></el-icon> 待审核岗位</div>
+              </div>
+            </el-col>
+            <!-- 待上传发票 → 发票管理 -->
+            <el-col :span="8">
+              <div class="todo-cell" @click="navigateTo('/recruitment/invoice')">
+                <div class="todo-value danger">{{ worklist.pendingInvoices || 0 }}</div>
+                <div class="todo-label"><el-icon><Tickets /></el-icon> 待上传发票</div>
+              </div>
+            </el-col>
+          </el-row>
+        </el-card>
+      </el-col>
+
+      <!-- 风险提醒：渲染 riskAlerts（动作 + 对象 + 操作人 + 时间） -->
+      <el-col :xs="24" :lg="12">
+        <el-card shadow="hover" class="risk-card">
+          <template #header>
+            <div class="card-header">
+              <span>风险提醒</span>
+              <el-badge :value="worklist.riskAlerts.length" type="danger" :hidden="worklist.riskAlerts.length === 0" />
+            </div>
+          </template>
+          <el-table
+            v-if="worklist.riskAlerts.length > 0"
+            :data="worklist.riskAlerts"
+            stripe
+            size="small"
+            max-height="220"
+          >
+            <el-table-column prop="action" label="动作" min-width="90" show-overflow-tooltip>
+              <template #default="{ row }">
+                <el-tag type="danger" size="small" effect="plain">{{ row.action || '-' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="对象" min-width="120" show-overflow-tooltip>
+              <template #default="{ row }">
+                {{ riskTarget(row) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="operName" label="操作人" width="90" show-overflow-tooltip />
+            <el-table-column prop="operTime" label="时间" width="100">
+              <template #default="{ row }">
+                {{ formatDate(row.operTime || '') }}
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-else description="暂无风险提醒" :image-size="60" />
+        </el-card>
+      </el-col>
+    </el-row>
+
     <!-- ========== 区块二：图表区 ========== -->
     <el-row :gutter="16" class="mb-4">
       <!-- 投递趋势折线图 -->
@@ -287,9 +361,13 @@ import {
   Warning,
   Top,
   InfoFilled,
+  OfficeBuilding,
+  Briefcase,
+  Tickets,
 } from '@element-plus/icons-vue';
 import {
   getOverview,
+  getWorklist,
   getApplyTrend,
   getJobTypeDistribution,
   getHotJobs,
@@ -301,7 +379,7 @@ import {
   getUserTrend,
   getApplyStatusDistribution,
 } from '@/api/recruitment';
-import type { RecruitmentOverview, ApplyTrend, JobTypeDistribution, HotJobVO, ExceptionApplyVO } from '@/api/recruitment';
+import type { RecruitmentOverview, ApplyTrend, JobTypeDistribution, HotJobVO, ExceptionApplyVO, DashboardWorklistVO, WorklistRiskAlert } from '@/api/recruitment';
 import { ElMessage } from 'element-plus';
 import { formatDate as formatDateUtil } from '@/utils';
 import { unwrapList } from './helpers';
@@ -334,6 +412,14 @@ const hotJobType = ref('apply');
 
 // 数据
 const overview = reactive<RecruitmentOverview>({} as RecruitmentOverview);
+// 工作台「今日待办 + 风险提醒」数据（来源 getWorklist → /dashboard/worklist）。
+// riskAlerts 预置为空数组，模板内可安全读取 .length，避免首屏未加载时报错。
+const worklist = reactive<DashboardWorklistVO>({
+  pendingCompanies: 0,
+  pendingJobs: 0,
+  pendingInvoices: 0,
+  riskAlerts: [],
+});
 const applyTrendData = ref<ApplyTrend[]>([]);
 const companyTrendData = ref<ApplyTrend[]>([]);
 const userTrendData = ref<ApplyTrend[]>([]);
@@ -353,6 +439,14 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null;
 function formatDate(val: string) {
   if (!val) return '-';
   return formatDateUtil(val);
+}
+
+// 风险提醒「对象」列拼接：对象类型 + 编号（如「企业 #123」），两者缺失时回退到占位符。
+function riskTarget(row: WorklistRiskAlert) {
+  const type = row.targetType || '';
+  const no = row.targetNo ? `#${row.targetNo}` : '';
+  const text = `${type} ${no}`.trim();
+  return text || '-';
 }
 
 // echarts 分类调色板：职位类型分布图与热门职位图共用基础配色，避免两处各写一份
@@ -481,10 +575,11 @@ async function loadAllData() {
   loading.value = true;
   try {
     const days = Number(timeRange.value);
-    const [overviewRes, applyTrendRes, jobTypeRes, hotJobsRes,
+    const [overviewRes, worklistRes, applyTrendRes, jobTypeRes, hotJobsRes,
            exchangeRes, exceptionRes, recentJobsRes, recentAppliesRes,
            companyTrendRes, userTrendRes, applyStatusRes] = await Promise.all([
       getOverview(),
+      getWorklist(),
       getApplyTrend(days),
       getJobTypeDistribution(),
       getHotJobs({ limit: 10, type: hotJobType.value }),
@@ -498,6 +593,14 @@ async function loadAllData() {
     ]);
 
     Object.assign(overview, overviewRes.data || {});
+    // 工作台待办/风险：后端载荷在 res.data；riskAlerts 兜底为空数组防止模板读取报错
+    const wl = (worklistRes.data || {}) as Partial<DashboardWorklistVO>;
+    Object.assign(worklist, {
+      pendingCompanies: wl.pendingCompanies || 0,
+      pendingJobs: wl.pendingJobs || 0,
+      pendingInvoices: wl.pendingInvoices || 0,
+      riskAlerts: wl.riskAlerts || [],
+    });
     applyTrendData.value = applyTrendRes.data || [];
     companyTrendData.value = companyTrendRes.data || [];
     userTrendData.value = userTrendRes.data || [];
@@ -692,6 +795,38 @@ onUnmounted(() => {
 .kpi-trend.up    { color: #67C23A; }
 .kpi-trend.down { color: #F56C6C; }
 .kpi-trend.neutral { color: #909399; }
+
+/* ---------- 今日待办 / 风险提醒 ---------- */
+/* 待办单元格：可点击跳转对应审核/发票页，悬停轻微抬升提示可交互 */
+.todo-cell {
+  cursor: pointer;
+  text-align: center;
+  padding: 10px 4px;
+  border-radius: 8px;
+  transition: all 0.25s;
+}
+.todo-cell:hover {
+  background-color: #f5f7fa;
+  transform: translateY(-2px);
+}
+.todo-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.todo-value.primary { color: #409EFF; }
+.todo-value.warning { color: #E6A23C; }
+.todo-value.danger  { color: #F56C6C; }
+.todo-label {
+  font-size: 12px;
+  color: #606266;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.todo-label .el-icon { font-size: 13px; }
 
 /* ---------- 卡片头部 ---------- */
 .card-header {

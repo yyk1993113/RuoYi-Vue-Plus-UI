@@ -280,6 +280,32 @@ export interface InvoiceUploadForm {
 
 // ========== 综合概览 ==========
 
+// 工作台「今日待办 + 风险提醒」VO（对应后端 GET /admin/recruitment/dashboard/worklist）。
+// 数据来源：后端 dashboard/worklist 聚合三类待办计数 + 近期高风险操作留痕（取自 rec_audit_log）。
+// - pendingCompanies/pendingJobs/pendingInvoices：三张可点待办卡片的角标数字（点击跳对应审核/发票页）。
+// - riskAlerts：风险提醒列表项，结构复用审计留痕字段（action 动作 / targetType 对象类型 /
+//   targetNo 对象编号 / operName 操作人 / operTime 时间），其余后端附带字段宽松接收。
+export interface WorklistRiskAlert {
+  action?: string;
+  targetType?: string;
+  targetNo?: string;
+  operName?: string;
+  operTime?: string;
+  // 后端可能附带的其它留痕字段（detail/remark 等），保持宽松不强约束
+  [key: string]: any;
+}
+
+export interface DashboardWorklistVO {
+  // 待审核企业数（待办卡片）
+  pendingCompanies: number;
+  // 待审核岗位数（待办卡片）
+  pendingJobs: number;
+  // 待上传发票数（待办卡片）
+  pendingInvoices: number;
+  // 风险提醒列表（近期高风险操作留痕）
+  riskAlerts: WorklistRiskAlert[];
+}
+
 export interface RecruitmentOverview {
   totalCompanies: number;
   pendingCompanies: number;
@@ -886,6 +912,12 @@ export function markInvoiceManageStatus(data: { invoiceId: number; status: strin
 
 export function getOverview() {
   return request.get<any>(`${baseUrl}/dashboard/overview`);
+}
+
+// 工作台「今日待办 + 风险提醒」：GET /admin/recruitment/dashboard/worklist。
+// 返回 R<DashboardWorklistVO>（业务载荷在 res.data）：三类待办计数 + riskAlerts 风险留痕列表。
+export function getWorklist() {
+  return request.get<DashboardWorklistVO>(`${baseUrl}/dashboard/worklist`);
 }
 
 export function getApplyTrend(days: number = 7) {
