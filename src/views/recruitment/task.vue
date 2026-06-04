@@ -109,11 +109,7 @@
         <el-table-column label="工作时间" prop="workTime" width="160" align="center" />
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.status === '0'" type="primary" size="small">进行中</el-tag>
-            <el-tag v-else-if="row.status === '1'" type="warning" size="small">待核验</el-tag>
-            <el-tag v-else-if="row.status === '2'" type="success" size="small">已通过</el-tag>
-            <el-tag v-else-if="row.status === '3'" type="danger" size="small">已拒绝</el-tag>
-            <el-tag v-else type="info" size="small">已结算</el-tag>
+            <el-tag :type="taskStatusMeta(row.status).type" size="small">{{ taskStatusMeta(row.status).label }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="160" fixed="right" align="center">
@@ -141,11 +137,7 @@
       <el-descriptions :column="2" border v-if="currentTask">
         <el-descriptions-item label="任务ID">{{ currentTask.taskId }}</el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag v-if="currentTask.status === '0'" type="primary">进行中</el-tag>
-          <el-tag v-else-if="currentTask.status === '1'" type="warning">待核验</el-tag>
-          <el-tag v-else-if="currentTask.status === '2'" type="success">已通过</el-tag>
-          <el-tag v-else-if="currentTask.status === '3'" type="danger">已拒绝</el-tag>
-          <el-tag v-else type="info">已结算</el-tag>
+          <el-tag :type="taskStatusMeta(currentTask.status).type">{{ taskStatusMeta(currentTask.status).label }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="求职者">{{ currentTask.workerName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="联系电话">{{ currentTask.workerPhone || '-' }}</el-descriptions-item>
@@ -164,11 +156,12 @@
       <div v-if="currentTask?.photoPath" class="photo-section">
         <div class="photo-title">工作照片</div>
         <div class="photo-list">
+          <!-- 工作照片：photoPath 为逗号分隔多图地址，统一切割一次（原模板对同串 split 了两次） -->
           <el-image
-            v-for="(photo, index) in currentTask.photoPath.split(',')"
+            v-for="(photo, index) in taskPhotos"
             :key="index"
             :src="photo"
-            :preview-src-list="currentTask.photoPath.split(',')"
+            :preview-src-list="taskPhotos"
             style="width: 120px; height: 120px; border-radius: 8px; margin-right: 8px"
             fit="cover"
           />
@@ -201,10 +194,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Refresh } from '@element-plus/icons-vue';
 import { listTask, getTaskStatistics, getTask, verifyTask } from '@/api/recruitment';
+import { unwrapList, splitToArray } from './helpers';
+import { taskStatusMeta } from './constants';
 
 const loading = ref(false);
 const total = ref(0);
@@ -241,12 +236,16 @@ const verifyForm = reactive({
   remark: '',
 });
 
+// 当前任务的工作照片列表（逗号分隔地址 → 数组），供详情弹窗图片墙与预览复用，避免模板内重复 split
+const taskPhotos = computed(() => splitToArray(currentTask.value?.photoPath));
+
 async function loadData() {
   loading.value = true;
   try {
     const res = await listTask(queryParams);
-    tableData.value = res.data?.rows || res.rows || [];
-    total.value = res.data?.total || res.total || 0;
+    const list = unwrapList(res);
+    tableData.value = list.rows;
+    total.value = list.total;
   } catch (error) {
     console.error('加载数据失败:', error);
   } finally {

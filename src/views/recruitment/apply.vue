@@ -231,7 +231,7 @@
           <div class="header-right">
             <div class="status-badge" :class="'status-' + detail.status">
               <div class="status-dot"></div>
-              {{ detail.statusName || getStatusLabel(detail.status) }}
+              {{ detail.statusName || applyStatusMeta(detail.status).label }}
             </div>
             <div class="time-label">{{ formatTime(detail.applyTime) }} 投递</div>
           </div>
@@ -278,7 +278,7 @@
                   <el-icon><View /></el-icon> 技能标签
                 </div>
                 <div class="skill-tags">
-                  <el-tag v-for="item in (seeker.skills || '').split(',').filter((s) => s)" :key="item" class="skill-tag" effect="light" round>
+                  <el-tag v-for="item in splitToArray(seeker.skills)" :key="item" class="skill-tag" effect="light" round>
                     {{ item }}
                   </el-tag>
                   <span v-if="!seeker.skills" class="empty-text">暂无技能标签</span>
@@ -476,6 +476,8 @@ import {
 import { listApply, listApply2, getApplyStatistics, getApply2Detail } from '@/api/recruitment';
 import type { ApplyDetailVO } from '@/api/recruitment';
 import { download } from '@/utils/request';
+import { unwrapList, splitToArray } from './helpers';
+import { applyStatusMeta } from './constants';
 
 const loading = ref(false);
 const total = ref(0);
@@ -544,8 +546,9 @@ async function loadData() {
       // 常规模式：apply/list（带联表展示字段）
       res = await listApply(queryParams as any);
     }
-    tableData.value = res.data?.rows || res.rows || [];
-    total.value = res.data?.total || res.total || 0;
+    const list = unwrapList(res);
+    tableData.value = list.rows;
+    total.value = list.total;
   } catch (error) {
     console.error('加载数据失败:', error);
   } finally {
@@ -610,11 +613,6 @@ onMounted(() => {
 function handleExport() {
   // 导出复用既有常规导出端点（精确条件未覆盖时按当前模糊条件导出）
   download('/admin/recruitment/apply/export', queryParams, `投递记录_${new Date().getTime()}.xlsx`);
-}
-
-function getStatusLabel(status?: string) {
-  const map: any = { '0': '已投递', '1': '面试邀请', '2': '已录用', '3': '已拒绝' };
-  return map[status || ''] || '未知';
 }
 
 // 状态流水节点 → 时间轴圆点配色

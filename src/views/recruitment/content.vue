@@ -88,8 +88,8 @@
             </span>
             <!-- 标签列（逗号分隔渲染成 tag） -->
             <template v-else-if="col.type === 'tags'">
-              <el-tag v-for="t in splitTags(row[col.prop])" :key="t" size="small" class="tag-item">{{ t }}</el-tag>
-              <span v-if="!splitTags(row[col.prop]).length">-</span>
+              <el-tag v-for="t in splitToArray(row[col.prop])" :key="t" size="small" class="tag-item">{{ t }}</el-tag>
+              <span v-if="!splitToArray(row[col.prop]).length">-</span>
             </template>
             <!-- 上下架/显隐开关 -->
             <el-switch
@@ -199,6 +199,7 @@ import {
   // 求职服务
   listJobService, getJobService, addJobService, updateJobService, delJobService, changeJobServiceStatus
 } from '@/api/recruitment/content';
+import { unwrapList, splitToArray } from './helpers';
 
 // 列定义：type 决定单元格渲染方式（image/price/tags/status/text/缺省纯文本）
 interface ColumnDef {
@@ -453,15 +454,6 @@ const form = reactive<Record<string, any>>({});
 
 const dialogTitle = computed(() => `${isEdit.value ? '编辑' : '新增'}${currentConfig.value.label}`);
 
-// 标签字符串 -> 数组（逗号/中文逗号都切）
-function splitTags(val?: string): string[] {
-  if (!val) return [];
-  return String(val)
-    .split(/[，,]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 // 组装列表请求参数：把通用 keyword 落到当前 tab 对应的实体字段
 function buildQuery() {
   const cfg = currentConfig.value;
@@ -480,8 +472,9 @@ async function loadData() {
   loading.value = true;
   try {
     const res = await currentConfig.value.api.list(buildQuery());
-    tableData.value = res.rows || [];
-    total.value = res.total || 0;
+    const list = unwrapList(res);
+    tableData.value = list.rows;
+    total.value = list.total;
   } catch (e) {
     ElMessage.error('加载数据失败');
   } finally {

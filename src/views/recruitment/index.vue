@@ -220,7 +220,7 @@
             <el-table-column prop="jobName" label="职位" min-width="100" show-overflow-tooltip />
             <el-table-column prop="statusName" label="状态" width="80" align="center">
               <template #default="{ row }">
-                <el-tag :type="getApplyStatusTagType(row.status)" size="small">
+                <el-tag :type="applyStatusMeta(row.status).type" size="small">
                   {{ row.statusName }}
                 </el-tag>
               </template>
@@ -250,7 +250,7 @@
             :data="exceptionApplies"
             stripe
             size="small"
-            :row-class-name="tableRowClassName"
+            row-class-name="exception-row"
           >
             <el-table-column prop="jobName" label="职位" min-width="100" show-overflow-tooltip />
             <el-table-column prop="exceptionTypeName" label="异常类型" width="80" align="center">
@@ -300,11 +300,12 @@ import {
   getCompanyTrend,
   getUserTrend,
   getApplyStatusDistribution,
-  getUserSilenceStatistics,
 } from '@/api/recruitment';
 import type { RecruitmentOverview, ApplyTrend, JobTypeDistribution, HotJobVO, ExceptionApplyVO } from '@/api/recruitment';
 import { ElMessage } from 'element-plus';
 import { formatDate as formatDateUtil } from '@/utils';
+import { unwrapList } from './helpers';
+import { applyStatusMeta } from './constants';
 
 const router = useRouter();
 const route = useRoute();
@@ -354,19 +355,8 @@ function formatDate(val: string) {
   return formatDateUtil(val);
 }
 
-function getApplyStatusTagType(status: string) {
-  const map: Record<string, string> = {
-    '0': 'info',    // 已投递
-    '1': 'primary', // 面试邀请
-    '2': 'success', // 已录用
-    '3': 'danger',  // 已拒绝
-  };
-  return map[status] || 'info';
-}
-
-function tableRowClassName({ row }: { row: ExceptionApplyVO }) {
-  return 'exception-row';
-}
+// echarts 分类调色板：职位类型分布图与热门职位图共用基础配色，避免两处各写一份
+const CHART_PALETTE = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#1ABC9C', '#E74C3C'];
 
 // ---------- 图表初始化 ----------
 function initTrendChart(data: ApplyTrend[], label: string, color: string) {
@@ -402,7 +392,7 @@ function initTrendChart(data: ApplyTrend[], label: string, color: string) {
 function initJobTypeChart() {
   if (!jobTypeChartRef.value) return;
   if (!jobTypeChart) jobTypeChart = echarts.init(jobTypeChartRef.value);
-  const colors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#1ABC9C', '#E74C3C'];
+  const colors = CHART_PALETTE;
   jobTypeChart.setOption({
     tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
     legend: { orient: 'vertical', right: '5%', top: 'center', textStyle: { fontSize: 11 } },
@@ -455,7 +445,7 @@ function initHotJobChart() {
   if (!hotJobChartRef.value) return;
   if (!hotJobChart) hotJobChart = echarts.init(hotJobChartRef.value);
   const sorted = [...hotJobs.value].sort((a, b) => (b.applyCount || 0) - (a.applyCount || 0)).slice(0, 10);
-  const colors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#1ABC9C', '#E74C3C', '#34495E', '#2C3E50'];
+  const colors = [...CHART_PALETTE, '#34495E', '#2C3E50'];
   hotJobChart.setOption({
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: '3%', right: '4%', bottom: '3%', top: '3%', containLabel: true },
@@ -514,11 +504,10 @@ async function loadAllData() {
     jobTypeDist.value = jobTypeRes.data || [];
     hotJobs.value = hotJobsRes.data || [];
     Object.assign(exchangeStat, exchangeRes.data || {});
-    // 解包修正：拦截器已返回响应体，标准 RuoYi 列表 rows 在顶层(res.rows)，
-    // 原 res.data?.rows 取不到、再 || res.data 会把整个对象误当列表。统一 res.rows ?? res.data?.rows。
-    exceptionApplies.value = exceptionRes.rows ?? exceptionRes.data?.rows ?? [];
-    recentJobs.value = recentJobsRes.rows ?? recentJobsRes.data?.rows ?? [];
-    recentApplies.value = recentAppliesRes.rows ?? recentAppliesRes.data?.rows ?? [];
+    // 列表拆包统一走 unwrapList（顶层 rows 优先，兼容历史 data.rows 形状）
+    exceptionApplies.value = unwrapList<ExceptionApplyVO>(exceptionRes).rows;
+    recentJobs.value = unwrapList(recentJobsRes).rows;
+    recentApplies.value = unwrapList(recentAppliesRes).rows;
     applyStatusDist.value = applyStatusRes.data || [];
 
     renderAllCharts();
@@ -530,13 +519,18 @@ async function loadAllData() {
   }
 }
 
-function renderAllCharts() {
+// 趋势图三类数据源配置（投递量 / 新增企业 / 新增求职者），渲染与切换事件共用一份
+function resolveTrend() {
   const trendMap: Record<string, { data: ApplyTrend[]; label: string; color: string }> = {
     apply: { data: applyTrendData.value, label: '投递量', color: '#409EFF' },
     company: { data: companyTrendData.value, label: '新增企业', color: '#67C23A' },
-    user: { data: userTrendData.value, label: '新增求职者', color: '#E6A23C' },
+    user: { data: userTrendData.value, label: '新增求职者', color: '#E6A23C' }
   };
-  const t = trendMap[trendType.value];
+  return trendMap[trendType.value];
+}
+
+function renderAllCharts() {
+  const t = resolveTrend();
   if (t.data.length > 0) {
     initTrendChart(t.data, t.label, t.color);
   }
@@ -551,12 +545,7 @@ function handleTimeRangeChange() {
 }
 
 function handleTrendTypeChange() {
-  const trendMap: Record<string, { data: ApplyTrend[]; label: string; color: string }> = {
-    apply: { data: applyTrendData.value, label: '投递量', color: '#409EFF' },
-    company: { data: companyTrendData.value, label: '新增企业', color: '#67C23A' },
-    user: { data: userTrendData.value, label: '新增求职者', color: '#E6A23C' },
-  };
-  const t = trendMap[trendType.value];
+  const t = resolveTrend();
   if (t.data.length > 0) initTrendChart(t.data, t.label, t.color);
 }
 

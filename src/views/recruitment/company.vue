@@ -121,9 +121,7 @@
         </el-table-column>
         <el-table-column label="认证状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.status === '0'" type="warning">待审核</el-tag>
-            <el-tag v-else-if="row.status === '1'" type="success">已认证</el-tag>
-            <el-tag v-else type="danger">已禁用</el-tag>
+            <el-tag :type="companyStatusMeta(row.status).type">{{ companyStatusMeta(row.status).label }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="禁言状态" width="110" align="center">
@@ -179,9 +177,7 @@
         <el-descriptions title="主体信息" :column="2" border>
           <el-descriptions-item label="企业ID">{{ currentCompany.companyId }}</el-descriptions-item>
           <el-descriptions-item label="企业状态">
-            <el-tag v-if="currentCompany.status === '0'" type="warning">待审核</el-tag>
-            <el-tag v-else-if="currentCompany.status === '1'" type="success">已认证</el-tag>
-            <el-tag v-else type="danger">已禁用</el-tag>
+            <el-tag :type="companyStatusMeta(currentCompany.status).type">{{ companyStatusMeta(currentCompany.status).label }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="企业名称" :span="2">{{ currentCompany.companyName }}</el-descriptions-item>
           <el-descriptions-item label="企业描述" :span="2">{{ currentCompany.description || '无' }}</el-descriptions-item>
@@ -268,9 +264,7 @@
             <el-card v-for="cert in auditHistory.certHistory" :key="cert.certId" shadow="never" class="cert-card">
               <div class="cert-card-header">
                 <span class="cert-card-title">认证 #{{ cert.certId }}</span>
-                <el-tag v-if="cert.status === '0'" type="warning" size="small">待审核</el-tag>
-                <el-tag v-else-if="cert.status === '1'" type="success" size="small">已通过</el-tag>
-                <el-tag v-else type="danger" size="small">已拒绝</el-tag>
+                <el-tag :type="certStatusMeta(cert.status).type" size="small">{{ certStatusMeta(cert.status).label }}</el-tag>
                 <span class="cert-card-time">{{ cert.auditTime || cert.createTime || '' }}</span>
               </div>
               <el-descriptions :column="2" border size="small">
@@ -382,7 +376,6 @@
 <script setup name="CompanyManagement" lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus';
-import { Download } from '@element-plus/icons-vue';
 import {
   listCompany,
   getCompanyStatistics,
@@ -396,6 +389,8 @@ import {
   type CompanyCertVO,
 } from '@/api/recruitment';
 import { download } from '@/utils/request';
+import { unwrapList, splitToArray } from './helpers';
+import { companyStatusMeta, certStatusMeta } from './constants';
 
 const loading = ref(false);
 const total = ref(0);
@@ -467,8 +462,9 @@ async function loadData() {
   loading.value = true;
   try {
     const res = await listCompany(queryParams);
-    tableData.value = res.rows || [];
-    total.value = res.total || 0;
+    const list = unwrapList(res);
+    tableData.value = list.rows;
+    total.value = list.total;
   } catch (error) {
     ElMessage.error('加载数据失败');
   } finally {
@@ -545,10 +541,8 @@ function certImageList(cert: CompanyCertVO): { label: string; url: string; index
   push('法人身份证(反)', cert.legalPersonIdBack);
   push('对公账户凭证', cert.bankAccountProof);
   push('招聘授权书', cert.authLetter);
-  (cert.officePhotos ? String(cert.officePhotos).split(',') : [])
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .forEach((url, i) => push(`办公实景${i + 1}`, url));
+  // officePhotos 为逗号分隔多图地址，统一切割（含中文逗号兼容）
+  splitToArray(cert.officePhotos).forEach((url, i) => push(`办公实景${i + 1}`, url));
   return list.map((item, index) => ({ ...item, index }));
 }
 

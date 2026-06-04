@@ -169,6 +169,7 @@ import { ref, reactive } from 'vue';
 import { ElMessage } from 'element-plus';
 import { listAuditLog, getAuditHistory, auditLogExportUrl, type AuditLogVO } from '@/api/recruitment';
 import { download } from '@/utils/request';
+import { unwrapList } from './helpers';
 
 const loading = ref(false);
 const total = ref(0);
@@ -219,8 +220,9 @@ async function loadData() {
   try {
     syncDateRange();
     const res = await listAuditLog(queryParams);
-    tableData.value = res.data?.rows || res.rows || [];
-    total.value = res.data?.total || res.total || 0;
+    const list = unwrapList<AuditLogVO>(res);
+    tableData.value = list.rows;
+    total.value = list.total;
   } catch (error) {
     console.error('加载审计日志失败:', error);
   } finally {

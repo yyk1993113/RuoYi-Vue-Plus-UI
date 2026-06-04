@@ -334,6 +334,7 @@ import {
   type RecruitmentUserVO,
 } from '@/api/recruitment';
 import { download } from '@/utils/request';
+import { unwrapList } from './helpers';
 
 const loading = ref(false);
 const total = ref(0);
@@ -403,14 +404,11 @@ async function loadData() {
       phonenumber: queryParams.phonenumber || undefined,
       isRecruitmentSilenced: queryParams.isSilenced || undefined,
     });
-    // 拦截器 resolve(res.data) 返回 R.body：
-    // 后端实际返回 { code, msg, data: { total, rows, code, msg } }
-    // → res = { code, msg, data: { total, rows, code, msg } }
-    const rows = (res as any).rows ?? (res as any).data?.rows ?? [];
-    const totalCount = (res as any).total ?? (res as any).data?.total ?? 0;
-    tableData.value = Array.isArray(rows) ? rows : [];
-    total.value = typeof totalCount === 'number' ? totalCount : 0;
-    // 安全：移除打印整包响应的 console.log（会把求职者手机号/邮箱/登录IP 等 PII 暴露到浏览器控制台）
+    // 列表拆包统一走 unwrapList（顶层 rows/total 优先，兼容历史 data.rows 形状）
+    // 安全：不要打印整包响应，避免把求职者手机号/邮箱/登录IP 等 PII 暴露到浏览器控制台
+    const list = unwrapList<RecruitmentUserVO>(res);
+    tableData.value = list.rows;
+    total.value = list.total;
   } catch (e) {
     tableData.value = [];
     total.value = 0;

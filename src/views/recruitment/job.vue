@@ -99,10 +99,7 @@
             <div class="job-info">
               <div class="job-header">
                 <span class="job-name">{{ row.jobName }}</span>
-                <el-tag v-if="row.jobType === '0'" type="success" size="small">全职</el-tag>
-                <el-tag v-else-if="row.jobType === '1'" type="warning" size="small">兼职</el-tag>
-                <el-tag v-else-if="row.jobType === '2'" type="danger" size="small">临时工</el-tag>
-                <el-tag v-else size="small">项目制</el-tag>
+                <el-tag :type="jobTypeMeta(row.jobType).type" size="small">{{ jobTypeMeta(row.jobType).label }}</el-tag>
               </div>
               <div class="job-salary">{{ row.salary }}</div>
               <div class="job-location">
@@ -144,9 +141,7 @@
         </el-table-column>
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.status === '0'" type="warning">待审核</el-tag>
-            <el-tag v-else-if="row.status === '1'" type="success">已上架</el-tag>
-            <el-tag v-else type="info">已下架</el-tag>
+            <el-tag :type="jobStatusMeta(row.status).type">{{ jobStatusMeta(row.status).label }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="发布时间" prop="publishTime" width="160" align="center" />
@@ -189,17 +184,13 @@
           <!-- 基本信息 -->
           <el-descriptions-item label="岗位ID">{{ currentJob.jobId }}</el-descriptions-item>
           <el-descriptions-item label="岗位状态">
-            <el-tag v-if="currentJob.status === '0'" type="warning">待审核</el-tag>
-            <el-tag v-else-if="currentJob.status === '1'" type="success">已上架</el-tag>
-            <el-tag v-else type="info">已下架</el-tag>
+            <el-tag :type="jobStatusMeta(currentJob.status).type">{{ jobStatusMeta(currentJob.status).label }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="岗位名称" :span="2">{{ currentJob.jobName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="企业名称" :span="2">{{ currentJob.companyName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="用工性质">
-            <el-tag v-if="currentJob.jobType === '0'" type="success">{{ currentJob.jobTypeName || '全职' }}</el-tag>
-            <el-tag v-else-if="currentJob.jobType === '1'" type="warning">{{ currentJob.jobTypeName || '兼职' }}</el-tag>
-            <el-tag v-else-if="currentJob.jobType === '2'" type="danger">{{ currentJob.jobTypeName || '临时工' }}</el-tag>
-            <el-tag v-else>{{ currentJob.jobTypeName || '项目制' }}</el-tag>
+            <!-- 文案优先用后端 jobTypeName，缺失时回退到本地 jobType 映射；颜色取本地映射 -->
+            <el-tag :type="jobTypeMeta(currentJob.jobType).type">{{ currentJob.jobTypeName || jobTypeMeta(currentJob.jobType).label }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="职位类目">{{ currentJob.category || '-' }}</el-descriptions-item>
           <el-descriptions-item label="薪资范围">{{ currentJob.salary || '面议' }}</el-descriptions-item>
@@ -286,6 +277,8 @@ import { computed } from 'vue';
 import { listJob, getJobStatistics, getJobFullDetail, auditJob, changeJobStatus, delJob, updateJob } from '@/api/recruitment';
 import type { JobFullVO } from '@/api/recruitment';
 import { download } from '@/utils/request';
+import { unwrapList, splitToArray } from './helpers';
+import { jobStatusMeta, jobTypeMeta } from './constants';
 
 const loading = ref(false);
 const total = ref(0);
@@ -333,7 +326,8 @@ const benefitsList = computed<string[]>(() => {
     }
     return [String(parsed)];
   } catch {
-    return String(raw).split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+    // 非法 JSON 时按中英文逗号兜底切分
+    return splitToArray(raw);
   }
 });
 
@@ -365,8 +359,9 @@ async function loadData() {
   loading.value = true;
   try {
     const res = await listJob(queryParams);
-    tableData.value = res.rows || [];
-    total.value = res.total || 0;
+    const list = unwrapList(res);
+    tableData.value = list.rows;
+    total.value = list.total;
   } catch (error) {
     console.error('加载数据失败:', error);
   } finally {

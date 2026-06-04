@@ -77,7 +77,7 @@
         <el-table-column label="企业ID" prop="companyId" width="100" align="center" />
         <el-table-column label="金额(元)" width="120" align="right">
           <template #default="{ row }">
-            <span v-if="row.amount != null" class="amount-text">{{ formatAmount(row.amount) }}</span>
+            <span v-if="row.amount != null" class="amount-text">{{ formatMoney(row.amount) }}</span>
             <span v-else class="text-secondary">-</span>
           </template>
         </el-table-column>
@@ -97,9 +97,7 @@
         </el-table-column>
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.status === '0'" type="warning">未开票</el-tag>
-            <el-tag v-else-if="row.status === '1'" type="success">已开票</el-tag>
-            <el-tag v-else type="danger">已作废</el-tag>
+            <el-tag :type="invoiceStatusMeta(row.status).type">{{ invoiceStatusMeta(row.status).label }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="发票文件" min-width="120" align="center">
@@ -143,9 +141,7 @@
       <el-descriptions :column="2" border v-if="currentInvoice">
         <el-descriptions-item label="发票ID">{{ currentInvoice.invoiceId }}</el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag v-if="currentInvoice.status === '0'" type="warning">未开票</el-tag>
-          <el-tag v-else-if="currentInvoice.status === '1'" type="success">已开票</el-tag>
-          <el-tag v-else type="danger">已作废</el-tag>
+          <el-tag :type="invoiceStatusMeta(currentInvoice.status).type">{{ invoiceStatusMeta(currentInvoice.status).label }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="企业">{{ currentInvoice.companyName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="台账ID">{{ currentInvoice.ledgerId || '-' }}</el-descriptions-item>
@@ -246,6 +242,8 @@ import {
   markInvoiceManageStatus
 } from '@/api/recruitment';
 import type { InvoiceManageVO, InvoiceUploadForm } from '@/api/recruitment';
+import { unwrapList, formatMoney } from './helpers';
+import { invoiceStatusMeta } from './constants';
 
 const loading = ref(false);
 const submitting = ref(false);
@@ -303,11 +301,6 @@ const bindRules = {
   ledgerId: [{ required: true, message: '请输入台账ID', trigger: 'blur' }]
 };
 
-// 金额展示：保留两位小数千分位
-function formatAmount(amount: number) {
-  return Number(amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
 async function loadData() {
   loading.value = true;
   try {
@@ -320,8 +313,9 @@ async function loadData() {
     if (queryParams.ledgerId) params.ledgerId = queryParams.ledgerId;
     if (queryParams.status) params.status = queryParams.status;
     const res = await listInvoiceManage(params);
-    tableData.value = res.rows || [];
-    total.value = res.total || 0;
+    const list = unwrapList<InvoiceManageVO>(res);
+    tableData.value = list.rows;
+    total.value = list.total;
   } catch (error) {
     console.error('加载数据失败:', error);
   } finally {
@@ -486,7 +480,7 @@ async function submitBind() {
 
 // ===== 标记开票状态：走 markInvoiceManageStatus(/admin/invoice-manage/markStatus) =====
 async function handleStatusChange(row: InvoiceManageVO, status: string) {
-  const statusText = status === '1' ? '已开票' : '已作废';
+  const statusText = invoiceStatusMeta(status).label;
   try {
     await ElMessageBox.confirm(`确认要将该发票标记为"${statusText}"吗？`, '提示', {
       confirmButtonText: '确定',

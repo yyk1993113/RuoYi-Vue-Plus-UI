@@ -115,6 +115,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { listLedger, getLedgerStatistics, getLedger } from '@/api/recruitment';
+import { unwrapList, formatMoney } from './helpers';
 
 const loading = ref(false);
 const total = ref(0);
@@ -137,17 +138,13 @@ const statistics = reactive({
   todayAmount: 0
 });
 
-function formatMoney(amount: number | undefined): string {
-  if (amount === undefined || amount === null) return '0.00';
-  return amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-}
-
 async function loadData() {
   loading.value = true;
   try {
     const res = await listLedger(queryParams);
-    tableData.value = res.rows || [];
-    total.value = res.total || 0;
+    const list = unwrapList(res);
+    tableData.value = list.rows;
+    total.value = list.total;
   } catch (error) {
     console.error('加载数据失败:', error);
   } finally {
