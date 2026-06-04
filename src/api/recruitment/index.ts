@@ -212,11 +212,20 @@ export interface LedgerStatistics {
 export interface LedgerVO {
   ledgerId?: number;
   taskId?: number;
+  // 岗位编号（后端 Ledger.jobId），台账列表展示用
+  jobId?: number;
+  // 投递编号（后端 Ledger.applyId），台账列表展示用
+  applyId?: number;
   companyId?: number;
   companyName?: string;
   userId?: number;
   userName?: string;
+  // 台账编号（订单号），台账列表「台账编号」列用此字段
   orderNo?: string;
+  // 发票绑定状态 0:未绑定 1:已绑定（后端 Ledger.invoiceStatus）
+  invoiceStatus?: string;
+  // 台账业务状态（后端 Ledger.status）
+  status?: string;
   timestamp?: string;
   amount?: number;
   createTime?: string;

@@ -37,6 +37,16 @@ const INVOICE_STATUS: Record<string, StatusMeta> = {
 };
 export const invoiceStatusMeta = (status?: string | null): StatusMeta => resolve(INVOICE_STATUS, status, INVOICE_STATUS['2']);
 
+// ========== 台账发票绑定状态 ledger.invoiceStatus：0未绑定 / 1已绑定 ==========
+// 来源：后端台账 Ledger.invoiceStatus（台账是否已绑定发票）。
+// 注意：这是「台账侧的发票绑定状态」，区别于上方 invoiceStatusMeta（发票自身的开票/作废状态）。
+// 未命中（含 undefined/null）兜底为「未绑定 / info」。
+const LEDGER_INVOICE_STATUS: Record<string, StatusMeta> = {
+  '0': { label: '未绑定', type: 'info' },
+  '1': { label: '已绑定', type: 'success' }
+};
+export const ledgerInvoiceStatusMeta = (status?: string | null): StatusMeta => resolve(LEDGER_INVOICE_STATUS, status, LEDGER_INVOICE_STATUS['0']);
+
 // ========== 企业认证状态 company：0待审核 / 1已认证 / 2已禁用 ==========
 // 来源：company.vue 表格列与详情弹窗的 el-tag 阶梯；原 v-else 兜底为「已禁用 / danger」。
 const COMPANY_STATUS: Record<string, StatusMeta> = {

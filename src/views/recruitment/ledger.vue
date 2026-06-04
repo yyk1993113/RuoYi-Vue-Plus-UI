@@ -55,8 +55,19 @@
       </template>
 
       <el-table v-loading="loading" :data="tableData" border stripe>
-        <el-table-column label="台账ID" prop="ledgerId" width="200" align="center" />
-        <el-table-column label="订单号" prop="orderNo" min-width="200" show-overflow-tooltip />
+        <!-- 台账编号：后端 Ledger.orderNo（替代原台账ID展示，业务侧以编号为准） -->
+        <el-table-column label="台账编号" prop="orderNo" min-width="200" show-overflow-tooltip />
+        <!-- 岗位编号 / 投递编号：后端 Ledger.jobId / Ledger.applyId，缺失时占位「-」 -->
+        <el-table-column label="岗位编号" prop="jobId" width="100" align="center">
+          <template #default="{ row }">
+            <span>{{ row.jobId ?? '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="投递编号" prop="applyId" width="100" align="center">
+          <template #default="{ row }">
+            <span>{{ row.applyId ?? '-' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="企业" prop="companyName" min-width="150" />
         <el-table-column label="用户" min-width="120">
           <template #default="{ row }">
@@ -66,6 +77,12 @@
         <el-table-column label="结算金额" width="120" align="right">
           <template #default="{ row }">
             <span class="amount">¥{{ formatMoney(row.amount) }}</span>
+          </template>
+        </el-table-column>
+        <!-- 发票状态：后端 Ledger.invoiceStatus 0未绑定/1已绑定，用 el-tag 着色（来源 constants.ledgerInvoiceStatusMeta） -->
+        <el-table-column label="发票状态" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag :type="ledgerInvoiceStatusMeta(row.invoiceStatus).type">{{ ledgerInvoiceStatusMeta(row.invoiceStatus).label }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="不可篡改时间" prop="timestamp" width="180" align="center" />
@@ -91,12 +108,17 @@
     <!-- 台账详情对话框 -->
     <el-dialog v-model="detailVisible" title="台账详情" width="600px" append-to-body>
       <el-descriptions :column="2" border v-if="currentLedger">
-        <el-descriptions-item label="台账ID">{{ currentLedger.ledgerId }}</el-descriptions-item>
-        <el-descriptions-item label="订单号" :span="2">{{ currentLedger.orderNo }}</el-descriptions-item>
+        <el-descriptions-item label="台账编号" :span="2">{{ currentLedger.orderNo }}</el-descriptions-item>
+        <el-descriptions-item label="岗位编号">{{ currentLedger.jobId ?? '-' }}</el-descriptions-item>
+        <el-descriptions-item label="投递编号">{{ currentLedger.applyId ?? '-' }}</el-descriptions-item>
         <el-descriptions-item label="企业">{{ currentLedger.companyName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="用户">{{ currentLedger.userName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="结算金额">
           <span class="amount-lg">¥{{ formatMoney(currentLedger.amount) }}</span>
+        </el-descriptions-item>
+        <!-- 发票状态：台账侧绑定状态 0未绑定/1已绑定 -->
+        <el-descriptions-item label="发票状态">
+          <el-tag :type="ledgerInvoiceStatusMeta(currentLedger.invoiceStatus).type">{{ ledgerInvoiceStatusMeta(currentLedger.invoiceStatus).label }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="任务ID">{{ currentLedger.taskId }}</el-descriptions-item>
         <el-descriptions-item label="不可篡改时间" :span="2">{{ currentLedger.timestamp }}</el-descriptions-item>
@@ -116,6 +138,8 @@ import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { listLedger, getLedgerStatistics, getLedger } from '@/api/recruitment';
 import { unwrapList, formatMoney } from './helpers';
+// 台账发票绑定状态（0未绑定/1已绑定）→ el-tag 文案/颜色，集中映射见 constants.ts
+import { ledgerInvoiceStatusMeta } from './constants';
 
 const loading = ref(false);
 const total = ref(0);
