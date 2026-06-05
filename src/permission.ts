@@ -1,4 +1,3 @@
-import { to as tos } from 'await-to-js';
 import router from './router';
 import NProgress from 'nprogress';
 import 'nprogress/nprogress.css';
@@ -30,19 +29,13 @@ router.beforeEach(async (to, from, next) => {
     } else {
       if (useUserStore().roles.length === 0) {
         isRelogin.show = true;
-        // 并行获取用户信息和路由权限，不再串行等待
-        const [[err], accessRoutes] = await Promise.all([
-          tos(useUserStore().getInfo()),
-          usePermissionStore().generateRoutes(),
-        ]);
-        if (err) {
-          isRelogin.show = false;
-          await useUserStore().logout();
-          ElMessage.error(err);
-          next({ path: '/' });
-        } else {
-          isRelogin.show = false;
-          // 根据roles权限生成可访问的路由表
+        try {
+          // getInfo 与 generateRoutes 互不依赖（getRouters 已在后端按权限过滤），并行拉取以减少首屏等待
+          const [, accessRoutes] = await Promise.all([
+            useUserStore().getInfo(),
+            usePermissionStore().generateRoutes(),
+          ]);
+          // 根据后端返回的路由表动态添加可访问路由
           accessRoutes.forEach((route: any) => {
             if (!isHttp(route.path)) {
               router.addRoute(route); // 动态添加可访问路由表
@@ -50,6 +43,13 @@ router.beforeEach(async (to, from, next) => {
           });
           // @ts-expect-error hack方法 确保addRoutes已完成
           next({ path: to.path, replace: true, params: to.params, query: to.query, hash: to.hash, name: to.name as string }); // hack方法 确保addRoutes已完成
+        } catch (err) {
+          // 任一请求失败（最常见 token 失效 401）→ 登出并跳登录页，避免导航抛错导致白屏
+          await useUserStore().logout();
+          ElMessage.error(err instanceof Error ? err.message : String(err));
+          next(`/login?redirect=${encodeURIComponent(to.fullPath)}`);
+        } finally {
+          isRelogin.show = false; // 两分支重复的复位收敛到 finally
         }
       } else {
         next();
