@@ -427,6 +427,9 @@ export interface ApplyQuery {
   status?: string;
   companyName?: string;
   isRead?: string;
+  // 企业管理「已反馈/未反馈」弹窗用：companyId 精确过滤企业；feedback=0 未反馈 / 1 已反馈
+  companyId?: number;
+  feedback?: string;
 }
 
 export interface TaskQuery {

@@ -127,6 +127,18 @@
             <el-tag type="success">{{ row.applyCount || 0 }}</el-tag>
           </template>
         </el-table-column>
+        <!-- 已反馈：企业已处理的投递(面试邀请/已录用/已拒绝)；未反馈：仅已投递、企业尚未处理。后端聚合返回，无额外查询。
+             点击数字弹框查看对应投递人员列表。 -->
+        <el-table-column label="已反馈" prop="feedbackCount" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag type="warning" class="count-clickable" @click="openApplyDialog(row, '1')">{{ row.feedbackCount || 0 }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="未反馈" prop="noFeedbackCount" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag type="info" class="count-clickable" @click="openApplyDialog(row, '0')">{{ row.noFeedbackCount || 0 }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="认证状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="companyStatusMeta(row.status).type">{{ companyStatusMeta(row.status).label }}</el-tag>
@@ -477,6 +489,40 @@
     <el-dialog v-model="staffVisible" :title="staffTitle" width="90%" top="5vh" append-to-body destroy-on-close>
       <iframe v-if="staffUrl" :src="staffUrl" class="staff-iframe" frameborder="0"></iframe>
     </el-dialog>
+
+    <!-- 投递人员弹窗：点击「已反馈/未反馈」数字，按企业 + 反馈口径分页查看投递人员列表；点击行查看求职者详情 -->
+    <el-dialog v-model="applyVisible" :title="applyTitle" width="900px" append-to-body destroy-on-close>
+      <div class="apply-tip">点击任意行可查看投递全景详情</div>
+      <el-table v-loading="applyLoading" :data="applyList" border stripe row-class-name="row-clickable" @row-click="openApplyDetail">
+        <el-table-column label="求职者" prop="userName" min-width="120" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.userName || row.realName || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="联系电话" prop="phonenumber" width="140" align="center">
+          <template #default="{ row }">{{ row.phonenumber || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="应聘职位" prop="jobName" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.jobName || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="投递状态" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag :type="applyStatusMeta(row.status).type">{{ applyStatusMeta(row.status).label }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="投递时间" prop="applyTime" width="170" align="center">
+          <template #default="{ row }">{{ row.applyTime || row.createTime || '-' }}</template>
+        </el-table-column>
+      </el-table>
+      <pagination
+        v-show="applyTotal > 0"
+        v-model:page="applyQuery.pageNum"
+        v-model:limit="applyQuery.pageSize"
+        :total="applyTotal"
+        @pagination="loadApplyList"
+      />
+    </el-dialog>
+
+    <!-- 投递全景详情弹窗（复用组件）：点击投递行后按 applyId 加载完整详情 -->
+    <ApplyDetailDialog ref="applyDetailRef" />
   </div>
 </template>
 
@@ -494,12 +540,13 @@ import {
   silenceCompany,
   unsilenceCompany,
   type CompanyAuditHistoryVO,
-  type CompanyCertVO, addOrUpdate, delCompany
+  type CompanyCertVO, addOrUpdate, delCompany, listApply
 } from '@/api/recruitment';
+import ApplyDetailDialog from './components/ApplyDetailDialog.vue';
 import { download } from '@/utils/request';
 import { listByIds } from '@/api/system/oss';
 import { unwrapList, splitToArray } from './helpers';
-import { companyStatusMeta, certStatusMeta } from './constants';
+import { companyStatusMeta, certStatusMeta, applyStatusMeta } from './constants';
 import { UserForm } from '@/api/system/user/types';
 import { updateUserProfile } from '@/api/system/user';
 import { RoleVO } from '@/api/system/role/types';
@@ -524,6 +571,17 @@ const staffTitle = ref('人员管理');
 // 详情弹窗「资质图片」：company 表各资质字段存的是 OSS id，需解析为 URL 后分组展示
 const certLoading = ref(false);
 const certGroups = ref<{ label: string; urls: string[] }[]>([]);
+
+// 投递人员弹窗：点击「已反馈/未反馈」按企业 + 反馈口径分页查看
+const applyVisible = ref(false);
+const applyTitle = ref('');
+const applyLoading = ref(false);
+const applyList = ref<any[]>([]);
+const applyTotal = ref(0);
+const applyQuery = reactive({ pageNum: 1, pageSize: 10, companyId: undefined as number | undefined, feedback: '' });
+
+// 投递全景详情弹窗组件引用：点击投递行 → open(applyId)
+const applyDetailRef = ref<InstanceType<typeof ApplyDetailDialog>>();
 const queryFormRef = ref();
 const auditFormRef = ref();
 const silenceFormRef = ref();
@@ -818,6 +876,35 @@ function handleStaff(row: any) {
   staffVisible.value = true;
 }
 
+// 打开投递人员弹窗：feedback='1' 已反馈 / '0' 未反馈，按 companyId 精确过滤
+function openApplyDialog(row: any, feedback: string) {
+  applyQuery.companyId = row.companyId;
+  applyQuery.feedback = feedback;
+  applyQuery.pageNum = 1;
+  applyTitle.value = `${feedback === '1' ? '已反馈' : '未反馈'}投递 - ${row.companyName || ''}`;
+  applyVisible.value = true;
+  loadApplyList();
+}
+
+async function loadApplyList() {
+  applyLoading.value = true;
+  try {
+    const res = await listApply(applyQuery);
+    const list = unwrapList(res);
+    applyList.value = list.rows;
+    applyTotal.value = list.total;
+  } catch (error) {
+    ElMessage.error('加载投递列表失败');
+  } finally {
+    applyLoading.value = false;
+  }
+}
+
+// 点击投递行 → 打开投递全景详情（组件内部按 applyId 调 apply2/detail 加载）
+function openApplyDetail(applyRow: any) {
+  applyDetailRef.value?.open(applyRow?.applyId);
+}
+
 function handleSilence(row: any) {
   silenceForm.companyId = row.companyId;
   silenceForm.companyName = row.companyName;
@@ -1071,6 +1158,24 @@ const handleOsslogoUrlChange= (ossIds) => {
   font-weight: 600;
   color: #303133;
   border-left: 4px solid #2b7fff;
+}
+
+/* 已反馈/未反馈数字 tag：可点击查看投递人员 */
+.count-clickable {
+  cursor: pointer;
+}
+.count-clickable:hover {
+  opacity: 0.8;
+}
+
+/* 投递人员弹窗：行可点击查看求职者详情 */
+.apply-tip {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+:deep(.row-clickable) {
+  cursor: pointer;
 }
 
 /* 人员管理弹窗内嵌 iframe：撑满弹窗体，去边框 */
