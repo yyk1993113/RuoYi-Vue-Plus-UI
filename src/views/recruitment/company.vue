@@ -213,31 +213,25 @@
           <el-descriptions-item label="备注/审核意见" :span="2">{{ currentCompany.remark || '无' }}</el-descriptions-item>
         </el-descriptions>
 
-        <!-- 资质图片：企业 Logo 与营业执照（来自 company 表，点击可放大预览） -->
+        <!-- 资质图片：营业执照/身份证/对公凭证/办公实景/授权书/Logo（来自 company 表）。
+             这些字段存的是 OSS 文件 id(逗号分隔)，已在 handleDetail 中通过 listByIds 解析为可预览 URL。
+             每组支持多图，点击可放大轮播预览。 -->
         <div class="section-title">资质图片</div>
-        <div class="cert-images">
-          <div class="cert-item">
-            <div class="cert-label">企业 Logo</div>
-            <el-image
-              v-if="currentCompany.logoUrl"
-              :src="currentCompany.logoUrl"
-              :preview-src-list="[currentCompany.logoUrl]"
-              :preview-teleported="true"
-              fit="cover"
-              class="cert-img"
-            />
-            <div v-else class="cert-empty">未上传</div>
-          </div>
-          <div class="cert-item">
-            <div class="cert-label">营业执照</div>
-            <el-image
-              v-if="currentCompany.businessLicense"
-              :src="currentCompany.businessLicense"
-              :preview-src-list="[currentCompany.businessLicense]"
-              :preview-teleported="true"
-              fit="cover"
-              class="cert-img"
-            />
+        <div v-loading="certLoading" class="cert-images">
+          <div v-for="group in certGroups" :key="group.label" class="cert-item">
+            <div class="cert-label">{{ group.label }}</div>
+            <div v-if="group.urls.length" class="cert-img-row">
+              <el-image
+                v-for="(url, idx) in group.urls"
+                :key="url"
+                :src="url"
+                :preview-src-list="group.urls"
+                :initial-index="idx"
+                :preview-teleported="true"
+                fit="cover"
+                class="cert-img"
+              />
+            </div>
             <div v-else class="cert-empty">未上传</div>
           </div>
         </div>
@@ -503,6 +497,7 @@ import {
   type CompanyCertVO, addOrUpdate, delCompany
 } from '@/api/recruitment';
 import { download } from '@/utils/request';
+import { listByIds } from '@/api/system/oss';
 import { unwrapList, splitToArray } from './helpers';
 import { companyStatusMeta, certStatusMeta } from './constants';
 import { UserForm } from '@/api/system/user/types';
@@ -525,6 +520,10 @@ const selectedIds = ref<number[]>([]);
 const staffVisible = ref(false);
 const staffUrl = ref('');
 const staffTitle = ref('人员管理');
+
+// 详情弹窗「资质图片」：company 表各资质字段存的是 OSS id，需解析为 URL 后分组展示
+const certLoading = ref(false);
+const certGroups = ref<{ label: string; urls: string[] }[]>([]);
 const queryFormRef = ref();
 const auditFormRef = ref();
 const silenceFormRef = ref();
@@ -643,13 +642,49 @@ function resetQuery() {
   loadData();
 }
 
+// 解析企业资质图片：company 表各字段存的是逗号分隔的 OSS id（个别历史数据可能直接是 URL）。
+// 统一收集 id 批量 listByIds 换成可预览 URL，按资质类型分组（每组可多图），失败不阻断详情。
+async function loadCompanyCertImages(company: any) {
+  const isOssId = (t: string) => /^\d+$/.test(t); // 纯数字视为 OSS id，其余（含 http/相对路径）按 URL 直用
+  const fields = [
+    { label: '营业执照正负本', value: company?.businessLicense },
+    { label: '法人身份证正反面', value: company?.idCardPhotoIds },
+    { label: '对公账户凭证', value: company?.bankAccountIds },
+    { label: '办公场地实景', value: company?.companyAddressIds },
+    { label: '招聘授权书', value: company?.recruitmentAuthorizationIds },
+    { label: '企业 Logo', value: company?.logoUrl }
+  ];
+  certLoading.value = true;
+  certGroups.value = [];
+  try {
+    // 收集所有需要解析的 OSS id（去重），一次性查回 URL
+    const idSet = new Set<string>();
+    fields.forEach((f) => splitToArray(f.value).forEach((t) => { if (isOssId(t)) idSet.add(t); }));
+    const urlMap: Record<string, string> = {};
+    if (idSet.size > 0) {
+      const res = await listByIds(Array.from(idSet).join(','));
+      (res.data || []).forEach((o: any) => { urlMap[String(o.ossId)] = o.url; });
+    }
+    certGroups.value = fields.map((f) => ({
+      label: f.label,
+      urls: splitToArray(f.value).map((t) => (isOssId(t) ? urlMap[t] : t)).filter(Boolean) as string[]
+    }));
+  } catch (e) {
+    // 解析失败时退化为按原始值展示，避免整块空白
+    certGroups.value = fields.map((f) => ({ label: f.label, urls: splitToArray(f.value).filter(Boolean) }));
+  } finally {
+    certLoading.value = false;
+  }
+}
+
 async function handleDetail(row: any) {
   try {
     const res = await getCompany(row.companyId);
     currentCompany.value = res.data;
     historyTab.value = 'logs';
     detailVisible.value = true;
-    // 并行加载历史审核记录（操作留痕 + 认证历史），失败不阻断详情展示
+    // 解析资质图片（OSS id → URL）；并行加载历史审核记录，二者失败均不阻断详情展示
+    loadCompanyCertImages(res.data);
     loadAuditHistory(row.companyId);
   } catch (error) {
     ElMessage.error('获取企业详情失败');
@@ -1063,6 +1098,13 @@ const handleOsslogoUrlChange= (ossIds) => {
 
 .cert-images-wrap {
   margin-top: 12px;
+}
+
+/* 同一资质类型下的多张图片横向排列 */
+.cert-img-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .cert-item {
