@@ -1,4 +1,5 @@
 import request from '@/utils/request';
+import { UserForm } from '@/api/system/user/types';
 
 // ========== 企业相关 ==========
 
@@ -571,6 +572,21 @@ export function unsilenceCompany(data: { companyId: number }) {
 export function getCompanyStatistics() {
   return request.get<any>(`${baseUrl}/company/statistics`);
 }
+
+// 删除企业（支持批量）。按 RuoYi-Vue-Plus 惯例走 DELETE /company/{ids}，
+// 多选时 ids 以逗号拼接传入路径，与 delJob 一致。后端接口待补。
+export function delCompany(companyId: number | number[]) {
+  return request.delete(`${baseUrl}/company/${companyId}`);
+}
+
+//新增企业
+export const addOrUpdate = (data: UserForm) => {
+  return request({
+    url: `${baseUrl}/company/addOrUpdate`,
+    method: 'post',
+    data: data
+  });
+};
 
 // ---------- 求职者管理 ----------
 

@@ -79,7 +79,14 @@
       <template #header>
         <el-row :gutter="10">
           <el-col :span="1.5">
+            <el-button type="primary" plain icon="Plus" @click="add">新增</el-button>
+          </el-col>
+          <el-col :span="1.5">
             <el-button type="primary" plain icon="Refresh" @click="loadData">刷新</el-button>
+          </el-col>
+          <el-col :span="1.5">
+            <!-- 批量删除：未勾选时点击给出提示，勾选后按所选 companyId 批量删除 -->
+            <el-button type="danger" plain icon="Delete" @click="handleBatchDelete">删除</el-button>
           </el-col>
           <el-col :span="1.5">
             <el-button type="success" plain icon="Download" @click="handleExport">导出</el-button>
@@ -87,7 +94,8 @@
         </el-row>
       </template>
 
-      <el-table v-loading="loading" :data="tableData" border stripe>
+      <el-table v-loading="loading" :data="tableData" border stripe @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="50" align="center" />
         <el-table-column label="企业ID" prop="companyId" width="200" align="center" />
         <el-table-column label="企业信息" min-width="200">
           <template #default="{ row }">
@@ -137,12 +145,15 @@
           <template #default="{ row }">
             <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
               <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
+              <el-button link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
               <el-dropdown trigger="click">
                 <span class="el-dropdown-link">
                   <el-button link type="primary">管理<el-icon class="el-icon--right"><arrow-down /></el-icon></el-button>
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
+                    <!-- 人员：已认证企业的人员管理入口，置于菜单最上方（行为待接，后端接口待补） -->
+                    <el-dropdown-item v-if="row.status === '1'" icon="User" @click="handleStaff(row)">人员</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '0'" icon="CircleCheck" @click="handleAudit(row, '1')">审核通过</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '2')">审核拒绝</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '1'" icon="Lock" @click="handleStatusChange(row, '2')">禁用企业</el-dropdown-item>
@@ -300,6 +311,103 @@
       </template>
     </el-dialog>
 
+    <!-- 企业编辑对话框：主体信息 + 资质图片（视觉风格与"企业详情"对齐：分区标题 + 边框分组） -->
+    <el-dialog v-model="editVisible" title="企业编辑" width="820px" append-to-body>
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
+        <!-- 主体信息：与详情弹窗一致的蓝条分区标题 + 边框分组容器 -->
+        <div class="section-title">主体信息</div>
+        <div class="edit-block">
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="公司全称" prop="companyName">
+                <el-input v-model="form.companyName" placeholder="与营业执照一致" maxlength="20" ></el-input>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="信用代码" prop="socialCreditCode">
+                <el-input v-model="form.socialCreditCode" placeholder="统一社会信用代码" maxlength="60"></el-input>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="法人姓名" prop="contactPerson">
+                <el-input v-model="form.contactPerson" placeholder="法定代表人姓名" maxlength="10"></el-input>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="法人电话" prop="contactPhone">
+                <el-input v-model="form.contactPhone" placeholder="法定代表人电话"  maxlength="11"
+                          @input="form.contactPhone = form.contactPhone.replace(/[^\d]/g, '')"></el-input>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="24">
+              <el-form-item label="注册地址" prop="registeredAddress">
+                <el-input type="textarea" show-word-limit  :autosize="{ minRows: 3, maxRows: 6 }" v-model="form.registeredAddress" placeholder="企业注册登记地址" maxlength="150"></el-input>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="24">
+              <el-form-item label="办公地址" prop="creditCode">
+                <el-input type="textarea" show-word-limit  :autosize="{ minRows: 3, maxRows: 6 }" v-model="form.companyAddress" placeholder="与注册地址不符时填写" maxlength="150"></el-input>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+
+        <!-- 资质图片：与详情弹窗"资质图片"分区一致，按网格平铺各类上传项 -->
+        <div class="section-title">资质图片</div>
+        <div class="edit-block">
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="营业执照正负本">
+                <imageUpload v-model="form.businessLicense" :limit="1" @update:modelValue="handleOssChange" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="法人身份证正反面">
+                <imageUpload v-model="form.idCardPhotoIds" :limit="2" @update:modelValue="handleOssIdCarPhotoChange"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="对公账户凭证">
+                <imageUpload v-model="form.bankAccountIds" :limit="1" @update:modelValue="handleOssBankAccountIdsChange"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="办公场地实景">
+                <imageUpload v-model="form.companyAddressIds" @update:modelValue="handleOssCompanyAddressIdsChange"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="企业logo">
+                <imageUpload v-model="form.logoUrl" :limit="1" @update:modelValue="handleOsslogoUrlChange" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="招聘授权书">
+                <imageUpload v-model="form.recruitmentAuthorizationIds" :limit="1" @update:modelValue="handleOssRecruitmentAuthorizationIdsChange"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+      </el-form>
+      <template #footer>
+        <el-button type="primary" @click="handleSave"  v-if="form.status && form.status !== '4'">保存</el-button>
+        <el-button type="primary" @click="handleDraft"  v-if="form.status !== '1'">存草稿</el-button>
+        <el-button type="primary" v-if="form.status !== '1'" @click="submit">提交</el-button>
+        <el-button @click="editVisible = false">取消</el-button>
+
+      </template>
+    </el-dialog>
+
     <!-- 审核对话框：通过走 /company/audit（后端固定置为已认证并生成企业编号）；驳回走 /company/changeStatus（status=2，原因写入 remark） -->
     <el-dialog v-model="auditVisible" title="企业审核" width="500px" append-to-body>
       <el-form ref="auditFormRef" :model="auditForm" :rules="auditRules" label-width="80px">
@@ -370,11 +478,17 @@
         <el-button type="danger" @click="submitSilence">确认禁言</el-button>
       </template>
     </el-dialog>
+
+    <!-- 人员管理弹窗：iframe 内嵌系统用户管理页(/system/user)，destroy-on-close 保证每次打开为最新状态 -->
+    <el-dialog v-model="staffVisible" :title="staffTitle" width="90%" top="5vh" append-to-body destroy-on-close>
+      <iframe v-if="staffUrl" :src="staffUrl" class="staff-iframe" frameborder="0"></iframe>
+    </el-dialog>
   </div>
 </template>
 
 <script setup name="CompanyManagement" lang="ts">
 import { ref, reactive, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus';
 import {
   listCompany,
@@ -386,22 +500,57 @@ import {
   silenceCompany,
   unsilenceCompany,
   type CompanyAuditHistoryVO,
-  type CompanyCertVO,
+  type CompanyCertVO, addOrUpdate, delCompany
 } from '@/api/recruitment';
 import { download } from '@/utils/request';
 import { unwrapList, splitToArray } from './helpers';
 import { companyStatusMeta, certStatusMeta } from './constants';
+import { UserForm } from '@/api/system/user/types';
+import { updateUserProfile } from '@/api/system/user';
+import { RoleVO } from '@/api/system/role/types';
+
+const router = useRouter();
 
 const loading = ref(false);
 const total = ref(0);
 const tableData = ref<any[]>([]);
 const detailVisible = ref(false);
+const editVisible = ref(false);
 const auditVisible = ref(false);
 const silenceVisible = ref(false);
 const currentCompany = ref<any>(null);
+// 表格多选：勾选行的 companyId 集合，驱动批量删除按钮的可用态与删除请求
+const selectedIds = ref<number[]>([]);
+// 人员管理弹窗：iframe 内嵌 /system/user
+const staffVisible = ref(false);
+const staffUrl = ref('');
+const staffTitle = ref('人员管理');
 const queryFormRef = ref();
 const auditFormRef = ref();
 const silenceFormRef = ref();
+const formRef = ref();
+
+const form = ref<Partial<UserForm>>({});
+
+const rules = reactive({
+  companyName: [
+    { required: true, message: '请输入公司全称', trigger: 'blur' }
+  ],
+  socialCreditCode:[
+    { required: true, message: '请输入信用代码', trigger: 'blur' },
+    { pattern: /^[0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10}$/, message: '请输入正确的18位统一社会信用代码', trigger: 'blur' }
+  ],
+  contactPhone: [
+    { required: true, message: '请输入法定代表人电话', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的11位手机号', trigger: 'blur' }
+  ],
+  contactPerson:[
+    { required: true, message: '请输入法人姓名', trigger: 'blur' },
+  ],
+  registeredAddress:[
+    { required: true, message: '请输入注册地址', trigger: 'blur' }
+  ]
+})
 
 // 审核提交中标志，防止重复提交（通过/驳回均复用）
 const auditSubmitting = ref(false);
@@ -502,6 +651,16 @@ async function handleDetail(row: any) {
     detailVisible.value = true;
     // 并行加载历史审核记录（操作留痕 + 认证历史），失败不阻断详情展示
     loadAuditHistory(row.companyId);
+  } catch (error) {
+    ElMessage.error('获取企业详情失败');
+  }
+}
+
+async function handleEdit(row: any) {
+  try {
+    const res = await getCompany(row.companyId);
+    form.value = res.data;
+    editVisible.value = true;
   } catch (error) {
     ElMessage.error('获取企业详情失败');
   }
@@ -608,6 +767,22 @@ async function handleStatusChange(row: any, status: string) {
   }
 }
 
+// 人员管理入口：用弹窗 + iframe 内嵌「用户管理」(/system/user)。
+// iframe 在弹窗内独立加载该路由，即使该路由 404 也只影响 iframe 内部，不会动到外层 Layout/左侧菜单。
+// 带上 companyId/deptId 作上下文透传，便于用户管理页后续按企业过滤。
+function handleStaff(row: any) {
+  // deptName=企业名：企业审核通过时以企业名建的部门(deptName=companyName)，
+  // 用户管理页据此默认选中对应单位并过滤用户；companyId 仅作上下文备用。
+  const { href } = router.resolve({
+    path: '/system/user',
+    query: { companyId: row.companyId, deptName: row.companyName }
+  });
+  // 兼容 history / hash 两种路由模式，统一拼成同源绝对地址供 iframe 加载
+  staffUrl.value = new URL(href, window.location.href).toString();
+  staffTitle.value = `人员管理${row.companyName ? ' - ' + row.companyName : ''}`;
+  staffVisible.value = true;
+}
+
 function handleSilence(row: any) {
   silenceForm.companyId = row.companyId;
   silenceForm.companyName = row.companyName;
@@ -657,6 +832,138 @@ onMounted(() => {
 function handleExport() {
   download('/admin/recruitment/company/exportData', queryParams, `企业数据_${new Date().getTime()}.xlsx`);
 }
+
+// 表格勾选变化：收集所选行的 companyId
+function handleSelectionChange(rows: any[]) {
+  selectedIds.value = rows.map((r) => r.companyId);
+}
+
+// 批量删除：二次确认后按所选 companyId 删除（后端接口待补，前端已对接 delCompany）
+async function handleBatchDelete() {
+  // 未勾选任何企业时给出提示，避免静默无反应
+  if (selectedIds.value.length === 0) {
+    ElMessage.warning('请先选择要删除的企业');
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(`是否删除选中企业？`, '提示', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning',
+    });
+    await delCompany(selectedIds.value);
+    ElMessage.success('删除成功');
+    selectedIds.value = [];
+    loadData();
+    loadStatistics();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败');
+    }
+  }
+}
+
+//新增
+
+function add(){
+  editVisible.value = true;
+  form.value = {
+    companyName: '',
+    socialCreditCode: '',
+    contactPerson: '',
+    contactPhone: '',
+    registeredAddress: '',
+    companyAddress: '',
+    businessLicense: '',
+    idCardPhotoIds: '',
+    bankAccountIds: '',
+    companyAddressIds: '',
+    recruitmentAuthorizationIds: '',
+    logoUrl:''
+  };
+}
+/** 提交按钮：完整校验通过后置为「待审核」(status=0)，进入运营审核队列。 */
+const submit = async () => {
+  // 1. 表单校验
+  try {
+    formRef.value?.validate(async (valid: boolean) => {
+      if (valid) {
+        (form.value as any).status = '0'; // 待审核
+        await addOrUpdate(form.value);
+        ElMessage.success('提交成功，已进入待审核');
+        editVisible.value = false;
+        loadData(); // 刷新列表
+      }
+    });
+  } catch (e) {
+    ElMessage.error('提交失败');
+  }
+}
+
+/**
+ * 存草稿按钮：把当前填写的内容以「草稿」(status=4)落库，允许信息不完整 —— 不做必填校验，
+ * 便于运营先存后补。新增时走新增、编辑时走更新（addOrUpdate 按 companyId 自动区分）。
+ */
+const handleDraft = async () => {
+  try {
+    (form.value as any).status = '4'; // 草稿
+    await addOrUpdate(form.value);
+    ElMessage.success('已存为草稿');
+    editVisible.value = false;
+    loadData(); // 刷新列表
+  } catch (e) {
+    ElMessage.error('存草稿失败');
+  }
+}
+
+/**
+ * 保存按钮：企业编辑(修改)场景。
+ * form 由 handleEdit 注入完整企业数据(含 companyId)，沿用 addOrUpdate 接口 —— 后端见 companyId 非空
+ * 即走 updateById 仅更新非空字段，不会新增。无 companyId(理论上不会进保存按钮)时拦截给提示。
+ */
+const handleSave = async () => {
+  if (!(form.value as any).companyId) {
+    ElMessage.warning('缺少企业ID，无法保存修改');
+    return;
+  }
+  formRef.value?.validate(async (valid: boolean) => {
+    if (!valid) return;
+    try {
+      await addOrUpdate(form.value);
+      ElMessage.success('保存成功');
+      editVisible.value = false;
+      loadData(); // 刷新列表
+    } catch (e) {
+      ElMessage.error('保存失败');
+    }
+  });
+}
+
+const handleOssChange = (ossIds) => {
+  form.businessLicense = ossIds;
+};
+
+const handleOssIdCarPhotoChange = (ossIds) => {
+  form.idCardPhotoIds = ossIds;
+};
+
+const handleOssBankAccountIdsChange = (ossIds) => {
+  form.bankAccountIds = ossIds;
+};
+
+const handleOssCompanyAddressIdsChange= (ossIds) => {
+  form.companyAddressIds = ossIds;
+};
+
+const handleOssRecruitmentAuthorizationIdsChange= (ossIds) => {
+  form.recruitmentAuthorizationIds = ossIds;
+};
+
+const handleOsslogoUrlChange= (ossIds) => {
+  form.logoUrl = ossIds;
+};
+
+
 </script>
 
 <style scoped>
@@ -729,6 +1036,22 @@ function handleExport() {
   font-weight: 600;
   color: #303133;
   border-left: 4px solid #2b7fff;
+}
+
+/* 人员管理弹窗内嵌 iframe：撑满弹窗体，去边框 */
+.staff-iframe {
+  width: 100%;
+  height: 75vh;
+  border: 0;
+  display: block;
+}
+
+/* 编辑弹窗：分区内容容器，浅边框 + 圆角，呼应详情弹窗的 el-descriptions 边框观感 */
+.edit-block {
+  padding: 18px 16px 2px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background: #fafbfc;
 }
 
 /* 资质图片网格（企业 Logo / 营业执照 / 认证材料） */

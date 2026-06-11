@@ -472,6 +472,39 @@ const handleNodeClick = (data: DeptVO) => {
   handleQuery();
 };
 
+/** 在部门树中按名称递归查找节点 id（供「企业管理-人员」入口按企业名定位单位用） */
+const findDeptIdByName = (list: DeptTreeVO[], name: string): number | string | undefined => {
+  for (const dept of list || []) {
+    if (dept.label === name) return dept.id;
+    if (dept.children && dept.children.length) {
+      const found = findDeptIdByName(dept.children, name);
+      if (found !== undefined) return found;
+    }
+  }
+  return undefined;
+};
+
+/**
+ * 入口透传定位：当从企业管理「人员」弹窗进入(URL 带 deptName=企业名 / deptId)时，
+ * 默认选中对应单位节点并过滤用户列表。无该参数时(常规菜单进入)不做任何处理。
+ */
+const applyEntryDeptFilter = async () => {
+  const query = router.currentRoute.value.query;
+  const deptName = query.deptName as string;
+  const deptIdQuery = query.deptId as string;
+  let targetId: number | string | undefined;
+  if (deptIdQuery) {
+    targetId = deptIdQuery;
+  } else if (deptName) {
+    targetId = findDeptIdByName(deptOptions.value, deptName);
+  }
+  if (targetId !== undefined) {
+    queryParams.value.deptId = targetId;
+    await nextTick();
+    deptTreeRef.value?.setCurrentKey(targetId);
+  }
+};
+
 /** 搜索按钮操作 */
 const handleQuery = () => {
   queryParams.value.pageNum = 1;
@@ -663,9 +696,10 @@ const resetForm = () => {
   form.value.id = undefined;
   form.value.status = '1';
 };
-onMounted(() => {
-  getDeptTree(); // 初始化部门数据
-  getList(); // 初始化列表数据
+onMounted(async () => {
+  await getDeptTree(); // 初始化部门数据
+  await applyEntryDeptFilter(); // 若由企业「人员」入口带参进入，默认选中对应单位
+  getList(); // 初始化列表数据（已带上入口定位的 deptId）
   proxy?.getConfigKey('sys.user.initPassword').then((response) => {
     initPassword.value = response.data;
   });

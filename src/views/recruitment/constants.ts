@@ -52,7 +52,8 @@ export const ledgerInvoiceStatusMeta = (status?: string | null): StatusMeta => r
 const COMPANY_STATUS: Record<string, StatusMeta> = {
   '0': { label: '待审核', type: 'warning' },
   '1': { label: '已认证', type: 'success' },
-  '2': { label: '已禁用', type: 'danger' }
+  '2': { label: '已禁用', type: 'danger' },
+  '4': { label: '草稿', type: 'warning' }
 };
 export const companyStatusMeta = (status?: string | null): StatusMeta => resolve(COMPANY_STATUS, status, COMPANY_STATUS['2']);
 

@@ -155,6 +155,7 @@
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
+                    <el-dropdown-item icon="user" @click="handleSelectApplyUsers(row)">候选人</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '0'" icon="CircleCheck" @click="handleAudit(row, '1')">审核通过</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '2')">审核拒绝</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '1'" icon="Bottom" @click="handleStatusChange(row, '2')">下架</el-dropdown-item>
@@ -266,7 +267,71 @@
         <el-button type="primary" @click="submitAudit">确定</el-button>
       </template>
     </el-dialog>
-
+    <el-dialog v-model="handleSelectApplyUsersVisible" title="查看候选人" width="85%" append-to-body>
+      <!-- ========== 数据表格 ========== -->
+        <el-table  :data="SelectApplyUsertableData" border stripe>
+          <el-table-column label="投递ID" prop="applyId" width="200" align="center" />
+          <el-table-column label="求职者信息" min-width="160">
+            <template #default="{ row }">
+              <div class="user-cell">
+                <el-avatar :size="34" :src="row.avatarUrl || row.avatar" style="background: #2b7fff; flex-shrink: 0">
+                  {{ (row.userName || 'U').charAt(0) }}
+                </el-avatar>
+                <div class="user-detail">
+                  <div class="name">{{ row.userName || (row.userId ? '用户#' + row.userId : '未知用户') - row.phonenumber}}</div>
+                  <div class="phone">{{ row.phonenumber || '-' }}</div>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="岗位信息" min-width="150">
+            <template #default="{ row }">
+              <div class="job-cell">
+                <div class="job-name">{{ row.jobName || (row.jobId ? '岗位#' + row.jobId : '-') }}</div>
+                <div class="salary">{{ row.salary || '' }}</div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="投递时间" prop="applyTime" width="160" align="center" />
+          <el-table-column label="状态" width="150" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.status === '0'" :type="row.isRead === '0' ? 'warning' : 'info'" size="small">
+                {{ row.isRead === '0' ? '新投递' : '已投递' }}
+              </el-tag>
+              <el-tag v-else-if="row.status === '1'" type="primary" size="small">面试邀请</el-tag>
+              <el-tag v-else-if="row.status === '2'" type="success" size="small">已录用</el-tag>
+              <el-tag v-else type="danger" size="small">已拒绝</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="已读" width="150" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.isRead === '1'" type="success" size="small">已读</el-tag>
+              <el-tag v-else type="warning" size="small">未读</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="联系方式" width="150" align="center">
+            <template #default="{ row }">
+              <el-tag
+                v-if="row.exchanged === true || row.exchanged === '1' || (typeof row.exchanged === 'number' && row.exchanged > 0)"
+                type="success"
+                size="small"
+              >已交换</el-tag
+              >
+              <span v-else class="text-muted">-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="80" fixed="right" align="center">
+            <template #default="{ row }">
+              <div style="display: flex; align-items: center; justify-content: center; gap: 8px">
+                <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+      <template #footer>
+        <pagination v-show="total1 > 0" v-model:page="queryParams1.pageNum" v-model:limit="queryParams1.pageSize" :total="total1" @pagination="loadData1" />
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -274,7 +339,16 @@
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed } from 'vue';
-import { listJob, getJobStatistics, getJobFullDetail, auditJob, changeJobStatus, delJob, updateJob } from '@/api/recruitment';
+import {
+  listJob,
+  getJobStatistics,
+  getJobFullDetail,
+  auditJob,
+  changeJobStatus,
+  delJob,
+  updateJob,
+  listApply2, listApply
+} from '@/api/recruitment';
 import type { JobFullVO } from '@/api/recruitment';
 import { download } from '@/utils/request';
 import { unwrapList, splitToArray } from './helpers';
@@ -282,9 +356,13 @@ import { jobStatusMeta, jobTypeMeta } from './constants';
 
 const loading = ref(false);
 const total = ref(0);
+const total1 = ref(0);
 const tableData = ref<any[]>([]);
+const SelectApplyUsertableData = ref<any[]>([]);
 const detailVisible = ref(false);
 const auditVisible = ref(false);
+const handleSelectApplyUsersVisible = ref(false);
+
 // 当前查看的岗位完整字段（数据来源：GET /admin/recruitment/jobDetail/{jobId} → JobFullVO）
 const currentJob = ref<JobFullVO | null>(null);
 const detailLoading = ref(false);
@@ -342,6 +420,16 @@ const queryParams = reactive({
   isHot: ''
 });
 
+const queryParams1 = reactive({
+  pageNum: 1,
+  pageSize: 10,
+  jobName: '',
+  jobType: '',
+  status: '',
+  companyName: '',
+  isRecommend: '',
+  isHot: ''
+});
 const statistics = reactive({
   totalCount: 0,
   pendingCount: 0,
@@ -366,6 +454,25 @@ async function loadData() {
     console.error('加载数据失败:', error);
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadData1() {
+  try {
+    const params: any = {
+      pageNum: queryParams1.pageNum,
+      pageSize: queryParams1.pageSize,
+      jobId: queryParams1.jobId ? Number(queryParams1.jobId) : undefined
+    };
+    let res: any;
+    res = await listApply(params);
+
+    const list = unwrapList(res);
+    SelectApplyUsertableData.value = list.rows;
+    total1.value = list.total;
+  } catch (error) {
+    console.error('加载数据失败:', error);
+  } finally {
   }
 }
 
@@ -437,6 +544,13 @@ function handleAudit(row: any, status: string) {
   auditForm.status = status;
   auditForm.remark = '';
   auditVisible.value = true;
+}
+
+//新增查询投简历人员
+function handleSelectApplyUsers(row: any){
+  handleSelectApplyUsersVisible.value=true;
+  queryParams1.jobId = row.jobId;
+  loadData1();
 }
 
 async function submitAudit() {

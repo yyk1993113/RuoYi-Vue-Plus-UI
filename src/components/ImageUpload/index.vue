@@ -80,7 +80,7 @@ const dialogImageUrl = ref('');
 const dialogVisible = ref(false);
 
 const baseUrl = import.meta.env.VITE_APP_BASE_API;
-const uploadImgUrl = ref(baseUrl + '/resource/oss/upload'); // 上传的图片服务器地址
+const uploadImgUrl = ref(baseUrl + '/api/company/upload'); // 上传的图片服务器地址
 const headers = ref(globalHeaders());
 
 const fileList = ref<any[]>([]);
@@ -101,6 +101,7 @@ watch(
         list = val as OssVO[];
       } else {
         const res = await listByIds(val);
+
         list = res.data;
       }
       // 然后将数组转为对象数组
@@ -173,6 +174,7 @@ const handleExceed = () => {
 
 // 上传成功回调
 const handleUploadSuccess = (res: any, file: UploadFile) => {
+  console.log(res.data);
   if (res.code === 200) {
     uploadList.value.push({ name: res.data.fileName, url: res.data.url, ossId: res.data.ossId });
     uploadedSuccessfully();
@@ -208,6 +210,15 @@ const uploadedSuccessfully = () => {
     proxy?.$modal.closeLoading();
   }
 };
+
+defineExpose({
+  clear() {
+    fileList.value = [];
+    uploadList.value = [];
+    number.value = 0;
+    emit('update:modelValue', '');
+  }
+});
 
 // 上传失败
 const handleUploadError = () => {
