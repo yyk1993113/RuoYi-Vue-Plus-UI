@@ -99,12 +99,16 @@
             <div class="job-info">
               <div class="job-header">
                 <span class="job-name">{{ row.jobName }}</span>
-                <el-tag :type="jobTypeMeta(row.jobType).type" size="small">{{ jobTypeMeta(row.jobType).label }}</el-tag>
+                <!-- 旧数据 jobType 可能为 null，回退到同口径的 employmentType（见 constants.ts JOB_TYPE 注释） -->
+                <el-tag :type="jobTypeMeta(row.jobType ?? row.employmentType).type" size="small">{{
+                  jobTypeMeta(row.jobType ?? row.employmentType).label
+                }}</el-tag>
               </div>
               <div class="job-salary">{{ row.salary }}</div>
               <div class="job-location">
                 <el-icon><Location /></el-icon>
-                {{ row.location || '未知地点' }}
+                <!-- 地点真实值在 workAddress，location 为旧字段，与详情弹窗口径保持一致 -->
+                {{ row.workAddress || row.location || '未知地点' }}
               </div>
             </div>
           </template>
@@ -190,8 +194,11 @@
           <el-descriptions-item label="岗位名称" :span="2">{{ currentJob.jobName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="企业名称" :span="2">{{ currentJob.companyName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="用工性质">
-            <!-- 文案优先用后端 jobTypeName，缺失时回退到本地 jobType 映射；颜色取本地映射 -->
-            <el-tag :type="jobTypeMeta(currentJob.jobType).type">{{ currentJob.jobTypeName || jobTypeMeta(currentJob.jobType).label }}</el-tag>
+            <!-- 文案/颜色统一走本地 JOB_TYPE 映射；后端不返回 jobTypeName，且 employmentTypeText 只认全职/兼职两值，均不可靠。
+                 旧数据 jobType 可能为 null，回退到同口径的 employmentType -->
+            <el-tag :type="jobTypeMeta(currentJob.jobType ?? currentJob.employmentType).type">{{
+              jobTypeMeta(currentJob.jobType ?? currentJob.employmentType).label
+            }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="职位类目">{{ currentJob.category || '-' }}</el-descriptions-item>
           <el-descriptions-item label="薪资范围">{{ currentJob.salary || '面议' }}</el-descriptions-item>

@@ -76,15 +76,17 @@ const JOB_STATUS: Record<string, StatusMeta> = {
 export const jobStatusMeta = (status?: string | null): StatusMeta => resolve(JOB_STATUS, status, JOB_STATUS['2']);
 
 // ========== 用工性质 jobType：0全职 / 1兼职 / 2临时工 / 3项目制 ==========
-// 来源：job.vue 表格列与详情弹窗的 el-tag 阶梯；原 v-else（项目制）为默认色（空 type）。
-// 注意：详情弹窗优先使用后端 jobTypeName 作为文案，仅在缺失时回退到本表 label。
+// 来源：job.vue 表格列与详情弹窗的 el-tag 阶梯。
+// 注意：后端旧数据可能只填 employment_type（job_type 为 null），两字段值口径一致
+//      （见后端 Job.java / JobMapper.xml 的 COALESCE 逻辑），调用方需传 jobType ?? employmentType。
+//      兜底为「未知 / info」——此前兜底到「项目制」会把字段缺失伪装成正常业务值，掩盖取错字段的问题。
 const JOB_TYPE: Record<string, StatusMeta> = {
   '0': { label: '全职', type: 'success' },
   '1': { label: '兼职', type: 'warning' },
   '2': { label: '临时工', type: 'danger' },
   '3': { label: '项目制', type: '' }
 };
-export const jobTypeMeta = (jobType?: string | null): StatusMeta => resolve(JOB_TYPE, jobType, JOB_TYPE['3']);
+export const jobTypeMeta = (jobType?: string | null): StatusMeta => resolve(JOB_TYPE, jobType, { label: '未知', type: 'info' });
 
 // ========== 投递状态 apply：0已投递 / 1面试邀请 / 2已录用 / 3已拒绝 ==========
 // 来源：apply.vue 详情头部 getStatusLabel 与 index.vue「最新投递」列表的状态着色。
