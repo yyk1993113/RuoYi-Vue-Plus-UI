@@ -82,12 +82,17 @@
     <!-- 数据表格 -->
     <el-card shadow="hover">
       <template #header>
-        <el-row :gutter="10">
+        <el-row :gutter="10" align="middle">
           <el-col :span="1.5">
             <el-button type="primary" plain icon="Refresh" @click="loadData">刷新</el-button>
           </el-col>
           <el-col :span="1.5">
             <el-button type="success" plain icon="Download" @click="handleExport">导出</el-button>
+          </el-col>
+          <!-- 操作指引：常驻文字提示（按需求不用 tooltip 气泡），与按钮同行展示 -->
+          <el-col :span="12" class="toolbar-tip">
+            <el-icon><InfoFilled /></el-icon>
+            提示：点击列表中的「投递人数」可查看具体投递人员
           </el-col>
         </el-row>
       </template>
@@ -120,7 +125,11 @@
         </el-table-column>
         <el-table-column label="投递人数" prop="applyCount" width="100" align="center">
           <template #default="{ row }">
-            <el-tag type="primary">{{ row.applyCount || 0 }}</el-tag>
+            <!-- 点击数字打开该岗位的求职人（候选人）列表弹窗，复用"更多→候选人"同一弹窗；
+                 操作指引为工具栏常驻文字（导出按钮旁），不用气泡 -->
+            <el-tag type="primary" class="apply-count-tag" @click="handleSelectApplyUsers(row)">
+              {{ row.applyCount || 0 }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="推荐" width="80" align="center">
@@ -149,17 +158,25 @@
           </template>
         </el-table-column>
         <el-table-column label="发布时间" prop="publishTime" width="160" align="center" />
-        <el-table-column label="操作" width="200" fixed="right" align="center">
+        <!-- 240px 容纳 详情/编辑/更多 三按钮单行展示；nowrap 防止"更多"折到第二行 -->
+        <el-table-column label="操作" width="240" fixed="right" align="center">
           <template #default="{ row }">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: nowrap; white-space: nowrap;">
               <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
+              <el-button link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
               <el-dropdown trigger="click">
                 <span class="el-dropdown-link">
                   <el-button link type="primary">更多<el-icon class="el-icon--right"><arrow-down /></el-icon></el-button>
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item icon="user" @click="handleSelectApplyUsers(row)">候选人</el-dropdown-item>
+                    <!-- 候选人入口仅审核通过后展示：待审核(0)/草稿(3)岗位尚无有效投递，隐藏避免误导；
+                         已上架(1)/已下架(2)/已满员(4)/已结束(5)均为通过后状态，保留查看历史候选人 -->
+                    <el-dropdown-item
+                      v-if="row.status !== '0' && row.status !== '3'"
+                      icon="user"
+                      @click="handleSelectApplyUsers(row)"
+                    >候选人</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '0'" icon="CircleCheck" @click="handleAudit(row, '1')">审核通过</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '2')">审核拒绝</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '1'" icon="Bottom" @click="handleStatusChange(row, '2')">下架</el-dropdown-item>
@@ -274,7 +291,83 @@
         <el-button type="primary" @click="submitAudit">确定</el-button>
       </template>
     </el-dialog>
-    <el-dialog v-model="handleSelectApplyUsersVisible" title="查看候选人" width="85%" append-to-body>
+
+    <!-- 岗位编辑对话框：运营修正岗位核心信息。
+         数据来源 getJobFullDetail 全量回显；提交走 PUT /admin/recruitment/job（updateById 按非空字段更新），
+         薪资改动时前端同步合成 salary 展示串（后端 update 不重算该串，不传会导致列表显示旧薪资）。 -->
+    <el-dialog v-model="editVisible" title="编辑岗位" width="640px" append-to-body>
+      <!-- 字段集与排序对齐 B 端发布岗位表单：名称/性质/类目/地点/薪资/经验/学历/人数/描述 -->
+      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="100px" v-loading="editLoading" scroll-to-error>
+        <el-form-item label="岗位名称" prop="jobName">
+          <el-input v-model="editForm.jobName" placeholder="请输入岗位名称" maxlength="50" show-word-limit />
+        </el-form-item>
+        <el-form-item label="用工性质" prop="jobType">
+          <el-radio-group v-model="editForm.jobType">
+            <el-radio label="0">全职</el-radio>
+            <el-radio label="1">兼职</el-radio>
+            <el-radio label="2">临时工</el-radio>
+            <el-radio label="3">项目制</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="职位类目" prop="category">
+          <el-select v-model="editForm.category" placeholder="请选择职位类目" clearable filterable style="width: 100%">
+            <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="工作地点" prop="location">
+          <el-input v-model="editForm.location" placeholder="请输入工作地点" maxlength="200" />
+        </el-form-item>
+        <el-form-item label="薪资区间" prop="salaryMin">
+          <div style="display: flex; align-items: center; gap: 8px; width: 100%">
+            <el-input-number v-model="editForm.salaryMin" :min="0" :max="9999999" controls-position="right" placeholder="最低" style="width: 150px" />
+            <span>至</span>
+            <el-input-number v-model="editForm.salaryMax" :min="0" :max="9999999" controls-position="right" placeholder="最高" style="width: 150px" />
+            <el-select v-model="editForm.salaryUnit" style="width: 100px">
+              <el-option label="元/月" value="月" />
+              <el-option label="元/天" value="天" />
+              <el-option label="元/时" value="时" />
+              <el-option label="元/次" value="次" />
+            </el-select>
+          </div>
+        </el-form-item>
+        <el-form-item label="经验要求" prop="experience">
+          <el-select v-model="editForm.experience" placeholder="请选择经验要求" clearable style="width: 100%">
+            <el-option v-for="opt in experienceOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="学历要求" prop="education">
+          <el-select v-model="editForm.education" placeholder="请选择学历要求" clearable style="width: 100%">
+            <el-option v-for="opt in educationOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="招聘人数" prop="recruitNumber">
+          <el-input-number v-model="editForm.recruitNumber" :min="1" :max="9999" controls-position="right" style="width: 150px" />
+          <span style="margin-left: 8px; color: #606266">人</span>
+        </el-form-item>
+        <el-form-item label="岗位描述" prop="description">
+          <el-input v-model="editForm.description" type="textarea" :rows="5" placeholder="岗位职责、工作内容、任职要求等" maxlength="2000" show-word-limit />
+        </el-form-item>
+        <!-- 岗位福利：小程序端为 JSON 数组串、B 端 PC 为纯文本，此处原样回显/原样保存不做转换，避免破坏来源格式 -->
+        <el-form-item label="岗位福利">
+          <el-input v-model="editForm.benefits" type="textarea" :rows="3" placeholder="选填：如五险一金、餐补、年终奖、弹性工作等" maxlength="500" show-word-limit />
+        </el-form-item>
+        <el-form-item label="团队介绍">
+          <el-input v-model="editForm.teamIntro" type="textarea" :rows="3" placeholder="选填：介绍团队规模、氛围、技术栈等" maxlength="500" show-word-limit />
+        </el-form-item>
+        <el-form-item label="附加条件">
+          <el-input v-model="editForm.additionalConditions" type="textarea" :rows="3" placeholder="选填：任职附加条件（如需自带工具、接受出差、持有相关证书等）" maxlength="500" show-word-limit />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="editForm.remark" type="textarea" :rows="2" placeholder="运营备注（选填）" maxlength="200" show-word-limit />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="editSubmitting" @click="submitEdit">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="handleSelectApplyUsersVisible" title="投递人员" width="85%" append-to-body>
       <!-- ========== 数据表格 ========== -->
         <el-table  :data="SelectApplyUsertableData" border stripe>
           <el-table-column label="投递ID" prop="applyId" width="200" align="center" />
@@ -285,7 +378,7 @@
                   {{ (row.userName || 'U').charAt(0) }}
                 </el-avatar>
                 <div class="user-detail">
-                  <div class="name">{{ row.userName || (row.userId ? '用户#' + row.userId : '未知用户') - row.phonenumber}}</div>
+                  <div class="name">{{ row.userName || (row.userId ? '用户#' + row.userId : '未知用户') }}</div>
                   <div class="phone">{{ row.phonenumber || '-' }}</div>
                 </div>
               </div>
@@ -430,6 +523,8 @@ const queryParams = reactive({
 const queryParams1 = reactive({
   pageNum: 1,
   pageSize: 10,
+  // 投递人员弹窗的岗位过滤条件：保存原始雪花ID（字符串），不可转 Number
+  jobId: undefined as string | number | undefined,
   jobName: '',
   jobType: '',
   status: '',
@@ -450,6 +545,172 @@ const auditForm = reactive({
   remark: ''
 });
 
+// ===== 岗位编辑 =====
+const editVisible = ref(false);
+const editLoading = ref(false); // 打开弹窗拉取全量详情时的回显 loading
+const editSubmitting = ref(false); // 保存提交中，驱动按钮等待动画防重复提交
+const editFormRef = ref();
+
+const editForm = reactive({
+  jobId: undefined as number | string | undefined,
+  jobName: '',
+  jobType: '0',
+  category: '',
+  salaryMin: undefined as number | undefined,
+  salaryMax: undefined as number | undefined,
+  salaryUnit: '天',
+  location: '',
+  experience: '',
+  education: '',
+  recruitNumber: undefined as number | undefined,
+  description: '',
+  benefits: '',
+  teamIntro: '',
+  additionalConditions: '',
+  remark: ''
+});
+
+// 职位类目：与 B 端发布表单同一套本地常量（value 为字典值、label 为展示名），保证两端落库口径一致
+const categoryOptions = [
+  { value: 'tech', label: '技术研发' },
+  { value: 'product', label: '产品' },
+  { value: 'design', label: '设计' },
+  { value: 'operation', label: '运营' },
+  { value: 'marketing', label: '市场营销' },
+  { value: 'sales', label: '销售' },
+  { value: 'service', label: '客服' },
+  { value: 'finance', label: '财务/会计' },
+  { value: 'hr', label: '人力资源/行政' },
+  { value: 'logistics', label: '物流/仓储' },
+  { value: 'catering', label: '餐饮/服务业' },
+  { value: 'retail', label: '零售/导购' },
+  { value: 'manufacture', label: '生产/制造' },
+  { value: 'education', label: '教育/培训' },
+  { value: 'other', label: '其他' }
+];
+
+// 经验要求 0-4 / 学历要求 0-7：口径与 B 端发布表单一致
+const experienceOptions = [
+  { value: '0', label: '经验不限' },
+  { value: '1', label: '应届/1年以内' },
+  { value: '2', label: '1-3年' },
+  { value: '3', label: '3-5年' },
+  { value: '4', label: '5年以上' }
+];
+
+const educationOptions = [
+  { value: '0', label: '学历不限' },
+  { value: '1', label: '初中及以下' },
+  { value: '2', label: '高中' },
+  { value: '3', label: '中专/技校' },
+  { value: '4', label: '大专' },
+  { value: '5', label: '本科' },
+  { value: '6', label: '硕士' },
+  { value: '7', label: '博士' }
+];
+
+const editRules = {
+  jobName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
+  jobType: [{ required: true, message: '请选择用工性质', trigger: 'change' }],
+  category: [{ required: true, message: '请选择职位类目', trigger: 'change' }],
+  location: [{ required: true, message: '请输入工作地点', trigger: 'blur' }],
+  experience: [{ required: true, message: '请选择经验要求', trigger: 'change' }],
+  education: [{ required: true, message: '请选择学历要求', trigger: 'change' }],
+  recruitNumber: [{ required: true, message: '请输入招聘人数', trigger: 'change' }],
+  description: [{ required: true, message: '请输入岗位描述', trigger: 'blur' }],
+  salaryMin: [
+    {
+      required: true,
+      validator: (_rule: any, _value: any, callback: (err?: Error) => void) => {
+        if (editForm.salaryMin == null || editForm.salaryMax == null) {
+          callback(new Error('请填写完整薪资区间'));
+        } else if (Number(editForm.salaryMax) < Number(editForm.salaryMin)) {
+          callback(new Error('最高薪资不能低于最低薪资'));
+        } else {
+          callback();
+        }
+      },
+      trigger: 'change'
+    }
+  ]
+};
+
+// 薪资单位归一：存量数据两套口径并存（数字码 '1'月/'2'次/'3'时 与中文 '月'/'天'…），统一转中文供下拉回显
+function normalizeSalaryUnit(u?: string): string {
+  const codeMap: Record<string, string> = { '1': '月', '2': '次', '3': '时' };
+  return codeMap[u || ''] || u || '天';
+}
+
+// 打开编辑：拉全量详情回显（列表行字段不全，缺 salaryMin/Max/recruitNumber/description 等）
+async function handleEdit(row: any) {
+  editVisible.value = true;
+  editLoading.value = true;
+  try {
+    const res = await getJobFullDetail(row.jobId);
+    const d: any = res.data || {};
+    editForm.jobId = d.jobId ?? row.jobId;
+    editForm.jobName = d.jobName ?? '';
+    editForm.jobType = d.jobType != null ? String(d.jobType) : '0';
+    editForm.category = d.category != null ? String(d.category) : '';
+    editForm.salaryMin = d.salaryMin ?? undefined;
+    editForm.salaryMax = d.salaryMax ?? undefined;
+    editForm.salaryUnit = normalizeSalaryUnit(d.salaryUnit);
+    editForm.location = d.location || d.workAddress || '';
+    editForm.experience = d.experience != null ? String(d.experience) : '';
+    editForm.education = d.education != null ? String(d.education) : '';
+    editForm.recruitNumber = d.recruitNumber ?? undefined;
+    editForm.description = d.description ?? '';
+    editForm.benefits = d.benefits ?? '';
+    editForm.teamIntro = d.teamIntro ?? '';
+    editForm.additionalConditions = d.additionalConditions ?? '';
+    editForm.remark = d.remark ?? '';
+    editFormRef.value?.clearValidate?.();
+  } catch (error) {
+    ElMessage.error('获取岗位详情失败');
+    editVisible.value = false;
+  } finally {
+    editLoading.value = false;
+  }
+}
+
+// 保存编辑：location/workAddress 同步提交（两字段并存，列表与 B 端各读一边）；
+// salary 展示串由 min/max/unit 前端合成（后端 update 走 updateById 不重算）
+async function submitEdit() {
+  editFormRef.value?.validate(async (valid: boolean) => {
+    if (!valid) return;
+    editSubmitting.value = true;
+    try {
+      await updateJob({
+        jobId: editForm.jobId,
+        jobName: editForm.jobName,
+        jobType: editForm.jobType,
+        category: editForm.category,
+        salaryMin: editForm.salaryMin,
+        salaryMax: editForm.salaryMax,
+        salaryUnit: editForm.salaryUnit,
+        salary: `${editForm.salaryMin}-${editForm.salaryMax}/${editForm.salaryUnit}`,
+        location: editForm.location,
+        workAddress: editForm.location,
+        experience: editForm.experience,
+        education: editForm.education,
+        recruitNumber: editForm.recruitNumber,
+        description: editForm.description,
+        benefits: editForm.benefits,
+        teamIntro: editForm.teamIntro,
+        additionalConditions: editForm.additionalConditions,
+        remark: editForm.remark || undefined
+      });
+      ElMessage.success('保存成功');
+      editVisible.value = false;
+      loadData();
+    } catch (error) {
+      ElMessage.error('保存失败');
+    } finally {
+      editSubmitting.value = false;
+    }
+  });
+}
+
 async function loadData() {
   loading.value = true;
   try {
@@ -469,7 +730,9 @@ async function loadData1() {
     const params: any = {
       pageNum: queryParams1.pageNum,
       pageSize: queryParams1.pageSize,
-      jobId: queryParams1.jobId ? Number(queryParams1.jobId) : undefined
+      // 岗位ID为19位雪花ID，必须按字符串透传：Number() 超出安全整数会丢精度，
+      // 后端按错误ID过滤导致列表恒空（后端 @RequestParam Long 会自行解析字符串）
+      jobId: queryParams1.jobId ? String(queryParams1.jobId) : undefined
     };
     let res: any;
     res = await listApply(params);
@@ -637,6 +900,65 @@ function formatStartDate(val?: string | number): string {
 <style scoped>
 .mb-4 {
   margin-bottom: 16px;
+}
+
+/* 投递人数：可点击打开候选人弹窗，hover 给出可交互反馈 */
+.apply-count-tag {
+  cursor: pointer;
+}
+
+.apply-count-tag:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+/* 投递人员弹窗：求职者/岗位单元格布局（与投递管理页 apply.vue 同款样式，
+   模板复制自该页但样式此前缺失，导致头像与文字纵向堆叠错位） */
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-detail .name {
+  font-weight: 600;
+  color: #303133;
+  font-size: 13px;
+}
+
+.user-detail .phone {
+  font-size: 11px;
+  color: #909399;
+  margin-top: 2px;
+}
+
+.job-cell {
+  padding: 2px 0;
+}
+
+.job-cell .job-name {
+  font-weight: 600;
+  color: #303133;
+  font-size: 13px;
+}
+
+.job-cell .salary {
+  font-size: 12px;
+  color: #f56c6c;
+  margin-top: 2px;
+}
+
+.text-muted {
+  color: #c0c4cc;
+}
+
+/* 工具栏操作指引：与刷新/导出按钮同行的常驻灰字提示 */
+.toolbar-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #909399;
 }
 
 .stat-mini-card {

@@ -1054,6 +1054,24 @@ export function listConfigDictData(dictType: string) {
   return request.get<ConfigDictDataVO[]>(`${configBaseUrl}/dict/${dictType}`);
 }
 
+// ---------- 招聘业务字典项管理（岗位类别 rec_job_category 等，后端白名单限定） ----------
+// 对应 AdminConfigController 的 /admin/config/dict 写接口，复用 sys_dict 存储不另建表。
+
+// 新增字典项：POST /admin/config/dict
+export function addConfigDictData(data: ConfigDictDataVO) {
+  return request.post(`${configBaseUrl}/dict`, data);
+}
+
+// 修改字典项：PUT /admin/config/dict（dictCode 必传）
+export function updateConfigDictData(data: ConfigDictDataVO) {
+  return request.put(`${configBaseUrl}/dict`, data);
+}
+
+// 删除字典项（支持批量，逗号拼接）：DELETE /admin/config/dict/{dictCodes}
+export function delConfigDictData(dictCodes: number | number[]) {
+  return request.delete(`${configBaseUrl}/dict/${dictCodes}`);
+}
+
 // ==================== 运营台·数据导出中心 — 各业务域导出端点 ====================
 // 说明：以下均为后端 POST 导出接口（blob 下载），供 views/recruitment/export.vue 配合
 //       utils/request 的全局 download(url, params, fileName) 使用。审计导出 URL
