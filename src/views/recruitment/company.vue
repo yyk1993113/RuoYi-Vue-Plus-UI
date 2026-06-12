@@ -319,7 +319,8 @@
 
     <!-- 企业编辑对话框：主体信息 + 资质图片（视觉风格与"企业详情"对齐：分区标题 + 边框分组） -->
     <el-dialog v-model="editVisible" title="企业编辑" width="820px" append-to-body>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
+      <!-- scroll-to-error：校验失败时自动滚动到首个出错字段，避免错误提示滚出视野后点提交"无反应" -->
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" scroll-to-error>
         <!-- 主体信息：与详情弹窗一致的蓝条分区标题 + 边框分组容器 -->
         <div class="section-title">主体信息</div>
         <div class="edit-block">
@@ -345,6 +346,15 @@
               <el-form-item label="法人电话" prop="contactPhone">
                 <el-input v-model="form.contactPhone" placeholder="法定代表人电话"  maxlength="11"
                           @input="form.contactPhone = form.contactPhone.replace(/[^\d]/g, '')"></el-input>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <!-- 超管手机号：企业超级管理员账号的登录手机号；不填时后端回退用法人电话开通账号 -->
+              <el-form-item label="超管手机号" prop="adminPhone">
+                <el-input v-model="form.adminPhone" placeholder="企业超级管理员手机号，空则用法人电话" maxlength="11"
+                          @input="form.adminPhone = (form.adminPhone || '').replace(/[^\d]/g, '')"></el-input>
               </el-form-item>
             </el-col>
           </el-row>
@@ -406,11 +416,30 @@
         </div>
       </el-form>
       <template #footer>
-        <el-button type="primary" @click="handleSave"  v-if="form.status && form.status !== '4'">保存</el-button>
-        <el-button type="primary" @click="handleDraft"  v-if="form.status !== '1'">存草稿</el-button>
-        <el-button type="primary" v-if="form.status !== '1'" @click="submit">提交</el-button>
-        <el-button @click="editVisible = false">取消</el-button>
-
+        <!-- 提交中：当前操作按钮转圈，其余按钮禁用，防止重复/交叉提交 -->
+        <el-button
+          v-if="form.status && form.status !== '4'"
+          type="primary"
+          :loading="editSubmitting === 'save'"
+          :disabled="!!editSubmitting && editSubmitting !== 'save'"
+          @click="handleSave"
+        >保存</el-button>
+        <!-- 存草稿仅限"新增（尚无状态）/ 草稿(4)"：已进入审核流（待审核/已认证/驳回）的企业不允许再回退为草稿 -->
+        <el-button
+          v-if="!form.status || form.status === '4'"
+          type="primary"
+          :loading="editSubmitting === 'draft'"
+          :disabled="!!editSubmitting && editSubmitting !== 'draft'"
+          @click="handleDraft"
+        >存草稿</el-button>
+        <el-button
+          v-if="form.status !== '1'"
+          type="primary"
+          :loading="editSubmitting === 'submit'"
+          :disabled="!!editSubmitting && editSubmitting !== 'submit'"
+          @click="submit"
+        >提交</el-button>
+        <el-button :disabled="!!editSubmitting" @click="editVisible = false">取消</el-button>
       </template>
     </el-dialog>
 
@@ -606,11 +635,28 @@ const rules = reactive({
   ],
   registeredAddress:[
     { required: true, message: '请输入注册地址', trigger: 'blur' }
+  ],
+  // 超管手机号：选填；填了必须是 11 位手机号（空值放行，不能直接用 pattern——async-validator 对空串也会跑 pattern）
+  adminPhone: [
+    {
+      validator: (_rule: any, value: string, callback: (err?: Error) => void) => {
+        if (!value || /^1[3-9]\d{9}$/.test(value)) {
+          callback();
+        } else {
+          callback(new Error('请输入正确的11位手机号'));
+        }
+      },
+      trigger: 'blur'
+    }
   ]
 })
 
 // 审核提交中标志，防止重复提交（通过/驳回均复用）
 const auditSubmitting = ref(false);
+
+// 企业编辑弹窗提交中状态：'' 空闲 / save 保存 / draft 存草稿 / submit 提交。
+// 驱动对应按钮的 loading 等待动画，其余按钮（含取消）禁用，防止请求期间重复或交叉操作。
+const editSubmitting = ref<'' | 'save' | 'draft' | 'submit'>('');
 
 // ===== 历史审核记录（详情弹窗）=====
 // 数据来源：getCompanyAuditHistory → CompanyAuditHistoryVO，聚合 rec_audit_log 与 company_cert。
@@ -994,6 +1040,7 @@ function add(){
     socialCreditCode: '',
     contactPerson: '',
     contactPhone: '',
+    adminPhone: '',
     registeredAddress: '',
     companyAddress: '',
     businessLicense: '',
@@ -1006,20 +1053,26 @@ function add(){
 }
 /** 提交按钮：完整校验通过后置为「待审核」(status=0)，进入运营审核队列。 */
 const submit = async () => {
-  // 1. 表单校验
-  try {
-    formRef.value?.validate(async (valid: boolean) => {
-      if (valid) {
-        (form.value as any).status = '0'; // 待审核
-        await addOrUpdate(form.value);
-        ElMessage.success('提交成功，已进入待审核');
-        editVisible.value = false;
-        loadData(); // 刷新列表
-      }
-    });
-  } catch (e) {
-    ElMessage.error('提交失败');
-  }
+  // 1. 表单校验（异常处理放回调内：外层 try 包不住 async 回调里的 await 异常）
+  formRef.value?.validate(async (valid: boolean) => {
+    // 校验失败必须显式提示：错误红字可能在弹窗滚动区上方（视野外），静默 return 会被误判为"按钮无效"
+    if (!valid) {
+      ElMessage.warning('请检查表单：必填项未填或格式不正确（信用代码需18位、电话需11位手机号）');
+      return;
+    }
+    editSubmitting.value = 'submit';
+    try {
+      (form.value as any).status = '0'; // 待审核
+      await addOrUpdate(form.value);
+      ElMessage.success('提交成功，已进入待审核');
+      editVisible.value = false;
+      loadData(); // 刷新列表
+    } catch (e) {
+      ElMessage.error('提交失败');
+    } finally {
+      editSubmitting.value = '';
+    }
+  });
 }
 
 /**
@@ -1027,6 +1080,7 @@ const submit = async () => {
  * 便于运营先存后补。新增时走新增、编辑时走更新（addOrUpdate 按 companyId 自动区分）。
  */
 const handleDraft = async () => {
+  editSubmitting.value = 'draft';
   try {
     (form.value as any).status = '4'; // 草稿
     await addOrUpdate(form.value);
@@ -1035,6 +1089,8 @@ const handleDraft = async () => {
     loadData(); // 刷新列表
   } catch (e) {
     ElMessage.error('存草稿失败');
+  } finally {
+    editSubmitting.value = '';
   }
 }
 
@@ -1049,7 +1105,11 @@ const handleSave = async () => {
     return;
   }
   formRef.value?.validate(async (valid: boolean) => {
-    if (!valid) return;
+    if (!valid) {
+      ElMessage.warning('请检查表单：必填项未填或格式不正确（信用代码需18位、电话需11位手机号）');
+      return;
+    }
+    editSubmitting.value = 'save';
     try {
       await addOrUpdate(form.value);
       ElMessage.success('保存成功');
@@ -1057,6 +1117,8 @@ const handleSave = async () => {
       loadData(); // 刷新列表
     } catch (e) {
       ElMessage.error('保存失败');
+    } finally {
+      editSubmitting.value = '';
     }
   });
 }
