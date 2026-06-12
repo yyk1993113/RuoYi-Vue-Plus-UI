@@ -99,9 +99,9 @@
             <div class="job-info">
               <div class="job-header">
                 <span class="job-name">{{ row.jobName }}</span>
-                <!-- 旧数据 jobType 可能为 null，回退到同口径的 employmentType（见 constants.ts JOB_TYPE 注释） -->
-                <el-tag :type="jobTypeMeta(row.jobType ?? row.employmentType).type" size="small">{{
-                  jobTypeMeta(row.jobType ?? row.employmentType).label
+                <!-- 旧数据 jobType 可能为 null/空串，回退到同口径的 employmentType（见 constants.ts JOB_TYPE 注释） -->
+                <el-tag :type="jobTypeMeta(row.jobType || row.employmentType).type" size="small">{{
+                  jobTypeMeta(row.jobType || row.employmentType).label
                 }}</el-tag>
               </div>
               <div class="job-salary">{{ row.salary }}</div>
@@ -195,9 +195,9 @@
           <el-descriptions-item label="企业名称" :span="2">{{ currentJob.companyName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="用工性质">
             <!-- 文案/颜色统一走本地 JOB_TYPE 映射；后端不返回 jobTypeName，且 employmentTypeText 只认全职/兼职两值，均不可靠。
-                 旧数据 jobType 可能为 null，回退到同口径的 employmentType -->
-            <el-tag :type="jobTypeMeta(currentJob.jobType ?? currentJob.employmentType).type">{{
-              jobTypeMeta(currentJob.jobType ?? currentJob.employmentType).label
+                 旧数据 jobType 可能为 null/空串，回退到同口径的 employmentType -->
+            <el-tag :type="jobTypeMeta(currentJob.jobType || currentJob.employmentType).type">{{
+              jobTypeMeta(currentJob.jobType || currentJob.employmentType).label
             }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="职位类目">{{ currentJob.category || '-' }}</el-descriptions-item>
