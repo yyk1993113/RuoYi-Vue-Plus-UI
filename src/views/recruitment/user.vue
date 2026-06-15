@@ -106,10 +106,10 @@
       </template>
 
       <el-table v-loading="loading" :data="tableData" border stripe>
-        <!-- 用户ID -->
-        <el-table-column label="用户ID" prop="userId" width="90" align="center" />
+        <!-- 用户ID：19位雪花ID需 ~170px 才能单行展示，避免折行成多行 -->
+        <el-table-column label="用户ID" prop="userId" width="180" align="center" />
 
-        <el-table-column label="用户信息" min-width="200">
+        <el-table-column label="用户信息" min-width="190">
           <template #default="{ row }">
             <div class="user-info">
               <el-avatar :src="row.avatarUrl" :size="40" fit="cover">
@@ -127,7 +127,7 @@
         </el-table-column>
 
         <!-- 联系方式 -->
-        <el-table-column label="联系方式" width="220">
+        <el-table-column label="联系方式" width="150">
           <template #default="{ row }">
             <div class="contact-info">
               <div class="contact-item">
@@ -142,22 +142,18 @@
           </template>
         </el-table-column>
 
-        <!-- 用户类型 & 性别 -->
-        <el-table-column label="类型/性别" width="110" align="center">
+        <!-- 性别（本列表按求职者口径查询，类型恒为求职者，不再展示类型标签；
+             双重身份用户的 userType 可在详情弹窗查看） -->
+        <el-table-column label="性别" width="70" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.userType === 'C'" type="success" size="small">求职者</el-tag>
-            <el-tag v-else-if="row.userType === 'B'" type="warning" size="small">企业</el-tag>
-            <el-tag v-else type="info" size="small">{{ row.userType || '-' }}</el-tag>
-            <div style="margin-top: 4px">
-              <el-tag v-if="row.sex === '0'" type="" size="small" plain>男</el-tag>
-              <el-tag v-else-if="row.sex === '1'" type="" size="small" plain>女</el-tag>
-              <span v-else class="text-muted">-</span>
-            </div>
+            <el-tag v-if="row.sex === '0'" type="" size="small" plain>男</el-tag>
+            <el-tag v-else-if="row.sex === '1'" type="" size="small" plain>女</el-tag>
+            <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
 
         <!-- 投递统计 -->
-        <el-table-column label="投递统计" align="center" width="320">
+        <el-table-column label="投递统计" align="center" width="280">
           <template #default="{ row }">
             <div class="apply-stats">
               <el-tooltip content="总投递数" placement="top">
@@ -195,7 +191,7 @@
         </el-table-column>
 
         <!-- 禁言状态 -->
-        <el-table-column label="禁言状态" width="100" align="center">
+        <el-table-column label="禁言状态" width="90" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.isRecruitmentSilenced === '1'" type="danger" size="small">
               <el-icon><WarnTriangleFilled /></el-icon> 已禁言
@@ -204,11 +200,15 @@
           </template>
         </el-table-column>
 
-        <!-- 注册时间 -->
-        <el-table-column label="注册时间" prop="createTime" width="160" align="center" />
-
-        <!-- 最后登录 -->
-        <el-table-column label="最后登录" prop="loginDate" width="160" align="center" />
+        <!-- 注册/最后登录合并双行展示，压缩横向占宽避免出现横向滚动条 -->
+        <el-table-column label="注册 / 最后登录" width="170" align="center">
+          <template #default="{ row }">
+            <div class="time-cell">
+              <div>{{ row.createTime || '-' }}</div>
+              <div class="sub">{{ row.loginDate || '未登录' }}</div>
+            </div>
+          </template>
+        </el-table-column>
 
         <!-- 操作 -->
         <el-table-column label="操作" width="150" fixed="right" align="center">
@@ -577,17 +577,17 @@ function handleExport() {
 .email-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
 
 /* ---------- 投递统计芯片 ---------- */
-.apply-stats { display: flex; align-items: center; gap: 6px; justify-content: center; }
+.apply-stats { display: flex; align-items: center; gap: 4px; justify-content: center; }
 .stat-chip {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: 8px;
   cursor: pointer;
   transition: transform 0.2s;
-  min-width: 48px;
+  min-width: 44px;
 }
 .stat-chip:hover { transform: scale(1.08); }
 .chip-num { font-size: 16px; font-weight: 800; line-height: 1.2; }
@@ -613,4 +613,8 @@ function handleExport() {
 .detail-stat-chip.rejected { background: #FEF0F0; color: #F56C6C; }
 
 .text-muted { color: #C0C4CC; }
+
+/* 注册/最后登录合并列：上行注册时间、下行最近登录（灰色小字） */
+.time-cell { font-size: 12px; line-height: 1.6; }
+.time-cell .sub { color: #909399; font-size: 11px; }
 </style>

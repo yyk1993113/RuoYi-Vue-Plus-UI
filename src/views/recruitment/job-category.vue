@@ -319,16 +319,32 @@ const categoryRules = {
   name: [{ required: true, message: '请输入类别名称', trigger: 'blur' }]
 };
 
+// 新增默认排序 = 同级（同父节点下）已有类别数 + 1，追加到末尾
+function nextCategorySort(parentId?: string | number): number {
+  const pid = String(parentId ?? '0');
+  return categoryFlat.value.filter((c) => String(c.parentId ?? '0') === pid).length + 1;
+}
+
 // 新增类别：传入 parent 时默认挂其下（树节点行内"+"），否则父级为当前选中节点/顶级
 function handleAddCategory(parent?: JobCategoryVO) {
   categoryForm.id = undefined;
   categoryForm.parentId = parent?.id ?? currentCategory.value?.id ?? undefined;
   categoryForm.name = '';
-  categoryForm.sort = 0;
+  categoryForm.sort = nextCategorySort(categoryForm.parentId);
   categoryForm.status = 0;
   categoryDialogVisible.value = true;
   categoryFormRef.value?.clearValidate?.();
 }
+
+// 新增模式下切换父级时，排序联动重算为目标父级下的"数量+1"（编辑模式不动用户已有排序）
+watch(
+  () => categoryForm.parentId,
+  (val) => {
+    if (categoryDialogVisible.value && !categoryForm.id) {
+      categoryForm.sort = nextCategorySort(val);
+    }
+  }
+);
 
 function handleEditCategory(data: JobCategoryVO) {
   categoryForm.id = data.id;
@@ -444,16 +460,42 @@ const positionRules = {
   name: [{ required: true, message: '请输入职位名称', trigger: 'blur' }]
 };
 
+// 新增默认排序 = 所属类别下已有职位数 + 1（轻量查询仅取 total），追加到末尾；查询失败兜底为 1
+async function applyNextPositionSort(categoryId?: string | number) {
+  if (!categoryId) {
+    positionForm.sort = 1;
+    return;
+  }
+  try {
+    const res: any = await listJobPosition({ categoryId, pageNum: 1, pageSize: 1 });
+    const body = res?.total !== undefined ? res : res?.data || {};
+    positionForm.sort = (Number(body.total) || 0) + 1;
+  } catch {
+    positionForm.sort = 1;
+  }
+}
+
 function handleAddPosition() {
   positionForm.id = undefined;
   // 默认挂当前选中类别，未选中时留空强制用户选择
   positionForm.categoryId = currentCategory.value?.id ?? undefined;
   positionForm.name = '';
-  positionForm.sort = 0;
+  positionForm.sort = 1;
   positionForm.status = 0;
   positionDialogVisible.value = true;
   positionFormRef.value?.clearValidate?.();
+  applyNextPositionSort(positionForm.categoryId);
 }
+
+// 新增模式下切换所属类别时，排序联动重算为目标类别下的"数量+1"（编辑模式不动用户已有排序）
+watch(
+  () => positionForm.categoryId,
+  (val) => {
+    if (positionDialogVisible.value && !positionForm.id) {
+      applyNextPositionSort(val);
+    }
+  }
+);
 
 function handleEditPosition(row: JobPositionVO) {
   positionForm.id = row.id;

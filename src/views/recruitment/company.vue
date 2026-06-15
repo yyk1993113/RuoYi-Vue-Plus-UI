@@ -3,7 +3,7 @@
     <!-- 统计卡片 -->
     <el-row :gutter="20" class="mb-4">
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card">
+        <el-card shadow="hover" class="stat-mini-card stat-clickable" role="button" tabindex="0" @click="handleStatFilter('all')" @keyup.enter="handleStatFilter('all')" @keyup.space="handleStatFilter('all')">
           <div class="stat-mini">
             <span class="label">企业总数</span>
             <span class="value">{{ statistics.totalCount || 0 }}</span>
@@ -11,7 +11,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card warning">
+        <el-card shadow="hover" class="stat-mini-card stat-clickable warning" role="button" tabindex="0" @click="handleStatFilter('pending')" @keyup.enter="handleStatFilter('pending')" @keyup.space="handleStatFilter('pending')">
           <div class="stat-mini">
             <span class="label">待审核</span>
             <span class="value warning">{{ statistics.pendingCount || 0 }}</span>
@@ -19,7 +19,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card success">
+        <el-card shadow="hover" class="stat-mini-card stat-clickable success" role="button" tabindex="0" @click="handleStatFilter('approved')" @keyup.enter="handleStatFilter('approved')" @keyup.space="handleStatFilter('approved')">
           <div class="stat-mini">
             <span class="label">已认证</span>
             <span class="value success">{{ statistics.approvedCount || 0 }}</span>
@@ -27,7 +27,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card danger">
+        <el-card shadow="hover" class="stat-mini-card stat-clickable danger" role="button" tabindex="0" @click="handleStatFilter('disabled')" @keyup.enter="handleStatFilter('disabled')" @keyup.space="handleStatFilter('disabled')">
           <div class="stat-mini">
             <span class="label">已禁用</span>
             <span class="value danger">{{ statistics.disabledCount || 0 }}</span>
@@ -39,7 +39,7 @@
     <!-- 禁言统计（独立一行） -->
     <el-row :gutter="20" class="mb-4">
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card danger">
+        <el-card shadow="hover" class="stat-mini-card stat-clickable danger" role="button" tabindex="0" @click="handleStatFilter('silenced')" @keyup.enter="handleStatFilter('silenced')" @keyup.space="handleStatFilter('silenced')">
           <div class="stat-mini">
             <span class="label">被禁言企业</span>
             <span class="value danger">{{ statistics.silencedCount || 0 }}</span>
@@ -50,9 +50,21 @@
 
     <!-- 查询表单 -->
     <el-card shadow="hover" class="mb-4">
-      <el-form ref="queryFormRef" :model="queryParams" :inline="true">
+      <el-form ref="queryFormRef" :model="queryParams" :inline="true" class="company-query-form">
+        <el-form-item label="企业ID" prop="companyId">
+          <el-input v-model="queryParams.companyId" placeholder="请输入企业ID" clearable style="width: 180px" @keyup.enter="handleQuery" />
+        </el-form-item>
         <el-form-item label="企业名称" prop="companyName">
           <el-input v-model="queryParams.companyName" placeholder="请输入企业名称" clearable @keyup.enter="handleQuery" />
+        </el-form-item>
+        <el-form-item v-show="showMoreQuery" label="企业描述" prop="description">
+          <el-input v-model="queryParams.description" placeholder="请输入描述关键词" clearable style="width: 180px" @keyup.enter="handleQuery" />
+        </el-form-item>
+        <el-form-item label="联系人" prop="contactPerson">
+          <el-input v-model="queryParams.contactPerson" placeholder="请输入联系人" clearable style="width: 150px" @keyup.enter="handleQuery" />
+        </el-form-item>
+        <el-form-item label="联系电话" prop="contactPhone">
+          <el-input v-model="queryParams.contactPhone" placeholder="请输入联系电话" clearable style="width: 170px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 150px">
@@ -67,9 +79,33 @@
             <el-option label="已禁言" value="1" />
           </el-select>
         </el-form-item>
+        <el-form-item v-show="showMoreQuery" label="职位数" prop="jobCount">
+          <el-input-number v-model="queryParams.jobCount" :min="0" :precision="0" controls-position="right" placeholder="职位数" style="width: 130px" />
+        </el-form-item>
+        <el-form-item v-show="showMoreQuery" label="投递数" prop="applyCount">
+          <el-input-number v-model="queryParams.applyCount" :min="0" :precision="0" controls-position="right" placeholder="投递数" style="width: 130px" />
+        </el-form-item>
+        <el-form-item v-show="showMoreQuery" label="已反馈" prop="feedbackCount">
+          <el-input-number v-model="queryParams.feedbackCount" :min="0" :precision="0" controls-position="right" placeholder="已反馈" style="width: 130px" />
+        </el-form-item>
+        <el-form-item v-show="showMoreQuery" label="未反馈" prop="noFeedbackCount">
+          <el-input-number v-model="queryParams.noFeedbackCount" :min="0" :precision="0" controls-position="right" placeholder="未反馈" style="width: 130px" />
+        </el-form-item>
+        <el-form-item v-show="showMoreQuery" label="注册时间">
+          <el-date-picker
+            v-model="dateRange"
+            value-format="YYYY-MM-DD"
+            type="daterange"
+            range-separator="-"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            style="width: 240px"
+          />
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
           <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+          <el-button link type="primary" @click="showMoreQuery = !showMoreQuery">{{ showMoreQuery ? '收起' : '更多条件' }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -119,12 +155,12 @@
         </el-table-column>
         <el-table-column label="职位数" prop="jobCount" width="100" align="center">
           <template #default="{ row }">
-            <el-tag type="info">{{ row.jobCount || 0 }}</el-tag>
+            <el-tag type="info" class="count-clickable" @click="openJobDialog(row)">{{ row.jobCount || 0 }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="投递数" prop="applyCount" width="100" align="center">
           <template #default="{ row }">
-            <el-tag type="success">{{ row.applyCount || 0 }}</el-tag>
+            <el-tag type="success" class="count-clickable" @click="openApplyDialog(row)">{{ row.applyCount || 0 }}</el-tag>
           </template>
         </el-table-column>
         <!-- 已反馈：企业已处理的投递(面试邀请/已录用/已拒绝)；未反馈：仅已投递、企业尚未处理。后端聚合返回，无额外查询。
@@ -519,6 +555,45 @@
       <iframe v-if="staffUrl" :src="staffUrl" class="staff-iframe" frameborder="0"></iframe>
     </el-dialog>
 
+    <!-- 职位列表弹窗：点击企业行「职位数」，按 companyId 分页查询该企业岗位 -->
+    <el-dialog v-model="jobVisible" :title="jobTitle" width="960px" append-to-body destroy-on-close>
+      <el-table v-loading="jobLoading" :data="jobList" border stripe>
+        <el-table-column label="岗位ID" prop="jobId" width="110" align="center" />
+        <el-table-column label="岗位名称" prop="jobName" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.jobName || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="用工性质" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag :type="jobTypeMeta(row.jobType).type">{{ row.jobTypeName || jobTypeMeta(row.jobType).label }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="薪资" prop="salary" min-width="120" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.salary || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="工作地点" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.location || row.workAddress || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="投递数" prop="applyCount" width="90" align="center">
+          <template #default="{ row }">{{ row.applyCount || 0 }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="jobStatusMeta(row.status).type">{{ row.statusName || jobStatusMeta(row.status).label }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="发布时间" prop="publishTime" width="170" align="center">
+          <template #default="{ row }">{{ row.publishTime || row.createTime || '-' }}</template>
+        </el-table-column>
+      </el-table>
+      <pagination
+        v-show="jobTotal > 0"
+        v-model:page="jobQuery.pageNum"
+        v-model:limit="jobQuery.pageSize"
+        :total="jobTotal"
+        @pagination="loadJobList"
+      />
+    </el-dialog>
+
     <!-- 投递人员弹窗：点击「已反馈/未反馈」数字，按企业 + 反馈口径分页查看投递人员列表；点击行查看求职者详情 -->
     <el-dialog v-model="applyVisible" :title="applyTitle" width="900px" append-to-body destroy-on-close>
       <div class="apply-tip">点击任意行可查看投递全景详情</div>
@@ -568,14 +643,19 @@ import {
   changeCompanyStatus,
   silenceCompany,
   unsilenceCompany,
+  listJob,
   type CompanyAuditHistoryVO,
-  type CompanyCertVO, addOrUpdate, delCompany, listApply
+  type CompanyCertVO,
+  type JobVO,
+  addOrUpdate,
+  delCompany,
+  listApply
 } from '@/api/recruitment';
 import ApplyDetailDialog from './components/ApplyDetailDialog.vue';
 import { download } from '@/utils/request';
 import { listByIds } from '@/api/system/oss';
 import { unwrapList, splitToArray } from './helpers';
-import { companyStatusMeta, certStatusMeta, applyStatusMeta } from './constants';
+import { companyStatusMeta, certStatusMeta, applyStatusMeta, jobStatusMeta, jobTypeMeta } from './constants';
 import { UserForm } from '@/api/system/user/types';
 import { updateUserProfile } from '@/api/system/user';
 import { RoleVO } from '@/api/system/role/types';
@@ -597,6 +677,14 @@ const staffVisible = ref(false);
 const staffUrl = ref('');
 const staffTitle = ref('人员管理');
 
+// 职位列表弹窗：点击企业行「职位数」后，按 companyId 调用岗位列表接口分页展示
+const jobVisible = ref(false);
+const jobTitle = ref('');
+const jobLoading = ref(false);
+const jobList = ref<JobVO[]>([]);
+const jobTotal = ref(0);
+const jobQuery = reactive({ pageNum: 1, pageSize: 10, companyId: undefined as number | undefined });
+
 // 详情弹窗「资质图片」：company 表各资质字段存的是 OSS id，需解析为 URL 后分组展示
 const certLoading = ref(false);
 const certGroups = ref<{ label: string; urls: string[] }[]>([]);
@@ -615,6 +703,8 @@ const queryFormRef = ref();
 const auditFormRef = ref();
 const silenceFormRef = ref();
 const formRef = ref();
+const dateRange = ref<[string, string] | []>([]);
+const showMoreQuery = ref(false);
 
 const form = ref<Partial<UserForm>>({});
 
@@ -667,9 +757,17 @@ const auditHistory = ref<CompanyAuditHistoryVO>({ auditLogs: [], certHistory: []
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
+  companyId: '',
   companyName: '',
+  description: '',
+  contactPerson: '',
+  contactPhone: '',
   status: '',
   isSilenced: '',
+  jobCount: undefined as number | undefined,
+  applyCount: undefined as number | undefined,
+  feedbackCount: undefined as number | undefined,
+  noFeedbackCount: undefined as number | undefined,
 });
 
 const statistics = reactive({
@@ -713,7 +811,14 @@ const silenceForm = reactive({
 async function loadData() {
   loading.value = true;
   try {
-    const res = await listCompany(queryParams);
+    const params: any = { ...queryParams };
+    if (dateRange.value && dateRange.value.length === 2) {
+      params.params = {
+        beginTime: `${dateRange.value[0]} 00:00:00`,
+        endTime: `${dateRange.value[1]} 23:59:59`
+      };
+    }
+    const res = await listCompany(params);
     const list = unwrapList(res);
     tableData.value = list.rows;
     total.value = list.total;
@@ -738,11 +843,42 @@ function handleQuery() {
   loadData();
 }
 
+function clearQueryFilters() {
+  queryParams.companyId = '';
+  queryParams.companyName = '';
+  queryParams.description = '';
+  queryParams.contactPerson = '';
+  queryParams.contactPhone = '';
+  queryParams.status = '';
+  queryParams.isSilenced = '';
+  queryParams.jobCount = undefined;
+  queryParams.applyCount = undefined;
+  queryParams.feedbackCount = undefined;
+  queryParams.noFeedbackCount = undefined;
+  dateRange.value = [];
+}
+
+function handleStatFilter(type: 'all' | 'pending' | 'approved' | 'disabled' | 'silenced') {
+  queryParams.pageNum = 1;
+  clearQueryFilters();
+
+  if (type === 'pending') {
+    queryParams.status = '0';
+  } else if (type === 'approved') {
+    queryParams.status = '1';
+  } else if (type === 'disabled') {
+    queryParams.status = '2';
+  } else if (type === 'silenced') {
+    queryParams.isSilenced = '1';
+  }
+
+  loadData();
+}
+
 function resetQuery() {
   queryFormRef.value?.resetFields();
   queryParams.pageNum = 1;
-  queryParams.status = '';
-  queryParams.isSilenced = '';
+  clearQueryFilters();
   loadData();
 }
 
@@ -914,7 +1050,7 @@ function handleStaff(row: any) {
   // 用户管理页据此默认选中对应单位并过滤用户；companyId 仅作上下文备用。
   const { href } = router.resolve({
     path: '/system/user',
-    query: { companyId: row.companyId, deptName: row.companyName }
+    query: { companyId: row.companyId, userId: row.userId, deptName: row.companyName }
   });
   // 兼容 history / hash 两种路由模式，统一拼成同源绝对地址供 iframe 加载
   staffUrl.value = new URL(href, window.location.href).toString();
@@ -922,12 +1058,35 @@ function handleStaff(row: any) {
   staffVisible.value = true;
 }
 
-// 打开投递人员弹窗：feedback='1' 已反馈 / '0' 未反馈，按 companyId 精确过滤
-function openApplyDialog(row: any, feedback: string) {
+function openJobDialog(row: any) {
+  jobQuery.companyId = row.companyId;
+  jobQuery.pageNum = 1;
+  jobTitle.value = `职位列表${row.companyName ? ' - ' + row.companyName : ''}`;
+  jobVisible.value = true;
+  loadJobList();
+}
+
+async function loadJobList() {
+  jobLoading.value = true;
+  try {
+    const res = await listJob(jobQuery);
+    const list = unwrapList(res);
+    jobList.value = list.rows;
+    jobTotal.value = list.total;
+  } catch (error) {
+    ElMessage.error('加载职位列表失败');
+  } finally {
+    jobLoading.value = false;
+  }
+}
+
+// 打开投递人员弹窗：feedback='1' 已反馈 / '0' 未反馈；不传 feedback 时展示该企业全部投递
+function openApplyDialog(row: any, feedback = '') {
   applyQuery.companyId = row.companyId;
   applyQuery.feedback = feedback;
   applyQuery.pageNum = 1;
-  applyTitle.value = `${feedback === '1' ? '已反馈' : '未反馈'}投递 - ${row.companyName || ''}`;
+  const label = feedback === '1' ? '已反馈投递' : feedback === '0' ? '未反馈投递' : '投递列表';
+  applyTitle.value = `${label} - ${row.companyName || ''}`;
   applyVisible.value = true;
   loadApplyList();
 }
@@ -1180,6 +1339,22 @@ const handleOsslogoUrlChange= (ossIds) => {
 .stat-mini .value.warning { color: #E6A23C; }
 .stat-mini .value.success { color: #67C23A; }
 .stat-mini .value.danger  { color: #F56C6C; }
+
+.company-query-form {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.stat-clickable {
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.stat-clickable:hover,
+.stat-clickable:focus-visible {
+  transform: translateY(-2px);
+}
 
 .text-secondary {
   font-size: 12px;

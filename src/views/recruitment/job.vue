@@ -3,7 +3,7 @@
     <!-- 统计卡片 -->
     <el-row :gutter="20" class="mb-4">
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card">
+        <el-card shadow="hover" class="stat-mini-card stat-clickable" role="button" tabindex="0" @click="handleStatFilter('all')" @keyup.enter="handleStatFilter('all')" @keyup.space="handleStatFilter('all')">
           <div class="stat-mini">
             <span class="label">岗位总数</span>
             <span class="value">{{ statistics.totalCount || 0 }}</span>
@@ -11,7 +11,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card warning">
+        <el-card shadow="hover" class="stat-mini-card stat-clickable warning" role="button" tabindex="0" @click="handleStatFilter('pending')" @keyup.enter="handleStatFilter('pending')" @keyup.space="handleStatFilter('pending')">
           <div class="stat-mini">
             <span class="label">待审核</span>
             <span class="value warning">{{ statistics.pendingCount || 0 }}</span>
@@ -19,7 +19,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card success">
+        <el-card shadow="hover" class="stat-mini-card stat-clickable success" role="button" tabindex="0" @click="handleStatFilter('online')" @keyup.enter="handleStatFilter('online')" @keyup.space="handleStatFilter('online')">
           <div class="stat-mini">
             <span class="label">已上架</span>
             <span class="value success">{{ statistics.onlineCount || 0 }}</span>
@@ -27,7 +27,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card info">
+        <el-card shadow="hover" class="stat-mini-card stat-clickable info" role="button" tabindex="0" @click="handleStatFilter('offline')" @keyup.enter="handleStatFilter('offline')" @keyup.space="handleStatFilter('offline')">
           <div class="stat-mini">
             <span class="label">已下架</span>
             <span class="value info">{{ statistics.offlineCount || 0 }}</span>
@@ -38,7 +38,10 @@
 
     <!-- 搜索栏 -->
     <el-card shadow="hover" class="mb-4">
-      <el-form ref="queryFormRef" :model="queryParams" :inline="true">
+      <el-form ref="queryFormRef" :model="queryParams" :inline="true" class="job-query-form">
+        <el-form-item label="岗位ID" prop="jobId">
+          <el-input v-model="queryParams.jobId" placeholder="请输入岗位ID" clearable style="width: 180px" @keyup.enter="handleQuery" />
+        </el-form-item>
         <el-form-item label="岗位名称" prop="jobName">
           <el-input v-model="queryParams.jobName" placeholder="请输入岗位名称" clearable @keyup.enter="handleQuery" />
         </el-form-item>
@@ -72,9 +75,30 @@
             <el-option label="已下架" value="2" />
           </el-select>
         </el-form-item>
+        <el-form-item v-show="showMoreQuery" label="工作地点" prop="workAddress">
+          <el-input v-model="queryParams.workAddress" placeholder="请输入工作地点" clearable style="width: 180px" @keyup.enter="handleQuery" />
+        </el-form-item>
+        <el-form-item v-show="showMoreQuery" label="薪资" prop="salary">
+          <el-input v-model="queryParams.salary" placeholder="请输入薪资关键词" clearable style="width: 170px" @keyup.enter="handleQuery" />
+        </el-form-item>
+        <el-form-item v-show="showMoreQuery" label="投递人数" prop="applyCount">
+          <el-input-number v-model="queryParams.applyCount" :min="0" :precision="0" controls-position="right" placeholder="投递人数" style="width: 130px" />
+        </el-form-item>
+        <el-form-item v-show="showMoreQuery" label="发布时间">
+          <el-date-picker
+            v-model="dateRange"
+            value-format="YYYY-MM-DD"
+            type="daterange"
+            range-separator="-"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            style="width: 240px"
+          />
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
           <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+          <el-button link type="primary" @click="showMoreQuery = !showMoreQuery">{{ showMoreQuery ? '收起' : '更多条件' }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -468,6 +492,8 @@ const currentJob = ref<JobFullVO | null>(null);
 const detailLoading = ref(false);
 const queryFormRef = ref();
 const auditFormRef = ref();
+const dateRange = ref<[string, string] | []>([]);
+const showMoreQuery = ref(false);
 
 // 兼职工作时间：后端 workTime 为 JSON 字符串，解析为可读的时段文本数组供详情渲染。
 // 兼容两种常见结构：字符串数组，或对象数组（取 start/end、day/time、label 等常见键拼装）。
@@ -512,12 +538,16 @@ const benefitsList = computed<string[]>(() => {
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
+  jobId: '',
   jobName: '',
   jobType: '',
   status: '',
   companyName: '',
   isRecommend: '',
-  isHot: ''
+  isHot: '',
+  workAddress: '',
+  salary: '',
+  applyCount: undefined as number | undefined
 });
 
 const queryParams1 = reactive({
@@ -714,7 +744,7 @@ async function submitEdit() {
 async function loadData() {
   loading.value = true;
   try {
-    const res = await listJob(queryParams);
+    const res = await listJob(buildJobQueryParams());
     const list = unwrapList(res);
     tableData.value = list.rows;
     total.value = list.total;
@@ -760,15 +790,48 @@ function handleQuery() {
   loadData();
 }
 
-function resetQuery() {
-  queryFormRef.value?.resetFields();
-  queryParams.pageNum = 1;
+function buildJobQueryParams() {
+  const params: any = { ...queryParams };
+  if (dateRange.value && dateRange.value.length === 2) {
+    params.params = {
+      beginTime: `${dateRange.value[0]} 00:00:00`,
+      endTime: `${dateRange.value[1]} 23:59:59`
+    };
+  }
+  return params;
+}
+
+function clearQueryFilters() {
+  queryParams.jobId = '';
   queryParams.jobName = '';
   queryParams.jobType = '';
   queryParams.status = '';
   queryParams.companyName = '';
   queryParams.isRecommend = '';
   queryParams.isHot = '';
+  queryParams.workAddress = '';
+  queryParams.salary = '';
+  queryParams.applyCount = undefined;
+  dateRange.value = [];
+}
+
+function handleStatFilter(type: 'all' | 'pending' | 'online' | 'offline') {
+  queryParams.pageNum = 1;
+  clearQueryFilters();
+  if (type === 'pending') {
+    queryParams.status = '0';
+  } else if (type === 'online') {
+    queryParams.status = '1';
+  } else if (type === 'offline') {
+    queryParams.status = '2';
+  }
+  loadData();
+}
+
+function resetQuery() {
+  queryFormRef.value?.resetFields();
+  queryParams.pageNum = 1;
+  clearQueryFilters();
   loadData();
 }
 
@@ -883,7 +946,7 @@ onMounted(() => {
 });
 
 function handleExport() {
-  download('/admin/recruitment/job/export', queryParams, `岗位数据_${new Date().getTime()}.xlsx`);
+  download('/admin/recruitment/job/export', buildJobQueryParams(), `岗位数据_${new Date().getTime()}.xlsx`);
 }
 
 // 期望到岗时间：后端 expectedStartDate 为 Date（序列化为时间戳/ISO 字符串），仅展示到日期即可
@@ -900,6 +963,22 @@ function formatStartDate(val?: string | number): string {
 <style scoped>
 .mb-4 {
   margin-bottom: 16px;
+}
+
+.job-query-form {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.stat-clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stat-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
 }
 
 /* 投递人数：可点击打开候选人弹窗，hover 给出可交互反馈 */

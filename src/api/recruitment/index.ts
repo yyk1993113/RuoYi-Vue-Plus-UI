@@ -400,21 +400,36 @@ export interface ExceptionApplyVO {
 export interface CompanyQuery {
   pageNum?: number;
   pageSize?: number;
+  companyId?: number | string;
   companyName?: string;
+  description?: string;
+  contactPerson?: string;
+  contactPhone?: string;
   status?: string;
   userId?: number;
   isSilenced?: string;
+  jobCount?: number | string;
+  applyCount?: number | string;
+  feedbackCount?: number | string;
+  noFeedbackCount?: number | string;
+  params?: Record<string, any>;
 }
 
 export interface JobQuery {
   pageNum?: number;
   pageSize?: number;
   jobName?: string;
+  jobId?: number | string;
   companyId?: number;
+  companyName?: string;
   status?: string;
   jobType?: string;
   isRecommend?: string;
   isHot?: string;
+  workAddress?: string;
+  salary?: string;
+  applyCount?: number | string;
+  params?: Record<string, any>;
 }
 
 export interface ApplyQuery {

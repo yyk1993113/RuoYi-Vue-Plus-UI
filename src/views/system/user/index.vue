@@ -484,21 +484,44 @@ const findDeptIdByName = (list: DeptTreeVO[], name: string): number | string | u
   return undefined;
 };
 
+const findDeptIdById = (list: DeptTreeVO[], id: string | number): number | string | undefined => {
+  const target = String(id);
+  for (const dept of list || []) {
+    if (String(dept.id) === target) return dept.id;
+    if (dept.children && dept.children.length) {
+      const found = findDeptIdById(dept.children, id);
+      if (found !== undefined) return found;
+    }
+  }
+  return undefined;
+};
+
 /**
  * 入口透传定位：当从企业管理「人员」弹窗进入(URL 带 deptName=企业名 / deptId)时，
  * 默认选中对应单位节点并过滤用户列表。无该参数时(常规菜单进入)不做任何处理。
  */
 const applyEntryDeptFilter = async () => {
   const query = router.currentRoute.value.query;
-  const deptName = query.deptName as string;
+  const entryDeptName = query.deptName as string;
   const deptIdQuery = query.deptId as string;
+  const userIdQuery = query.userId as string;
   let targetId: number | string | undefined;
-  if (deptIdQuery) {
-    targetId = deptIdQuery;
-  } else if (deptName) {
-    targetId = findDeptIdByName(deptOptions.value, deptName);
+  if (userIdQuery) {
+    try {
+      const { data } = await api.getUser(userIdQuery);
+      targetId = data?.user?.deptId ? findDeptIdById(deptOptions.value, data.user.deptId) : undefined;
+    } catch (error) {
+      console.warn('入口用户部门定位失败:', error);
+    }
+  }
+  if (targetId === undefined && deptIdQuery) {
+    targetId = findDeptIdById(deptOptions.value, deptIdQuery);
+  }
+  if (targetId === undefined && entryDeptName) {
+    targetId = findDeptIdByName(deptOptions.value, entryDeptName);
   }
   if (targetId !== undefined) {
+    deptName.value = '';
     queryParams.value.deptId = targetId;
     await nextTick();
     deptTreeRef.value?.setCurrentKey(targetId);
