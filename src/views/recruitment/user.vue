@@ -4,7 +4,7 @@
     <!-- ========== 区块一：统计概览 ========== -->
     <el-row :gutter="16" class="mb-4">
       <el-col :xs="24" :sm="12" :md="4">
-        <el-card shadow="hover" class="stat-card">
+        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'total' }" @click="handleStatQuery('total')">
           <div class="stat-inner">
             <div class="stat-icon primary"><el-icon><User /></el-icon></div>
             <div class="stat-body">
@@ -15,7 +15,7 @@
         </el-card>
       </el-col>
       <el-col :xs="24" :sm="12" :md="4">
-        <el-card shadow="hover" class="stat-card">
+        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'normal' }" @click="handleStatQuery('normal')">
           <div class="stat-inner">
             <div class="stat-icon success"><el-icon><CircleCheck /></el-icon></div>
             <div class="stat-body">
@@ -26,7 +26,7 @@
         </el-card>
       </el-col>
       <el-col :xs="24" :sm="12" :md="4">
-        <el-card shadow="hover" class="stat-card">
+        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'applied' }" @click="handleStatQuery('applied')">
           <div class="stat-inner">
             <div class="stat-icon warning"><el-icon><Document /></el-icon></div>
             <div class="stat-body">
@@ -37,7 +37,7 @@
         </el-card>
       </el-col>
       <el-col :xs="24" :sm="12" :md="4">
-        <el-card shadow="hover" class="stat-card">
+        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'pending' }" @click="handleStatQuery('pending')">
           <div class="stat-inner">
             <div class="stat-icon info"><el-icon><Clock /></el-icon></div>
             <div class="stat-body">
@@ -48,7 +48,7 @@
         </el-card>
       </el-col>
       <el-col :xs="24" :sm="12" :md="4">
-        <el-card shadow="hover" class="stat-card">
+        <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'silenced' }" @click="handleStatQuery('silenced')">
           <div class="stat-inner">
             <div class="stat-icon danger"><el-icon><WarnTriangleFilled /></el-icon></div>
             <div class="stat-body">
@@ -344,6 +344,8 @@ const silenceVisible = ref(false);
 const currentUser = ref<RecruitmentUserVO | null>(null);
 const queryFormRef = ref();
 const silenceFormRef = ref();
+type StatFilter = 'total' | 'normal' | 'applied' | 'pending' | 'silenced';
+const activeStat = ref<StatFilter>('total');
 
 const queryParams = reactive({
   pageNum: 1,
@@ -351,6 +353,7 @@ const queryParams = reactive({
   userName: '',
   phonenumber: '',
   isSilenced: '',
+  applyFilter: '',
 });
 
 const stats = reactive({
@@ -403,6 +406,7 @@ async function loadData() {
       userName: queryParams.userName || undefined,
       phonenumber: queryParams.phonenumber || undefined,
       isRecruitmentSilenced: queryParams.isSilenced || undefined,
+      applyFilter: queryParams.applyFilter || undefined,
     });
     // 列表拆包统一走 unwrapList（顶层 rows/total 优先，兼容历史 data.rows 形状）
     // 安全：不要打印整包响应，避免把求职者手机号/邮箱/登录IP 等 PII 暴露到浏览器控制台
@@ -430,6 +434,36 @@ async function loadStatistics() {
 
 function handleQuery() {
   queryParams.pageNum = 1;
+  syncActiveStatFromQuery();
+  loadData();
+}
+
+function syncActiveStatFromQuery() {
+  if (queryParams.applyFilter === 'applied' || queryParams.applyFilter === 'pending') {
+    activeStat.value = queryParams.applyFilter as StatFilter;
+  } else if (queryParams.isSilenced === '0') {
+    activeStat.value = 'normal';
+  } else if (queryParams.isSilenced === '1') {
+    activeStat.value = 'silenced';
+  } else {
+    activeStat.value = 'total';
+  }
+}
+
+function handleStatQuery(type: StatFilter) {
+  activeStat.value = type;
+  queryParams.pageNum = 1;
+  queryParams.applyFilter = '';
+  if (type === 'total') {
+    queryParams.isSilenced = '';
+  } else if (type === 'normal') {
+    queryParams.isSilenced = '0';
+  } else if (type === 'silenced') {
+    queryParams.isSilenced = '1';
+  } else {
+    queryParams.isSilenced = '';
+    queryParams.applyFilter = type;
+  }
   loadData();
 }
 
@@ -439,6 +473,8 @@ function resetQuery() {
   queryParams.userName = '';
   queryParams.phonenumber = '';
   queryParams.isSilenced = '';
+  queryParams.applyFilter = '';
+  activeStat.value = 'total';
   loadData();
 }
 
@@ -508,6 +544,7 @@ function handleExport() {
     userName: queryParams.userName || undefined,
     phonenumber: queryParams.phonenumber || undefined,
     isRecruitmentSilenced: queryParams.isSilenced || undefined,
+    applyFilter: queryParams.applyFilter || undefined,
   }, `求职者数据_${new Date().getTime()}.xlsx`);
 }
 </script>
@@ -530,9 +567,14 @@ function handleExport() {
 .stat-card {
   border-radius: 10px;
   transition: all 0.3s;
+  cursor: pointer;
 }
 .stat-card:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+}
+.stat-card.active {
+  border-color: #409EFF;
+  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.18) !important;
 }
 .stat-inner {
   display: flex;

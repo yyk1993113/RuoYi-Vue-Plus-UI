@@ -108,7 +108,7 @@
       <template #header>
         <el-row :gutter="10" align="middle">
           <el-col :span="1.5">
-            <el-button type="primary" plain icon="Refresh" @click="loadData">刷新</el-button>
+            <el-button type="primary" plain icon="Refresh" @click="handleRefresh" :loading="refreshing">刷新</el-button>
           </el-col>
           <el-col :span="1.5">
             <el-button type="success" plain icon="Download" @click="handleExport">导出</el-button>
@@ -471,6 +471,7 @@ import {
   changeJobStatus,
   delJob,
   updateJob,
+  refreshJobRecommendCache,
   listApply2, listApply
 } from '@/api/recruitment';
 import type { JobFullVO } from '@/api/recruitment';
@@ -479,6 +480,7 @@ import { unwrapList, splitToArray } from './helpers';
 import { jobStatusMeta, jobTypeMeta } from './constants';
 
 const loading = ref(false);
+const refreshing = ref(false);
 const total = ref(0);
 const total1 = ref(0);
 const tableData = ref<any[]>([]);
@@ -752,6 +754,20 @@ async function loadData() {
     console.error('加载数据失败:', error);
   } finally {
     loading.value = false;
+  }
+}
+
+async function handleRefresh() {
+  refreshing.value = true;
+  try {
+    await refreshJobRecommendCache();
+    await Promise.all([loadData(), loadStatistics()]);
+    ElMessage.success('刷新成功');
+  } catch (error) {
+    console.error('刷新岗位缓存失败:', error);
+    ElMessage.error('刷新失败');
+  } finally {
+    refreshing.value = false;
   }
 }
 

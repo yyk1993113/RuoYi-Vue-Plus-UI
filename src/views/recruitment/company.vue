@@ -811,14 +811,7 @@ const silenceForm = reactive({
 async function loadData() {
   loading.value = true;
   try {
-    const params: any = { ...queryParams };
-    if (dateRange.value && dateRange.value.length === 2) {
-      params.params = {
-        beginTime: `${dateRange.value[0]} 00:00:00`,
-        endTime: `${dateRange.value[1]} 23:59:59`
-      };
-    }
-    const res = await listCompany(params);
+    const res = await listCompany(buildCompanyQueryParams());
     const list = unwrapList(res);
     tableData.value = list.rows;
     total.value = list.total;
@@ -1080,6 +1073,17 @@ async function loadJobList() {
   }
 }
 
+function buildCompanyQueryParams() {
+  const params: any = { ...queryParams };
+  if (dateRange.value && dateRange.value.length === 2) {
+    params.params = {
+      beginTime: `${dateRange.value[0]} 00:00:00`,
+      endTime: `${dateRange.value[1]} 23:59:59`
+    };
+  }
+  return params;
+}
+
 // 打开投递人员弹窗：feedback='1' 已反馈 / '0' 未反馈；不传 feedback 时展示该企业全部投递
 function openApplyDialog(row: any, feedback = '') {
   applyQuery.companyId = row.companyId;
@@ -1157,7 +1161,7 @@ onMounted(() => {
 });
 
 function handleExport() {
-  download('/admin/recruitment/company/exportData', queryParams, `企业数据_${new Date().getTime()}.xlsx`);
+  download('/admin/recruitment/company/exportData', buildCompanyQueryParams(), `企业数据_${new Date().getTime()}.xlsx`);
 }
 
 // 表格勾选变化：收集所选行的 companyId

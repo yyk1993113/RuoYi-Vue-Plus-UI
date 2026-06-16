@@ -653,6 +653,7 @@ export function listUsersWithStats(params?: {
   userName?: string;
   phonenumber?: string;
   isRecruitmentSilenced?: string;
+  applyFilter?: string;
 }) {
   return request.get<{ rows: RecruitmentUserVO[]; total: number }>(`${baseUrl}/user/listWithStats`, { params });
 }
@@ -709,6 +710,10 @@ export function delJob(jobId: number | number[]) {
 
 export function updateJob(data: any) {
   return request.put(`${baseUrl}/job`, data);
+}
+
+export function refreshJobRecommendCache() {
+  return request.delete(`${baseUrl}/job/refreshCache`);
 }
 
 export function getJobStatistics() {
