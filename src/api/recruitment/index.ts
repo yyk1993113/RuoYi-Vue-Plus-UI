@@ -637,6 +637,8 @@ export interface RecruitmentUserVO {
   interviewApplies: number;
   hiredApplies: number;
   rejectedApplies: number;
+  resumeAttachmentUrl?: string;
+  resumeAttachmentName?: string;
   loginIp: string;
   loginDate: string;
   createTime: string;

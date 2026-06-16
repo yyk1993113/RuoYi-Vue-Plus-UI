@@ -1,5 +1,4 @@
 import { getToken } from '@/utils/auth';
-import { ElNotification } from 'element-plus';
 import { useNoticeStore } from '@/store/modules/notice';
 
 // 初始化
@@ -30,12 +29,6 @@ export const initSSE = (url: any) => {
       message: data.value,
       read: false,
       time: new Date().toLocaleString()
-    });
-    ElNotification({
-      title: '消息',
-      message: data.value,
-      type: 'success',
-      duration: 3000
     });
     data.value = null;
   });

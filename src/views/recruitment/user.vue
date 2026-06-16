@@ -271,6 +271,15 @@
             <span class="detail-stat-chip rejected">拒绝 {{ currentUser.rejectedApplies || 0 }}</span>
           </div>
         </el-descriptions-item>
+        <el-descriptions-item label="简历附件" :span="2">
+          <div v-if="currentUser.resumeAttachmentUrl" class="resume-attachment">
+            <el-icon><Document /></el-icon>
+            <span class="resume-file-name">{{ currentUser.resumeAttachmentName || getAttachmentName(currentUser.resumeAttachmentUrl) }}</span>
+            <el-button link type="primary" icon="View" @click="viewResumeAttachment(currentUser)">查看</el-button>
+            <el-button link type="primary" icon="Download" @click="downloadResumeAttachment(currentUser)">下载</el-button>
+          </div>
+          <span v-else>-</span>
+        </el-descriptions-item>
 
         <el-descriptions-item label="禁言状态">
           <el-tag v-if="currentUser.isRecruitmentSilenced === '1'" type="danger">已禁言</el-tag>
@@ -390,6 +399,8 @@ const silenceForm = reactive<RecruitmentUserVO & { reason: string }>({
   interviewApplies: 0,
   hiredApplies: 0,
   rejectedApplies: 0,
+  resumeAttachmentUrl: '',
+  resumeAttachmentName: '',
   loginIp: '',
   loginDate: '',
   createTime: '',
@@ -481,6 +492,47 @@ function resetQuery() {
 function handleDetail(row: RecruitmentUserVO) {
   currentUser.value = { ...row };
   detailVisible.value = true;
+}
+
+function getAttachmentName(url?: string) {
+  if (!url) return '简历附件';
+  const cleanUrl = url.split('?')[0].split('#')[0];
+  const fileName = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1);
+  try {
+    return decodeURIComponent(fileName || '简历附件');
+  } catch {
+    return fileName || '简历附件';
+  }
+}
+
+function normalizeFileUrl(url: string) {
+  if (/^(https?:)?\/\//i.test(url) || url.startsWith('/') || url.startsWith('blob:') || url.startsWith('data:')) {
+    return url;
+  }
+  return `/${url}`;
+}
+
+function viewResumeAttachment(row: RecruitmentUserVO | null) {
+  if (!row?.resumeAttachmentUrl) {
+    ElMessage.warning('暂无简历附件');
+    return;
+  }
+  window.open(normalizeFileUrl(row.resumeAttachmentUrl), '_blank', 'noopener,noreferrer');
+}
+
+function downloadResumeAttachment(row: RecruitmentUserVO | null) {
+  if (!row?.resumeAttachmentUrl) {
+    ElMessage.warning('暂无简历附件');
+    return;
+  }
+  const link = document.createElement('a');
+  link.href = normalizeFileUrl(row.resumeAttachmentUrl);
+  link.download = row.resumeAttachmentName || getAttachmentName(row.resumeAttachmentUrl);
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 function openSilence(row: RecruitmentUserVO) {
@@ -653,6 +705,18 @@ function handleExport() {
 .detail-stat-chip.interview { background: #ECF5FF; color: #409EFF; }
 .detail-stat-chip.hired { background: #E8F8EE; color: #22C55E; }
 .detail-stat-chip.rejected { background: #FEF0F0; color: #F56C6C; }
+
+.resume-attachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.resume-file-name {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .text-muted { color: #C0C4CC; }
 
