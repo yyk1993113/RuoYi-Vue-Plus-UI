@@ -583,6 +583,7 @@ export interface PromoterQuery {
 }
 
 export type PromoterForm = PromoterVO;
+export type PromoterStatisticsTimeUnit = 'day' | 'week' | 'month' | 'quarter' | 'year';
 
 export interface PromoterStatisticsRow extends PromoterVO {}
 
@@ -598,11 +599,8 @@ export interface PromoterStatisticsVO {
   totalPromoterCount?: number;
   totalCompanyCount?: number;
   totalJobSeekerCount?: number;
-  activeCount?: number;
-  disabledCount?: number;
   rows?: PromoterStatisticsRow[];
   identityStats?: PromoterStatisticsGroup[];
-  statusStats?: PromoterStatisticsGroup[];
   timeStats?: PromoterStatisticsGroup[];
 }
 

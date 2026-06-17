@@ -102,7 +102,7 @@
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="loadData" />
     </el-card>
 
-    <el-dialog v-model="statisticsVisible" title="渠道推广统计" width="980px" append-to-body>
+    <el-dialog v-model="statisticsVisible" title="渠道推广统计" width="1280px" append-to-body>
       <el-form :model="statisticsQuery" :inline="true" label-width="78px" class="statistics-filter">
         <el-form-item label="推广人">
           <el-input v-model="statisticsQuery.name" placeholder="请输入姓名/昵称" clearable style="width: 180px" @keyup.enter="loadStatistics" />
@@ -112,12 +112,6 @@
             <el-option label="内部渠道" value="0" />
             <el-option label="外部渠道" value="1" />
             <el-option label="合伙人" value="2" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="statisticsQuery.status" placeholder="全部" clearable style="width: 130px">
-            <el-option label="启用" value="1" />
-            <el-option label="禁用" value="0" />
           </el-select>
         </el-form-item>
         <el-form-item label="时间">
@@ -131,6 +125,11 @@
             style="width: 240px"
           />
         </el-form-item>
+        <el-form-item label="时间维度">
+          <el-select v-model="statisticsTimeUnit" placeholder="按天" style="width: 140px">
+            <el-option v-for="item in statisticsTimeUnitOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" icon="Search" @click="loadStatistics">搜索</el-button>
           <el-button icon="Refresh" @click="resetStatisticsQuery">重置</el-button>
@@ -138,34 +137,22 @@
       </el-form>
 
       <el-row :gutter="12" class="statistics-overview">
-        <el-col :span="5">
+        <el-col :span="8">
           <div class="statistics-card">
             <span>推广人</span>
             <strong>{{ statisticsData.totalPromoterCount || 0 }}</strong>
           </div>
         </el-col>
-        <el-col :span="5">
+        <el-col :span="8">
           <div class="statistics-card">
             <span>B端</span>
             <strong>{{ statisticsData.totalCompanyCount || 0 }}</strong>
           </div>
         </el-col>
-        <el-col :span="5">
+        <el-col :span="8">
           <div class="statistics-card">
             <span>C端</span>
             <strong>{{ statisticsData.totalJobSeekerCount || 0 }}</strong>
-          </div>
-        </el-col>
-        <el-col :span="4">
-          <div class="statistics-card">
-            <span>启用</span>
-            <strong>{{ statisticsData.activeCount || 0 }}</strong>
-          </div>
-        </el-col>
-        <el-col :span="5">
-          <div class="statistics-card">
-            <span>禁用</span>
-            <strong>{{ statisticsData.disabledCount || 0 }}</strong>
           </div>
         </el-col>
       </el-row>
@@ -182,14 +169,11 @@
         <el-table-column label="C端" prop="jobSeekerCount" width="90" align="center">
           <template #default="{ row }">{{ row.jobSeekerCount || 0 }}</template>
         </el-table-column>
-        <el-table-column label="状态" prop="status" width="90" align="center">
-          <template #default="{ row }">{{ row.status === '1' ? '启用' : '禁用' }}</template>
-        </el-table-column>
         <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
       </el-table>
 
       <el-row :gutter="12" class="statistics-breakdown">
-        <el-col :span="8">
+        <el-col :span="12">
           <div class="breakdown-title">按身份统计</div>
           <el-table :data="statisticsData.identityStats || []" border size="small">
             <el-table-column label="身份" prop="label" />
@@ -198,16 +182,7 @@
             <el-table-column label="C端" prop="jobSeekerCount" align="center" />
           </el-table>
         </el-col>
-        <el-col :span="8">
-          <div class="breakdown-title">按状态统计</div>
-          <el-table :data="statisticsData.statusStats || []" border size="small">
-            <el-table-column label="状态" prop="label" />
-            <el-table-column label="推广人" prop="promoterCount" align="center" />
-            <el-table-column label="B端" prop="companyCount" align="center" />
-            <el-table-column label="C端" prop="jobSeekerCount" align="center" />
-          </el-table>
-        </el-col>
-        <el-col :span="8">
+        <el-col :span="12">
           <div class="breakdown-title">按时间统计</div>
           <el-table :data="statisticsData.timeStats || []" border size="small">
             <el-table-column label="时间" prop="label" min-width="96" />
@@ -282,6 +257,7 @@ import {
   updatePromoter,
   type PromoterForm,
   type PromoterQuery,
+  type PromoterStatisticsTimeUnit,
   type PromoterStatisticsVO,
   type PromoterVO
 } from '@/api/recruitment';
@@ -303,23 +279,27 @@ const isAdminUser = computed(() => userStore.roles.includes('superadmin'));
 const statisticsVisible = ref(false);
 const statisticsLoading = ref(false);
 const statisticsDateRange = ref<[string, string] | []>([]);
+const statisticsTimeUnit = ref<PromoterStatisticsTimeUnit>('day');
+const statisticsTimeUnitOptions: { label: string; value: PromoterStatisticsTimeUnit }[] = [
+  { label: '按天', value: 'day' },
+  { label: '按周', value: 'week' },
+  { label: '按月', value: 'month' },
+  { label: '按季度', value: 'quarter' },
+  { label: '按年', value: 'year' }
+];
 
 const statisticsQuery = reactive<PromoterQuery>({
   name: '',
   identityType: '',
-  roleName: '',
-  status: ''
+  roleName: ''
 });
 
 const statisticsData = reactive<PromoterStatisticsVO>({
   totalPromoterCount: 0,
   totalCompanyCount: 0,
   totalJobSeekerCount: 0,
-  activeCount: 0,
-  disabledCount: 0,
   rows: [],
   identityStats: [],
-  statusStats: [],
   timeStats: []
 });
 
@@ -440,10 +420,10 @@ function buildStatisticsQuery(): PromoterQuery {
     name: statisticsQuery.name || undefined,
     identityType: statisticsQuery.identityType || undefined,
     roleName: statisticsQuery.roleName || undefined,
-    status: statisticsQuery.status || undefined,
     params: {
       beginTime: beginDate ? `${beginDate} 00:00:00` : undefined,
-      endTime: endDate ? `${endDate} 23:59:59` : undefined
+      endTime: endDate ? `${endDate} 23:59:59` : undefined,
+      timeUnit: statisticsTimeUnit.value
     }
   };
 }
@@ -456,11 +436,8 @@ async function loadStatistics() {
       totalPromoterCount: 0,
       totalCompanyCount: 0,
       totalJobSeekerCount: 0,
-      activeCount: 0,
-      disabledCount: 0,
       rows: [],
       identityStats: [],
-      statusStats: [],
       timeStats: [],
       ...(res?.data || {})
     });
@@ -478,8 +455,8 @@ function resetStatisticsQuery() {
   statisticsQuery.name = '';
   statisticsQuery.identityType = '';
   statisticsQuery.roleName = '';
-  statisticsQuery.status = '';
   statisticsDateRange.value = [];
+  statisticsTimeUnit.value = 'day';
   loadStatistics();
 }
 
