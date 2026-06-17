@@ -112,6 +112,12 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         meta: { title: '企业管理', icon: 'company' }
       },
       {
+        path: 'promoter',
+        component: () => import('@/views/recruitment/promoter.vue'),
+        name: 'RecruitmentPromoter',
+        meta: { title: '推广管理', icon: 'peoples' }
+      },
+      {
         path: 'job',
         component: () => import('@/views/recruitment/job.vue'),
         name: 'RecruitmentJob',

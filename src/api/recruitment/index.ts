@@ -553,6 +553,55 @@ export interface CompanyAuditHistoryVO {
 
 const baseUrl = '/admin/recruitment';
 
+// ---------- 推广管理 ----------
+
+export interface PromoterVO {
+  promoterId?: number;
+  name?: string;
+  phonenumber?: string;
+  identityType?: string;
+  roleName?: string;
+  status?: string;
+  remark?: string;
+  createTime?: string;
+}
+
+export interface PromoterQuery {
+  pageNum?: number;
+  pageSize?: number;
+  name?: string;
+  phonenumber?: string;
+  identityType?: string;
+  roleName?: string;
+  status?: string;
+}
+
+export type PromoterForm = PromoterVO;
+
+export function listPromoter(query: PromoterQuery) {
+  return request.get<any>(`${baseUrl}/promoter/list`, { params: query });
+}
+
+export function getPromoter(promoterId: number) {
+  return request.get<PromoterVO>(`${baseUrl}/promoter/${promoterId}`);
+}
+
+export function addPromoter(data: PromoterForm) {
+  return request.post(`${baseUrl}/promoter`, data);
+}
+
+export function updatePromoter(data: PromoterForm) {
+  return request.put(`${baseUrl}/promoter`, data);
+}
+
+export function delPromoter(promoterId: number | number[]) {
+  return request.delete(`${baseUrl}/promoter/${promoterId}`);
+}
+
+export function changePromoterStatus(data: { promoterId: number; status: string }) {
+  return request.post(`${baseUrl}/promoter/changeStatus`, data);
+}
+
 // ---------- 企业管理 ----------
 
 export function listCompany(query: CompanyQuery) {
@@ -658,6 +707,10 @@ export function listUsersWithStats(params?: {
   applyFilter?: string;
 }) {
   return request.get<{ rows: RecruitmentUserVO[]; total: number }>(`${baseUrl}/user/listWithStats`, { params });
+}
+
+export function getRecruitmentUserDetail(userId: number) {
+  return request.get<RecruitmentUserVO>(`${baseUrl}/user/${userId}`);
 }
 
 export function silenceUser(data: { userId: number; reason: string }) {

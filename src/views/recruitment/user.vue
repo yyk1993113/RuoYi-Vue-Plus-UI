@@ -338,6 +338,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   statisticsUser,
   listUsersWithStats,
+  getRecruitmentUserDetail,
   silenceUser,
   unsilenceUser,
   type RecruitmentUserVO,
@@ -489,9 +490,15 @@ function resetQuery() {
   loadData();
 }
 
-function handleDetail(row: RecruitmentUserVO) {
+async function handleDetail(row: RecruitmentUserVO) {
   currentUser.value = { ...row };
   detailVisible.value = true;
+  try {
+    const res = await getRecruitmentUserDetail(row.userId);
+    currentUser.value = { ...row, ...(res.data || {}) };
+  } catch {
+    ElMessage.error('求职者详情加载失败');
+  }
 }
 
 function getAttachmentName(url?: string) {
