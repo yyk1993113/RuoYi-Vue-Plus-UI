@@ -556,11 +556,16 @@ const baseUrl = '/admin/recruitment';
 // ---------- 推广管理 ----------
 
 export interface PromoterVO {
-  promoterId?: number;
+  promoterId?: string | number;
   name?: string;
   phonenumber?: string;
+  promotionCode?: string;
+  promotionPage?: string;
+  promotionLink?: string;
   identityType?: string;
   roleName?: string;
+  companyCount?: number;
+  jobSeekerCount?: number;
   status?: string;
   remark?: string;
   createTime?: string;
@@ -574,31 +579,58 @@ export interface PromoterQuery {
   identityType?: string;
   roleName?: string;
   status?: string;
+  params?: Record<string, any>;
 }
 
 export type PromoterForm = PromoterVO;
+
+export interface PromoterStatisticsRow extends PromoterVO {}
+
+export interface PromoterStatisticsGroup {
+  key?: string;
+  label?: string;
+  promoterCount?: number;
+  companyCount?: number;
+  jobSeekerCount?: number;
+}
+
+export interface PromoterStatisticsVO {
+  totalPromoterCount?: number;
+  totalCompanyCount?: number;
+  totalJobSeekerCount?: number;
+  activeCount?: number;
+  disabledCount?: number;
+  rows?: PromoterStatisticsRow[];
+  identityStats?: PromoterStatisticsGroup[];
+  statusStats?: PromoterStatisticsGroup[];
+  timeStats?: PromoterStatisticsGroup[];
+}
 
 export function listPromoter(query: PromoterQuery) {
   return request.get<any>(`${baseUrl}/promoter/list`, { params: query });
 }
 
-export function getPromoter(promoterId: number) {
+export function getPromoterStatistics(query: PromoterQuery) {
+  return request.get<PromoterStatisticsVO>(`${baseUrl}/promoter/statistics`, { params: query });
+}
+
+export function getPromoter(promoterId: string | number) {
   return request.get<PromoterVO>(`${baseUrl}/promoter/${promoterId}`);
 }
 
 export function addPromoter(data: PromoterForm) {
-  return request.post(`${baseUrl}/promoter`, data);
+  return request.post<PromoterVO>(`${baseUrl}/promoter`, data);
 }
 
 export function updatePromoter(data: PromoterForm) {
   return request.put(`${baseUrl}/promoter`, data);
 }
 
-export function delPromoter(promoterId: number | number[]) {
+export function delPromoter(promoterId: string | number | Array<string | number>) {
   return request.delete(`${baseUrl}/promoter/${promoterId}`);
 }
 
-export function changePromoterStatus(data: { promoterId: number; status: string }) {
+export function changePromoterStatus(data: { promoterId: string | number; status: string }) {
   return request.post(`${baseUrl}/promoter/changeStatus`, data);
 }
 
@@ -721,13 +753,7 @@ export function unsilenceUser(data: { userId: number }) {
   return request.post(`${baseUrl}/user/unsilence`, data);
 }
 
-export function listUsers(params?: {
-  pageNum?: number;
-  pageSize?: number;
-  userName?: string;
-  phonenumber?: string;
-  isRecruitmentSilenced?: string;
-}) {
+export function listUsers(params?: { pageNum?: number; pageSize?: number; userName?: string; phonenumber?: string; isRecruitmentSilenced?: string }) {
   return request.get<any>(`${baseUrl}/user/list`, { params });
 }
 

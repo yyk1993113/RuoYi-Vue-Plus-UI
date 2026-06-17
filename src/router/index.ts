@@ -145,6 +145,7 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         path: 'ledger',
         component: () => import('@/views/recruitment/ledger.vue'),
         name: 'RecruitmentLedger',
+        permissions: ['recruitment:ledger:list'],
         meta: { title: '台账管理', icon: 'money' }
       },
       {

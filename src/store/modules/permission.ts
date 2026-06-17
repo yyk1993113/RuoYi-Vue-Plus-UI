@@ -133,17 +133,22 @@ export const usePermissionStore = defineStore('permission', () => {
 export const filterDynamicRoutes = (routes: RouteRecordRaw[]) => {
   const res: RouteRecordRaw[] = [];
   routes.forEach((route) => {
-    // 如果路由没有权限配置，则直接添加（如招聘模块）
-    if (!route.permissions && !route.roles) {
-      res.push(route);
-    } else if (route.permissions) {
-      if (auth.hasPermiOr(route.permissions)) {
-        res.push(route);
-      }
-    } else if (route.roles) {
-      if (auth.hasRoleOr(route.roles)) {
-        res.push(route);
-      }
+    const tmp = { ...route };
+    if (tmp.children) {
+      tmp.children = filterDynamicRoutes(tmp.children);
+    }
+
+    let hasAccess = true;
+    if (tmp.permissions) {
+      hasAccess = auth.hasPermiOr(tmp.permissions);
+    } else if (tmp.roles) {
+      hasAccess = auth.hasRoleOr(tmp.roles);
+    }
+
+    if (hasAccess) {
+      res.push(tmp);
+    } else if (tmp.children && tmp.children.length > 0 && !route.permissions && !route.roles) {
+      res.push(tmp);
     }
   });
   return res;
