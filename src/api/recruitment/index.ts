@@ -583,7 +583,7 @@ export interface PromoterQuery {
 }
 
 export type PromoterForm = PromoterVO;
-export type PromoterStatisticsTimeUnit = 'day' | 'week' | 'month' | 'quarter' | 'year';
+export type PromoterStatisticsTimeUnit = 'month' | 'quarter' | 'halfYear' | 'year';
 
 export interface PromoterStatisticsRow extends PromoterVO {}
 
@@ -595,6 +595,40 @@ export interface PromoterStatisticsGroup {
   jobSeekerCount?: number;
 }
 
+export interface PromoterStatisticsOverview {
+  todayCompanyCount?: number;
+  todayJobSeekerCount?: number;
+  todayAuthorizedCount?: number;
+  todayResumeCount?: number;
+  todayApplyCount?: number;
+  totalCompanyCount?: number;
+  totalJobSeekerCount?: number;
+  remark?: string;
+  periodStats?: PromoterStatisticsPeriod[];
+  identityPeriodStats?: PromoterIdentityPeriod[];
+}
+
+export interface PromoterStatisticsPeriod {
+  key?: string;
+  label?: string;
+  companyCount?: number;
+  jobSeekerCount?: number;
+  authorizedCount?: number;
+  resumeCount?: number;
+  applyCount?: number;
+}
+
+export interface PromoterIdentityPeriod {
+  key?: string;
+  label?: string;
+  internalPromoterCount?: number;
+  internalCompanyCount?: number;
+  internalJobSeekerCount?: number;
+  channelPromoterCount?: number;
+  channelCompanyCount?: number;
+  channelJobSeekerCount?: number;
+}
+
 export interface PromoterStatisticsVO {
   totalPromoterCount?: number;
   totalCompanyCount?: number;
@@ -602,6 +636,32 @@ export interface PromoterStatisticsVO {
   rows?: PromoterStatisticsRow[];
   identityStats?: PromoterStatisticsGroup[];
   timeStats?: PromoterStatisticsGroup[];
+  statusStats?: PromoterStatisticsGroup[];
+  overview?: PromoterStatisticsOverview;
+}
+
+export interface PromoterWorkbenchVO {
+  promoterId?: string | number;
+  name?: string;
+  phonenumber?: string;
+  identityType?: string;
+  identityTypeName?: string;
+  roleName?: string;
+  promotionCode?: string;
+  promotionPage?: string;
+  cPromotionLink?: string;
+  bPromotionLink?: string;
+  todayCompanyCount?: number;
+  todayJobSeekerCount?: number;
+  todayAuthorizedCount?: number;
+  todayResumeCount?: number;
+  todayApplyCount?: number;
+  totalCompanyCount?: number;
+  totalJobSeekerCount?: number;
+  totalAuthorizedCount?: number;
+  totalResumeCount?: number;
+  totalApplyCount?: number;
+  remark?: string;
 }
 
 export function listPromoter(query: PromoterQuery) {
@@ -630,6 +690,17 @@ export function delPromoter(promoterId: string | number | Array<string | number>
 
 export function changePromoterStatus(data: { promoterId: string | number; status: string }) {
   return request.post(`${baseUrl}/promoter/changeStatus`, data);
+}
+
+export function getPromoterWorkbench() {
+  return request.get<PromoterWorkbenchVO>(`${baseUrl}/promoter/workbench`);
+}
+
+export function getPromoterWorkbenchQrCode(target: 'C' | 'B') {
+  return request.get<Blob>(`${baseUrl}/promoter/workbench/qrcode`, {
+    params: { target },
+    responseType: 'blob'
+  });
 }
 
 // ---------- 企业管理 ----------

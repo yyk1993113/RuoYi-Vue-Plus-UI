@@ -1,18 +1,18 @@
-<template>
+﻿<template>
   <!--
-    平台后台 路 渠道推广管理页。    职责：用页签拆分推广统计看板与推广人员维护；统计数据来自
-    GET /admin/recruitment/promoter/statistics锛屽垪琛?琛ㄥ崟来自同模块CRUD 鎺ュ彛銆?  -->
+    骞冲彴鍚庡彴 路 娓犻亾鎺ㄥ箍绠＄悊椤点€?    鑱岃矗锛氱敤椤电鎷嗗垎鎺ㄥ箍缁熻鐪嬫澘涓庢帹骞夸汉鍛樼淮鎶わ紱缁熻鏁版嵁鏉ヨ嚜
+    GET /admin/recruitment/promoter/statistics锛屽垪琛?琛ㄥ崟鏉ヨ嚜鍚屾ā鍧?CRUD 鎺ュ彛銆?  -->
   <div class="promoter-page">
     <div class="promoter-tabs-shell">
       <el-tabs v-model="activeTab" class="promoter-tabs" @tab-change="handleTabChange">
-        <el-tab-pane v-if="isAdminUser" label="总览统计" name="overview">
+        <el-tab-pane v-if="isAdminUser" label="鎬昏缁熻" name="overview">
           <div v-loading="statisticsLoading" class="overview-board">
             <div class="board-head">
               <div>
-                <div class="board-title">推广数据总览</div>
-                <div class="board-subtitle">按年、半年、季度、月统计 B/C 端整体转化</div>
+                <div class="board-title">鎺ㄥ箍鏁版嵁鎬昏</div>
+                <div class="board-subtitle">鎸夊勾銆佸崐骞淬€佸搴︺€佹湀缁熻 B/C 绔暣浣撹浆鍖?</div>
               </div>
-              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新总览</el-button>
+              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">鍒锋柊鎬昏</el-button>
             </div>
 
             <div class="overview-grid">
@@ -25,30 +25,30 @@
 
             <div class="overview-table">
               <div class="panel-head">
-                <span>统计口径</span>
-                <el-tag size="small" effect="plain">年 / 半年 / 季度 / 月</el-tag>
+                <span>缁熻鍙ｅ緞</span>
+                <el-tag size="small" effect="plain">骞?/ 鍗婂勾 / 瀛ｅ害 / 鏈?</el-tag>
               </div>
               <el-table :data="overviewRows" border stripe>
-                <el-table-column label="统计项" prop="label" min-width="180" />
-                <el-table-column label="说明" prop="description" min-width="300" show-overflow-tooltip />
+                <el-table-column label="缁熻椤? prop="label" min-width="180" />
+                <el-table-column label="璇存槑" prop="description" min-width="300" show-overflow-tooltip />
                 <el-table-column label="今日" prop="today" width="110" align="center" />
-                <el-table-column label="本年" prop="year" width="110" align="center" />
-                <el-table-column label="本半年" prop="halfYear" width="110" align="center" />
-                <el-table-column label="本季度" prop="quarter" width="110" align="center" />
-                <el-table-column label="本月" prop="month" width="110" align="center" />
+                <el-table-column label="鏈勾" prop="year" width="110" align="center" />
+                <el-table-column label="鏈崐骞? prop="halfYear" width="110" align="center" />
+                <el-table-column label="鏈搴? prop="quarter" width="110" align="center" />
+                <el-table-column label="鏈湀" prop="month" width="110" align="center" />
               </el-table>
             </div>
           </div>
         </el-tab-pane>
 
-        <el-tab-pane v-if="isAdminUser" label="人员渠道统计" name="identity">
+        <el-tab-pane v-if="isAdminUser" label="浜哄憳娓犻亾缁熻" name="identity">
           <div v-loading="statisticsLoading" class="overview-board">
             <div class="board-head">
               <div>
-                <div class="board-title">内部人员 / 渠道统计</div>
-                <div class="board-subtitle">按年、半年、季度、月拆分内部人员与渠道贡献</div>
+                <div class="board-title">鍐呴儴浜哄憳 / 娓犻亾缁熻</div>
+                <div class="board-subtitle">鎸夊勾銆佸崐骞淬€佸搴︺€佹湀鎷嗗垎鍐呴儴浜哄憳涓庢笭閬撹础鐚?</div>
               </div>
-              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新统计</el-button>
+              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">鍒锋柊缁熻</el-button>
             </div>
             <div class="chart-layout secondary">
               <div class="chart-panel">
@@ -65,30 +65,23 @@
                 </div>
                 <div ref="identityDistributionChartRef" class="chart-main compact"></div>
               </div>
-              <div class="chart-panel">
-                <div class="panel-head">
-                  <span>内部/渠道折线</span>
-                  <el-tag size="small" effect="plain">{{ metricLabel }}</el-tag>
-                </div>
-                <div ref="identityLineChartRef" class="chart-main compact"></div>
-              </div>
             </div>
             <div class="overview-table">
               <div class="panel-head">
-                <span>内部人员 / 渠道拆分</span>
-                <el-tag size="small" effect="plain">推广人贡献</el-tag>
+                <span>鍐呴儴浜哄憳 / 娓犻亾鎷嗗垎</span>
+                <el-tag size="small" effect="plain">鎺ㄥ箍浜鸿础鐚?</el-tag>
               </div>
               <el-table :data="identityPeriodRows" border stripe>
-                <el-table-column label="统计周期" prop="label" min-width="110" fixed />
-                <el-table-column label="内部人员" align="center">
-                  <el-table-column label="人数" prop="internalPromoterCount" width="90" align="center" />
-                  <el-table-column label="B端企业" prop="internalCompanyCount" width="110" align="center" />
-                  <el-table-column label="C端用户" prop="internalJobSeekerCount" width="110" align="center" />
+                <el-table-column label="缁熻鍛ㄦ湡" prop="label" min-width="110" fixed />
+                <el-table-column label="鍐呴儴浜哄憳" align="center">
+                  <el-table-column label="浜烘暟" prop="internalPromoterCount" width="90" align="center" />
+                  <el-table-column label="B绔紒涓? prop="internalCompanyCount" width="110" align="center" />
+                  <el-table-column label="C绔敤鎴? prop="internalJobSeekerCount" width="110" align="center" />
                 </el-table-column>
-                <el-table-column label="渠道" align="center">
-                  <el-table-column label="人数" prop="channelPromoterCount" width="90" align="center" />
-                  <el-table-column label="B端企业" prop="channelCompanyCount" width="110" align="center" />
-                  <el-table-column label="C端用户" prop="channelJobSeekerCount" width="110" align="center" />
+                <el-table-column label="娓犻亾" align="center">
+                  <el-table-column label="浜烘暟" prop="channelPromoterCount" width="90" align="center" />
+                  <el-table-column label="B绔紒涓? prop="channelCompanyCount" width="110" align="center" />
+                  <el-table-column label="C绔敤鎴? prop="channelJobSeekerCount" width="110" align="center" />
                 </el-table-column>
               </el-table>
               <el-alert
@@ -103,59 +96,59 @@
           </div>
         </el-tab-pane>
 
-        <el-tab-pane v-if="isAdminUser" label="活跃统计" name="statistics">
+        <el-tab-pane v-if="isAdminUser" label="娲昏穬缁熻" name="statistics">
           <div v-loading="statisticsLoading" class="statistics-board">
             <div class="board-head">
               <div>
-                <div class="board-title">渠道推广活跃统计</div>
-                <div class="board-subtitle">推广人、身份、时间、B/C端、状态</div>
+                <div class="board-title">娓犻亾鎺ㄥ箍娲昏穬缁熻</div>
+                <div class="board-subtitle">鎺ㄥ箍浜恒€佽韩浠姐€佹椂闂淬€丅/C绔€佺姸鎬?</div>
               </div>
-              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新统计</el-button>
+              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">鍒锋柊缁熻</el-button>
             </div>
 
             <el-form :model="statisticsQuery" :inline="true" label-width="76px" class="statistics-filter">
-              <el-form-item label="推广人">
-                <el-input v-model="statisticsQuery.name" placeholder="姓名/昵称" clearable style="width: 180px" @keyup.enter="loadStatistics" />
+              <el-form-item label="鎺ㄥ箍浜?>
+                <el-input v-model="statisticsQuery.name" placeholder="濮撳悕/鏄电О" clearable style="width: 180px" @keyup.enter="loadStatistics" />
               </el-form-item>
-              <el-form-item label="身份">
-                <el-select v-model="statisticsQuery.identityType" placeholder="全部" clearable style="width: 150px">
-                  <el-option label="内部人员" value="0" />
-                  <el-option label="外部渠道" value="1" />
-                  <el-option label="合伙人" value="2" />
+              <el-form-item label="韬唤">
+                <el-select v-model="statisticsQuery.identityType" placeholder="鍏ㄩ儴" clearable style="width: 150px">
+                  <el-option label="鍐呴儴娓犻亾" value="0" />
+                  <el-option label="澶栭儴娓犻亾" value="1" />
+                  <el-option label="鍚堜紮浜? value="2" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="状态">
-                <el-select v-model="statisticsQuery.status" placeholder="全部" clearable style="width: 130px">
-                  <el-option label="启用" value="1" />
-                  <el-option label="禁用" value="0" />
+              <el-form-item label="鐘舵€?>
+                <el-select v-model="statisticsQuery.status" placeholder="鍏ㄩ儴" clearable style="width: 130px">
+                  <el-option label="鍚敤" value="1" />
+                  <el-option label="绂佺敤" value="0" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="时间">
+              <el-form-item label="鏃堕棿">
                 <el-date-picker
                   v-model="statisticsDateRange"
                   type="daterange"
                   value-format="YYYY-MM-DD"
-                  start-placeholder="开始日期"
-                  end-placeholder="结束日期"
+                  start-placeholder="寮€濮嬫棩鏈?
+                  end-placeholder="缁撴潫鏃ユ湡"
                   range-separator="-"
                   style="width: 240px"
                 />
               </el-form-item>
-              <el-form-item label="时间维度">
-                <el-select v-model="statisticsTimeUnit" placeholder="按天" style="width: 126px">
+              <el-form-item label="鏃堕棿缁村害">
+                <el-select v-model="statisticsTimeUnit" placeholder="鎸夊ぉ" style="width: 126px">
                   <el-option v-for="item in statisticsTimeUnitOptions" :key="item.value" :label="item.label" :value="item.value" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="B/C端">
+              <el-form-item label="B/C绔?>
                 <el-radio-group v-model="statisticsSide">
-                  <el-radio-button value="all">合计</el-radio-button>
-                  <el-radio-button value="company">B端</el-radio-button>
-                  <el-radio-button value="jobSeeker">C端</el-radio-button>
+                  <el-radio-button value="all">鍚堣</el-radio-button>
+                  <el-radio-button value="company">B绔?</el-radio-button>
+                  <el-radio-button value="jobSeeker">C绔?</el-radio-button>
                 </el-radio-group>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" icon="Search" @click="loadStatistics">搜索</el-button>
-                <el-button icon="Refresh" @click="resetStatisticsQuery">重置</el-button>
+                <el-button type="primary" icon="Search" @click="loadStatistics">鎼滅储</el-button>
+                <el-button icon="Refresh" @click="resetStatisticsQuery">閲嶇疆</el-button>
               </el-form-item>
             </el-form>
 
@@ -170,15 +163,15 @@
             <div class="chart-layout main">
               <div class="chart-panel chart-panel-wide">
                 <div class="panel-head">
-                  <span>按时间趋势</span>
+                  <span>鎸夋椂闂磋秼鍔?</span>
                   <el-tag size="small" effect="plain">{{ metricLabel }}</el-tag>
                 </div>
                 <div ref="trendChartRef" class="chart-main"></div>
               </div>
               <div class="chart-panel">
                 <div class="panel-head">
-                  <span>B/C端占比</span>
-                  <el-tag size="small" effect="plain">总量</el-tag>
+                  <span>B/C绔崰姣?</span>
+                  <el-tag size="small" effect="plain">鎬婚噺</el-tag>
                 </div>
                 <div ref="sideChartRef" class="chart-main"></div>
               </div>
@@ -187,22 +180,22 @@
             <div class="chart-layout secondary">
               <div class="chart-panel">
                 <div class="panel-head">
-                  <span>推广人排行</span>
+                  <span>鎺ㄥ箍浜烘帓琛?</span>
                   <el-tag size="small" effect="plain">Top 8</el-tag>
                 </div>
                 <div ref="promoterChartRef" class="chart-main compact"></div>
               </div>
               <div class="chart-panel">
                 <div class="panel-head">
-                  <span>身份分布</span>
+                  <span>韬唤鍒嗗竷</span>
                   <el-tag size="small" effect="plain">{{ metricLabel }}</el-tag>
                 </div>
                 <div ref="identityChartRef" class="chart-main compact"></div>
               </div>
               <div class="chart-panel">
                 <div class="panel-head">
-                  <span>状态分布</span>
-                  <el-tag size="small" effect="plain">账号数</el-tag>
+                  <span>鐘舵€佸垎甯?</span>
+                  <el-tag size="small" effect="plain">璐﹀彿鏁?</el-tag>
                 </div>
                 <div ref="statusChartRef" class="chart-main compact"></div>
               </div>
@@ -210,11 +203,11 @@
 
             <div class="detail-panel">
               <div class="panel-head">
-                <span>统计明细</span>
-                <el-tag size="small" effect="plain">{{ statisticsRows.length }} 条</el-tag>
+                <span>缁熻鏄庣粏</span>
+                <el-tag size="small" effect="plain">{{ statisticsRows.length }} 鏉?</el-tag>
               </div>
               <el-table :data="statisticsRows" border stripe max-height="320">
-                <el-table-column label="推广人" min-width="160" show-overflow-tooltip>
+                <el-table-column label="鎺ㄥ箍浜? min-width="160" show-overflow-tooltip>
                   <template #default="{ row }">
                     <div class="name-cell">
                       <span class="name-text">{{ row.name || '-' }}</span>
@@ -222,94 +215,94 @@
                     </div>
                   </template>
                 </el-table-column>
-                <el-table-column label="身份" prop="identityType" width="120" align="center">
+                <el-table-column label="韬唤" prop="identityType" width="120" align="center">
                   <template #default="{ row }">
                     <el-tag :type="identityTypeTag(row.identityType)" size="small">{{ identityTypeText(row.identityType) }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="状态" prop="status" width="90" align="center">
+                <el-table-column label="鐘舵€? prop="status" width="90" align="center">
                   <template #default="{ row }">
                     <el-tag :type="statusTag(row.status)" size="small">{{ statusText(row.status) }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="B端企业" prop="companyCount" width="110" align="center">
+                <el-table-column label="B绔紒涓? prop="companyCount" width="110" align="center">
                   <template #default="{ row }">{{ row.companyCount || 0 }}</template>
                 </el-table-column>
-                <el-table-column label="C端求职者" prop="jobSeekerCount" width="120" align="center">
+                <el-table-column label="C绔眰鑱岃€? prop="jobSeekerCount" width="120" align="center">
                   <template #default="{ row }">{{ row.jobSeekerCount || 0 }}</template>
                 </el-table-column>
-                <el-table-column label="合计" width="100" align="center">
+                <el-table-column label="鍚堣" width="100" align="center">
                   <template #default="{ row }">{{ rowMetric(row) }}</template>
                 </el-table-column>
-                <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
+                <el-table-column label="鍒涘缓鏃堕棿" prop="createTime" width="170" align="center" />
               </el-table>
             </div>
           </div>
         </el-tab-pane>
 
-        <el-tab-pane v-if="isAdminUser" label="统计明细" name="statisticsDetail">
+        <el-tab-pane v-if="isAdminUser" label="缁熻鏄庣粏" name="statisticsDetail">
           <div v-loading="statisticsLoading" class="statistics-board">
             <div class="board-head">
               <div>
-                <div class="board-title">统计明细列表</div>
-                <div class="board-subtitle">按筛选条件查看活跃统计的明细数据</div>
+                <div class="board-title">缁熻鏄庣粏鍒楄〃</div>
+                <div class="board-subtitle">鎸夌瓫閫夋潯浠舵煡鐪嬫椿璺冪粺璁＄殑鏄庣粏鏁版嵁</div>
               </div>
-              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新明细</el-button>
+              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">鍒锋柊鏄庣粏</el-button>
             </div>
 
             <el-form :model="statisticsQuery" :inline="true" label-width="76px" class="statistics-filter">
-              <el-form-item label="推广人">
-                <el-input v-model="statisticsQuery.name" placeholder="姓名/昵称" clearable style="width: 180px" @keyup.enter="loadStatistics" />
+              <el-form-item label="鎺ㄥ箍浜?>
+                <el-input v-model="statisticsQuery.name" placeholder="濮撳悕/鏄电О" clearable style="width: 180px" @keyup.enter="loadStatistics" />
               </el-form-item>
-              <el-form-item label="身份">
-                <el-select v-model="statisticsQuery.identityType" placeholder="全部" clearable style="width: 150px">
-                  <el-option label="内部人员" value="0" />
-                  <el-option label="内部渠道" value="1" />
-                  <el-option label="外部渠道" value="2" />
+              <el-form-item label="韬唤">
+                <el-select v-model="statisticsQuery.identityType" placeholder="鍏ㄩ儴" clearable style="width: 150px">
+                  <el-option label="鍐呴儴浜哄憳" value="0" />
+                  <el-option label="鍐呴儴娓犻亾" value="1" />
+                  <el-option label="澶栭儴娓犻亾" value="2" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="状态">
-                <el-select v-model="statisticsQuery.status" placeholder="全部" clearable style="width: 130px">
-                  <el-option label="启用" value="1" />
-                  <el-option label="停用" value="0" />
+              <el-form-item label="鐘舵€?>
+                <el-select v-model="statisticsQuery.status" placeholder="鍏ㄩ儴" clearable style="width: 130px">
+                  <el-option label="鍚敤" value="1" />
+                  <el-option label="鍋滅敤" value="0" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="时间">
+              <el-form-item label="鏃堕棿">
                 <el-date-picker
                   v-model="statisticsDateRange"
                   type="daterange"
                   value-format="YYYY-MM-DD"
-                  start-placeholder="开始日期"
-                  end-placeholder="结束日期"
+                  start-placeholder="寮€濮嬫棩鏈?
+                  end-placeholder="缁撴潫鏃ユ湡"
                   range-separator="-"
                   style="width: 240px"
                 />
               </el-form-item>
-              <el-form-item label="时间维度">
-                <el-select v-model="statisticsTimeUnit" placeholder="按月" style="width: 126px">
+              <el-form-item label="鏃堕棿缁村害">
+                <el-select v-model="statisticsTimeUnit" placeholder="鎸夋湀" style="width: 126px">
                   <el-option v-for="item in statisticsTimeUnitOptions" :key="item.value" :label="item.label" :value="item.value" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="B/C端">
+              <el-form-item label="B/C绔?>
                 <el-radio-group v-model="statisticsSide">
-                  <el-radio-button value="all">全部</el-radio-button>
-                  <el-radio-button value="company">B端</el-radio-button>
-                  <el-radio-button value="jobSeeker">C端</el-radio-button>
+                  <el-radio-button value="all">鍏ㄩ儴</el-radio-button>
+                  <el-radio-button value="company">B绔?</el-radio-button>
+                  <el-radio-button value="jobSeeker">C绔?</el-radio-button>
                 </el-radio-group>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" icon="Search" @click="loadStatistics">查询</el-button>
-                <el-button icon="Refresh" @click="resetStatisticsQuery">重置</el-button>
+                <el-button type="primary" icon="Search" @click="loadStatistics">鏌ヨ</el-button>
+                <el-button icon="Refresh" @click="resetStatisticsQuery">閲嶇疆</el-button>
               </el-form-item>
             </el-form>
 
             <div class="detail-panel">
               <div class="panel-head">
-                <span>统计明细</span>
-                <el-tag size="small" effect="plain">{{ statisticsRows.length }} 条</el-tag>
+                <span>缁熻鏄庣粏</span>
+                <el-tag size="small" effect="plain">{{ statisticsRows.length }} 鏉?</el-tag>
               </div>
               <el-table :data="statisticsRows" border stripe max-height="520">
-                <el-table-column label="推广人" min-width="160" show-overflow-tooltip>
+                <el-table-column label="鎺ㄥ箍浜? min-width="160" show-overflow-tooltip>
                   <template #default="{ row }">
                     <div class="name-cell">
                       <span class="name-text">{{ row.name || '-' }}</span>
@@ -317,76 +310,76 @@
                     </div>
                   </template>
                 </el-table-column>
-                <el-table-column label="身份" prop="identityType" width="120" align="center">
+                <el-table-column label="韬唤" prop="identityType" width="120" align="center">
                   <template #default="{ row }">
                     <el-tag :type="identityTypeTag(row.identityType)" size="small">{{ identityTypeText(row.identityType) }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="状态" prop="status" width="90" align="center">
+                <el-table-column label="鐘舵€? prop="status" width="90" align="center">
                   <template #default="{ row }">
                     <el-tag :type="statusTag(row.status)" size="small">{{ statusText(row.status) }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="B端企业数" prop="companyCount" width="110" align="center">
+                <el-table-column label="B绔紒涓氭暟" prop="companyCount" width="110" align="center">
                   <template #default="{ row }">{{ row.companyCount || 0 }}</template>
                 </el-table-column>
-                <el-table-column label="C端求职者数" prop="jobSeekerCount" width="120" align="center">
+                <el-table-column label="C绔眰鑱岃€呮暟" prop="jobSeekerCount" width="120" align="center">
                   <template #default="{ row }">{{ row.jobSeekerCount || 0 }}</template>
                 </el-table-column>
-                <el-table-column label="合计" width="100" align="center">
+                <el-table-column label="鍚堣" width="100" align="center">
                   <template #default="{ row }">{{ rowMetric(row) }}</template>
                 </el-table-column>
-                <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
+                <el-table-column label="鍒涘缓鏃堕棿" prop="createTime" width="170" align="center" />
               </el-table>
             </div>
           </div>
         </el-tab-pane>
 
-        <el-tab-pane label="推广渠道维护" name="list">
+        <el-tab-pane label="鎺ㄥ箍娓犻亾缁存姢" name="list">
           <el-card shadow="never" class="query-card">
             <template #header>
               <div class="card-head">
-                <span>人员筛选</span>
-                <el-button link type="primary" @click="showMoreQuery = !showMoreQuery">{{ showMoreQuery ? '收起' : '更多条件' }}</el-button>
+                <span>浜哄憳绛涢€?</span>
+                <el-button link type="primary" @click="showMoreQuery = !showMoreQuery">{{ showMoreQuery ? '鏀惰捣' : '鏇村鏉′欢' }}</el-button>
               </div>
             </template>
             <el-form ref="queryFormRef" :model="queryParams" :inline="true" label-width="88px" class="query-form">
-              <el-form-item label="姓名/昵称" prop="name">
-                <el-input v-model="queryParams.name" placeholder="璇疯緭鍏ュ鍚?昵称" clearable style="width: 200px" @keyup.enter="handleQuery" />
+              <el-form-item label="濮撳悕/鏄电О" prop="name">
+                <el-input v-model="queryParams.name" placeholder="璇疯緭鍏ュ鍚?鏄电О" clearable style="width: 200px" @keyup.enter="handleQuery" />
               </el-form-item>
-              <el-form-item label="手机号" prop="phonenumber">
-                <el-input v-model="queryParams.phonenumber" placeholder="请输入手机号" clearable style="width: 200px" @keyup.enter="handleQuery" />
+              <el-form-item label="鎵嬫満鍙? prop="phonenumber">
+                <el-input v-model="queryParams.phonenumber" placeholder="璇疯緭鍏ユ墜鏈哄彿" clearable style="width: 200px" @keyup.enter="handleQuery" />
               </el-form-item>
-              <el-form-item label="身份类型" prop="identityType">
-                <el-select v-model="queryParams.identityType" placeholder="全部" clearable style="width: 150px">
-                  <el-option label="内部渠道" value="0" />
-                  <el-option label="外部渠道" value="1" />
-                  <el-option label="合伙人" value="2" />
+              <el-form-item label="韬唤绫诲瀷" prop="identityType">
+                <el-select v-model="queryParams.identityType" placeholder="鍏ㄩ儴" clearable style="width: 150px">
+                  <el-option label="鍐呴儴娓犻亾" value="0" />
+                  <el-option label="澶栭儴娓犻亾" value="1" />
+                  <el-option label="鍚堜紮浜? value="2" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="岗位/角色" prop="roleName">
-                <el-input v-model="queryParams.roleName" placeholder="请输入岗位/角色" clearable style="width: 180px" @keyup.enter="handleQuery" />
+              <el-form-item label="宀椾綅/瑙掕壊" prop="roleName">
+                <el-input v-model="queryParams.roleName" placeholder="璇疯緭鍏ュ矖浣?瑙掕壊" clearable style="width: 180px" @keyup.enter="handleQuery" />
               </el-form-item>
-              <el-form-item label="账号状态" prop="status">
-                <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 130px">
-                  <el-option label="启用" value="1" />
-                  <el-option label="禁用" value="0" />
+              <el-form-item label="璐﹀彿鐘舵€? prop="status">
+                <el-select v-model="queryParams.status" placeholder="鍏ㄩ儴" clearable style="width: 130px">
+                  <el-option label="鍚敤" value="1" />
+                  <el-option label="绂佺敤" value="0" />
                 </el-select>
               </el-form-item>
-              <el-form-item v-show="showMoreQuery" label="创建时间">
+              <el-form-item v-show="showMoreQuery" label="鍒涘缓鏃堕棿">
                 <el-date-picker
                   v-model="listDateRange"
                   type="daterange"
                   value-format="YYYY-MM-DD"
-                  start-placeholder="开始日期"
-                  end-placeholder="结束日期"
+                  start-placeholder="寮€濮嬫棩鏈?
+                  end-placeholder="缁撴潫鏃ユ湡"
                   range-separator="-"
                   style="width: 240px"
                 />
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-                <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+                <el-button type="primary" icon="Search" @click="handleQuery">鎼滅储</el-button>
+                <el-button icon="Refresh" @click="resetQuery">閲嶇疆</el-button>
               </el-form-item>
             </el-form>
           </el-card>
@@ -395,20 +388,20 @@
             <template #header>
               <div class="table-head">
                 <div>
-                  <span class="table-title">推广人员管理</span>
-                   <span class="table-subtitle">维护推广账号、推广码与B/C端数量</span>
+                  <span class="table-title">鎺ㄥ箍浜哄憳绠＄悊</span>
+                  <span class="table-subtitle">缁存姢鎺ㄥ箍璐﹀彿銆佹帹骞跨爜涓嶣/C绔暟閲?</span>
                 </div>
                 <div class="table-actions">
-                  <el-button type="primary" plain icon="Plus" @click="handleAdd">新增</el-button>
-                  <el-button type="danger" plain icon="Delete" :disabled="selectedIds.length === 0" @click="handleDelete()">删除</el-button>
-                  <el-button plain icon="Refresh" @click="loadData">刷新</el-button>
+                  <el-button type="primary" plain icon="Plus" @click="handleAdd">鏂板</el-button>
+                  <el-button type="danger" plain icon="Delete" :disabled="selectedIds.length === 0" @click="handleDelete()">鍒犻櫎</el-button>
+                  <el-button plain icon="Refresh" @click="loadData">鍒锋柊</el-button>
                 </div>
               </div>
             </template>
 
             <el-table v-loading="loading" :data="tableData" border stripe @selection-change="handleSelectionChange">
               <el-table-column type="selection" width="50" align="center" />
-              <el-table-column label="推广人" min-width="170" show-overflow-tooltip>
+              <el-table-column label="鎺ㄥ箍浜? min-width="170" show-overflow-tooltip>
                 <template #default="{ row }">
                   <div class="name-cell">
                     <span class="name-text">{{ row.name || '-' }}</span>
@@ -416,50 +409,50 @@
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="身份类型" prop="identityType" width="120" align="center">
+              <el-table-column label="韬唤绫诲瀷" prop="identityType" width="120" align="center">
                 <template #default="{ row }">
                   <el-tag :type="identityTypeTag(row.identityType)" size="small">
                     {{ identityTypeText(row.identityType) }}
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="岗位/角色" prop="roleName" min-width="150" show-overflow-tooltip />
-              <el-table-column label="B端企业" prop="companyCount" width="105" align="center">
+              <el-table-column label="宀椾綅/瑙掕壊" prop="roleName" min-width="150" show-overflow-tooltip />
+              <el-table-column label="B绔紒涓? prop="companyCount" width="105" align="center">
                 <template #default="{ row }">{{ row.companyCount ?? 0 }}</template>
               </el-table-column>
-              <el-table-column label="C端求职者" prop="jobSeekerCount" width="120" align="center">
+              <el-table-column label="C绔眰鑱岃€? prop="jobSeekerCount" width="120" align="center">
                 <template #default="{ row }">{{ row.jobSeekerCount ?? 0 }}</template>
               </el-table-column>
-              <el-table-column label="账号状态" prop="status" width="120" align="center">
+              <el-table-column label="璐﹀彿鐘舵€? prop="status" width="120" align="center">
                 <template #default="{ row }">
                   <el-switch
                     :model-value="row.status"
                     active-value="1"
                     inactive-value="0"
-                    active-text="启用"
-                    inactive-text="禁用"
+                    active-text="鍚敤"
+                    inactive-text="绂佺敤"
                     inline-prompt
                     @change="(val) => handleStatusChange(row, val as string)"
                   />
                 </template>
               </el-table-column>
-              <el-table-column label="推广码链接" prop="promotionCode" min-width="220" show-overflow-tooltip>
+              <el-table-column label="鎺ㄥ箍鐮?閾炬帴" prop="promotionCode" min-width="220" show-overflow-tooltip>
                 <template #default="{ row }">
                   <div class="promotion-cell">
                     <span class="promotion-code">{{ row.promotionCode || '-' }}</span>
-                    <el-button v-if="row.promotionCode" link type="primary" icon="CopyDocument" @click="handleCopyPromotion(row)">复制</el-button>
+                    <el-button v-if="row.promotionCode" link type="primary" icon="CopyDocument" @click="handleCopyPromotion(row)">澶嶅埗</el-button>
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="备注" prop="remark" min-width="180" show-overflow-tooltip>
+              <el-table-column label="澶囨敞" prop="remark" min-width="180" show-overflow-tooltip>
                 <template #default="{ row }">{{ row.remark || '-' }}</template>
               </el-table-column>
-              <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
-              <el-table-column label="操作" width="230" fixed="right" align="center">
+              <el-table-column label="鍒涘缓鏃堕棿" prop="createTime" width="170" align="center" />
+              <el-table-column label="鎿嶄綔" width="230" fixed="right" align="center">
                 <template #default="{ row }">
-                  <el-button link type="primary" icon="Download" @click="handleDownloadQrCode(row)">下载码</el-button>
-                  <el-button link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
-                  <el-button link type="danger" icon="Delete" @click="handleDelete(row)">删除</el-button>
+                  <el-button link type="primary" icon="Download" @click="handleDownloadQrCode(row)">涓嬭浇鐮?</el-button>
+                  <el-button link type="primary" icon="Edit" @click="handleEdit(row)">缂栬緫</el-button>
+                  <el-button link type="danger" icon="Delete" @click="handleDelete(row)">鍒犻櫎</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -478,49 +471,49 @@
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px" append-to-body @closed="resetForm">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <el-form-item label="姓名/昵称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入推广人员展示名称" maxlength="50" show-word-limit />
+        <el-form-item label="濮撳悕/鏄电О" prop="name">
+          <el-input v-model="form.name" placeholder="璇疯緭鍏ユ帹骞夸汉鍛樺睍绀哄悕绉? maxlength="50" show-word-limit />
         </el-form-item>
-        <el-form-item label="手机号" prop="phonenumber">
-          <el-input v-model="form.phonenumber" placeholder="账号登录手机号，作为唯一标识" maxlength="11" />
+        <el-form-item label="鎵嬫満鍙? prop="phonenumber">
+          <el-input v-model="form.phonenumber" placeholder="璐﹀彿鐧诲綍鎵嬫満鍙凤紝浣滀负鍞竴鏍囪瘑" maxlength="11" />
         </el-form-item>
-        <el-form-item label="身份类型" prop="identityType">
+        <el-form-item label="韬唤绫诲瀷" prop="identityType">
           <el-radio-group v-model="form.identityType" @change="handleIdentityTypeChange">
-            <el-radio label="0">内部渠道</el-radio>
-            <el-radio label="1">外部渠道</el-radio>
-            <el-radio label="2">合伙人</el-radio>
+            <el-radio label="0">鍐呴儴娓犻亾</el-radio>
+            <el-radio label="1">澶栭儴娓犻亾</el-radio>
+            <el-radio label="2">鍚堜紮浜?</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="岗位/角色" prop="roleName">
-          <el-select v-model="form.roleName" placeholder="请选择岗位/角色" clearable filterable style="width: 100%">
+        <el-form-item label="宀椾綅/瑙掕壊" prop="roleName">
+          <el-select v-model="form.roleName" placeholder="璇烽€夋嫨宀椾綅/瑙掕壊" clearable filterable style="width: 100%">
             <el-option v-for="item in roleOptions" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
         <el-row v-if="isEdit" :gutter="12">
           <el-col :span="12">
-            <el-form-item label="B端企业" prop="companyCount">
+            <el-form-item label="B绔紒涓? prop="companyCount">
               <el-input-number v-model="form.companyCount" :min="0" :precision="0" controls-position="right" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="C端求职者" prop="jobSeekerCount">
+            <el-form-item label="C绔眰鑱岃€? prop="jobSeekerCount">
               <el-input-number v-model="form.jobSeekerCount" :min="0" :precision="0" controls-position="right" style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="账号状态" prop="status">
+        <el-form-item label="璐﹀彿鐘舵€? prop="status">
           <el-radio-group v-model="form.status">
-            <el-radio label="1">启用</el-radio>
-            <el-radio label="0">禁用</el-radio>
+            <el-radio label="1">鍚敤</el-radio>
+            <el-radio label="0">绂佺敤</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="form.remark" type="textarea" :rows="4" placeholder="合作说明、地区、来源等" maxlength="500" show-word-limit />
+        <el-form-item label="澶囨敞" prop="remark">
+          <el-input v-model="form.remark" type="textarea" :rows="4" placeholder="鍚堜綔璇存槑銆佸湴鍖恒€佹潵婧愮瓑" maxlength="500" show-word-limit />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="submitForm">确定</el-button>
+        <el-button @click="dialogVisible = false">鍙栨秷</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitForm">纭畾</el-button>
       </template>
     </el-dialog>
   </div>
@@ -631,29 +624,27 @@ const form = reactive<PromoterForm>({
   remark: ''
 });
 
-// 渠道推广人员的数量字段由运营手工维护，后端按 company_count/job_seeker_count 原样落库。
-const nonNegativeCountRule = { type: 'number', min: 0, message: '数量不能小于0', trigger: 'change' } as const;
+// 娓犻亾鎺ㄥ箍浜哄憳鐨勬暟閲忓瓧娈电敱杩愯惀鎵嬪伐缁存姢锛屽悗绔寜 company_count/job_seeker_count 鍘熸牱钀藉簱銆?const nonNegativeCountRule = { type: 'number', min: 0, message: '鏁伴噺涓嶈兘灏忎簬0', trigger: 'change' } as const;
 const roleOptionsMap: Record<string, string[]> = {
-  // 身份类型为内部人员时，岗位角色作为二级分类使用。
-  '0': ['实习生', '销售岗', '拓展岗'],
-  '1': ['外部渠道'],
-  '2': ['合伙人']
+  // 韬唤绫诲瀷涓哄唴閮ㄦ笭閬撴椂锛屽矖浣?瑙掕壊浣滀负浜岀骇鍒嗙被浣跨敤銆?  '0': ['瀹炰範鐢?, '閿€鍞矖', '鎷撳睍宀?],
+  '1': ['澶栭儴娓犻亾'],
+  '2': ['鍚堜紮浜?]
 };
 
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入姓名/昵称', trigger: 'blur' }],
+  name: [{ required: true, message: '璇疯緭鍏ュ鍚?鏄电О', trigger: 'blur' }],
   phonenumber: [
-    { required: true, message: '请输入手机号', trigger: 'blur' },
-    { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' }
+    { required: true, message: '璇疯緭鍏ユ墜鏈哄彿', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '鎵嬫満鍙锋牸寮忎笉姝ｇ‘', trigger: 'blur' }
   ],
-  identityType: [{ required: true, message: '请选择身份类型', trigger: 'change' }],
-  roleName: [{ required: true, message: '请选择岗位/角色', trigger: 'change' }],
+  identityType: [{ required: true, message: '璇烽€夋嫨韬唤绫诲瀷', trigger: 'change' }],
+  roleName: [{ required: true, message: '璇烽€夋嫨宀椾綅/瑙掕壊', trigger: 'change' }],
   companyCount: [nonNegativeCountRule],
   jobSeekerCount: [nonNegativeCountRule],
-  status: [{ required: true, message: '请选择账号状态', trigger: 'change' }]
+  status: [{ required: true, message: '璇烽€夋嫨璐﹀彿鐘舵€?, trigger: 'change' }]
 };
 
-const dialogTitle = computed(() => (isEdit.value ? '编辑推广人员' : '新增推广人员'));
+const dialogTitle = computed(() => (isEdit.value ? '缂栬緫鎺ㄥ箍浜哄憳' : '鏂板鎺ㄥ箍浜哄憳'));
 const roleOptions = computed(() => roleOptionsMap[form.identityType || '0'] || []);
 const overviewCards = computed(() => {
   const yearCompany = overviewPeriodValue('year', 'companyCount');
@@ -665,38 +656,38 @@ const overviewCards = computed(() => {
   const monthCompany = overviewPeriodValue('month', 'companyCount');
   const monthJobSeeker = overviewPeriodValue('month', 'jobSeekerCount');
   return [
-    { key: 'year', label: '本年新增', value: yearCompany + yearJobSeeker, sub: `B端 ${yearCompany} / C端 ${yearJobSeeker}`, tone: 'success' },
-    { key: 'halfYear', label: '本半年新增', value: halfCompany + halfJobSeeker, sub: `B端 ${halfCompany} / C端 ${halfJobSeeker}`, tone: 'primary' },
+    { key: 'year', label: '鏈勾鏂板', value: yearCompany + yearJobSeeker, sub: `B绔?${yearCompany} / C绔?${yearJobSeeker}`, tone: 'success' },
+    { key: 'halfYear', label: '鏈崐骞存柊澧?, value: halfCompany + halfJobSeeker, sub: `B绔?${halfCompany} / C绔?${halfJobSeeker}`, tone: 'primary' },
     {
       key: 'quarter',
-      label: '本季度新增',
+      label: '鏈搴︽柊澧?,
       value: quarterCompany + quarterJobSeeker,
-      sub: `B端 ${quarterCompany} / C端 ${quarterJobSeeker}`,
+      sub: `B绔?${quarterCompany} / C绔?${quarterJobSeeker}`,
       tone: 'warning'
     },
-    { key: 'month', label: '本月新增', value: monthCompany + monthJobSeeker, sub: `B端 ${monthCompany} / C端 ${monthJobSeeker}`, tone: 'info' }
+    { key: 'month', label: '鏈湀鏂板', value: monthCompany + monthJobSeeker, sub: `B绔?${monthCompany} / C绔?${monthJobSeeker}`, tone: 'info' }
   ];
 });
 const overviewRows = computed(() => [
-  buildOverviewRow('新增B端企业', '通过推广进入的企业数量', 'companyCount'),
-  buildOverviewRow('新增C端用户', '通过推广进入的求职者数量', 'jobSeekerCount'),
-  buildOverviewRow('C端授权数', '授权手机号人数', 'authorizedCount'),
-  buildOverviewRow('C端简历数', '填写简历人数', 'resumeCount'),
-  buildOverviewRow('C端投递数', '产生投递的人数', 'applyCount')
+  buildOverviewRow('鏂板B绔紒涓?, '閫氳繃鎺ㄥ箍杩涘叆鐨勪紒涓氭暟閲?, 'companyCount'),
+  buildOverviewRow('鏂板C绔敤鎴?, '閫氳繃鎺ㄥ箍杩涘叆鐨勬眰鑱岃€呮暟閲?, 'jobSeekerCount'),
+  buildOverviewRow('C绔巿鏉冩暟', '鎺堟潈鎵嬫満鍙蜂汉鏁?, 'authorizedCount'),
+  buildOverviewRow('C绔畝鍘嗘暟', '濉啓绠€鍘嗕汉鏁?, 'resumeCount'),
+  buildOverviewRow('C绔姇閫掓暟', '浜х敓鎶曢€掔殑浜烘暟', 'applyCount')
 ]);
 const identityPeriodRows = computed(() => statisticsData.overview?.identityPeriodStats || []);
 const metricLabel = computed(() => {
-  if (statisticsSide.value === 'company') return 'B端企业';
-  if (statisticsSide.value === 'jobSeeker') return 'C端求职者';
-  return 'B/C合计';
+  if (statisticsSide.value === 'company') return 'B绔紒涓?;
+  if (statisticsSide.value === 'jobSeeker') return 'C绔眰鑱岃€?;
+  return 'B/C鍚堣';
 });
 
 const metricCards = computed(() => [
-  { key: 'promoter', label: '推广人', value: statisticsData.totalPromoterCount || 0, sub: '当前筛选结果', tone: 'primary' },
-  { key: 'company', label: 'B端企业', value: statisticsData.totalCompanyCount || 0, sub: '企业注册/线索量', tone: 'success' },
-  { key: 'jobSeeker', label: 'C端求职者', value: statisticsData.totalJobSeekerCount || 0, sub: '求职者注册/线索量', tone: 'warning' },
-  { key: 'enabled', label: '启用账号', value: statusCount('1'), sub: '推广人账号', tone: 'info' },
-  { key: 'disabled', label: '禁用账号', value: statusCount('0'), sub: '推广人账号', tone: 'danger' }
+  { key: 'promoter', label: '鎺ㄥ箍浜?, value: statisticsData.totalPromoterCount || 0, sub: '褰撳墠绛涢€夌粨鏋?, tone: 'primary' },
+  { key: 'company', label: 'B绔紒涓?, value: statisticsData.totalCompanyCount || 0, sub: '浼佷笟娉ㄥ唽/绾跨储閲?, tone: 'success' },
+  { key: 'jobSeeker', label: 'C绔眰鑱岃€?, value: statisticsData.totalJobSeekerCount || 0, sub: '姹傝亴鑰呮敞鍐?绾跨储閲?, tone: 'warning' },
+  { key: 'enabled', label: '鍚敤璐﹀彿', value: statusCount('1'), sub: '鎺ㄥ箍浜鸿处鍙?, tone: 'info' },
+  { key: 'disabled', label: '绂佺敤璐﹀彿', value: statusCount('0'), sub: '鎺ㄥ箍浜鸿处鍙?, tone: 'danger' }
 ]);
 
 const statisticsRows = computed(() => {
@@ -707,7 +698,6 @@ const trendChartRef = ref<HTMLElement | null>(null);
 const sideChartRef = ref<HTMLElement | null>(null);
 const identityPeriodChartRef = ref<HTMLElement | null>(null);
 const identityDistributionChartRef = ref<HTMLElement | null>(null);
-const identityLineChartRef = ref<HTMLElement | null>(null);
 const promoterChartRef = ref<HTMLElement | null>(null);
 const identityChartRef = ref<HTMLElement | null>(null);
 const statusChartRef = ref<HTMLElement | null>(null);
@@ -715,16 +705,15 @@ let trendChart: echarts.ECharts | null = null;
 let sideChart: echarts.ECharts | null = null;
 let identityPeriodChart: echarts.ECharts | null = null;
 let identityDistributionChart: echarts.ECharts | null = null;
-let identityLineChart: echarts.ECharts | null = null;
 let promoterChart: echarts.ECharts | null = null;
 let identityChart: echarts.ECharts | null = null;
 let statusChart: echarts.ECharts | null = null;
 const chartColors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#13C2C2', '#909399', '#9B59B6'];
 
 function identityTypeText(value?: string) {
-  if (value === '1') return '外部渠道';
-  if (value === '2') return '合伙人';
-  return '内部人员';
+  if (value === '1') return '澶栭儴娓犻亾';
+  if (value === '2') return '鍚堜紮浜?;
+  return '鍐呴儴娓犻亾';
 }
 
 function identityTypeTag(value?: string): TagType {
@@ -734,7 +723,7 @@ function identityTypeTag(value?: string): TagType {
 }
 
 function statusText(value?: string) {
-  return value === '1' ? '启用' : '禁用';
+  return value === '1' ? '鍚敤' : '绂佺敤';
 }
 
 function statusTag(value?: string): TagType {
@@ -787,22 +776,6 @@ function identityPeriodInternalMetric(
     return toCount(item.internalJobSeekerCount);
   }
   return toCount(item.internalCompanyCount) + toCount(item.internalJobSeekerCount);
-}
-
-function identityPeriodChannelMetric(
-  item: {
-    channelCompanyCount?: number;
-    channelJobSeekerCount?: number;
-  },
-  side?: StatisticsSide
-) {
-  if (side === 'company') {
-    return toCount(item.channelCompanyCount);
-  }
-  if (side === 'jobSeeker') {
-    return toCount(item.channelJobSeekerCount);
-  }
-  return toCount(item.channelCompanyCount) + toCount(item.channelJobSeekerCount);
 }
 
 function statusCount(status: string) {
@@ -1020,7 +993,7 @@ function buildPromotionLink(row: PromoterVO) {
 async function handleCopyPromotion(row: PromoterVO) {
   const link = buildPromotionLink(row);
   if (!link) {
-    ElMessage.warning('暂无推广链接');
+    ElMessage.warning('鏆傛棤鎺ㄥ箍閾炬帴');
     return;
   }
   if (navigator.clipboard?.writeText) {
@@ -1035,15 +1008,15 @@ async function handleCopyPromotion(row: PromoterVO) {
     document.execCommand('copy');
     document.body.removeChild(input);
   }
-  ElMessage.success('推广链接已复制');
+  ElMessage.success('鎺ㄥ箍閾炬帴宸插鍒?);
 }
 
 function handleDownloadQrCode(row: PromoterVO) {
   if (!row.promoterId) {
-    ElMessage.warning('请先保存推广员');
+    ElMessage.warning('璇峰厛淇濆瓨鎺ㄥ箍鍛?);
     return;
   }
-  const fileName = `推广二维码_${row.name || row.promoterId}.jpg`;
+  const fileName = `鎺ㄥ箍浜岀淮鐮乢${row.name || row.promoterId}.jpg`;
   download(`/admin/recruitment/promoter/${row.promoterId}/qrcode/download`, {}, fileName);
 }
 
@@ -1058,10 +1031,10 @@ async function submitForm() {
     };
     if (isEdit.value) {
       await updatePromoter(payload);
-      ElMessage.success('修改成功');
+      ElMessage.success('淇敼鎴愬姛');
     } else {
       await addPromoter(payload);
-      ElMessage.success('新增成功，已生成专属推广链接');
+      ElMessage.success('鏂板鎴愬姛锛屽凡鐢熸垚涓撳睘鎺ㄥ箍閾炬帴');
     }
     dialogVisible.value = false;
     await loadData();
@@ -1075,7 +1048,7 @@ async function handleStatusChange(row: PromoterVO, status: string) {
   try {
     await changePromoterStatus({ promoterId: row.promoterId!, status });
     row.status = status;
-    ElMessage.success('状态已更新');
+    ElMessage.success('鐘舵€佸凡鏇存柊');
     loadStatistics();
   } catch {
     loadData();
@@ -1086,18 +1059,18 @@ async function handleDelete(row?: PromoterVO) {
   const ids = row?.promoterId ? [row.promoterId] : selectedIds.value;
   if (!ids.length) return;
   try {
-    await ElMessageBox.confirm(`纭畾鍒犻櫎閫変腑鐨?${ids.length} 条推广人员吗？`, '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm(`纭畾鍒犻櫎閫変腑鐨?${ids.length} 鏉℃帹骞夸汉鍛樺悧锛焋, '鎻愮ず', {
+      confirmButtonText: '纭畾',
+      cancelButtonText: '鍙栨秷',
       type: 'warning'
     });
     await delPromoter(ids);
-    ElMessage.success('删除成功');
+    ElMessage.success('鍒犻櫎鎴愬姛');
     await loadData();
     loadStatistics();
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败');
+      ElMessage.error('鍒犻櫎澶辫触');
     }
   }
 }
@@ -1106,16 +1079,16 @@ function renderTrendChart() {
   if (!trendChartRef.value) return;
   if (!trendChart) trendChart = echarts.init(trendChartRef.value);
   const groups = statisticsData.timeStats || [];
-  const labels = groups.length ? groups.map((item) => item.label || item.key || '-') : ['暂无数据'];
+  const labels = groups.length ? groups.map((item) => item.label || item.key || '-') : ['鏆傛棤鏁版嵁'];
   const companyData = groups.length ? groups.map((item) => toCount(item.companyCount)) : [0];
   const jobSeekerData = groups.length ? groups.map((item) => toCount(item.jobSeekerCount)) : [0];
   const metricData = groups.length ? groups.map((item) => groupMetric(item)) : [0];
   const series =
     statisticsSide.value === 'all'
       ? [
-          { name: 'B端企业', type: 'bar', stack: 'total', data: companyData, itemStyle: { color: '#67C23A', borderRadius: [4, 4, 0, 0] } },
-          { name: 'C端求职者', type: 'bar', stack: 'total', data: jobSeekerData, itemStyle: { color: '#E6A23C', borderRadius: [4, 4, 0, 0] } },
-          { name: '合计', type: 'line', smooth: true, data: metricData, lineStyle: { color: '#409EFF', width: 2 }, itemStyle: { color: '#409EFF' } }
+          { name: 'B绔紒涓?, type: 'bar', stack: 'total', data: companyData, itemStyle: { color: '#67C23A', borderRadius: [4, 4, 0, 0] } },
+          { name: 'C绔眰鑱岃€?, type: 'bar', stack: 'total', data: jobSeekerData, itemStyle: { color: '#E6A23C', borderRadius: [4, 4, 0, 0] } },
+          { name: '鍚堣', type: 'line', smooth: true, data: metricData, lineStyle: { color: '#409EFF', width: 2 }, itemStyle: { color: '#409EFF' } }
         ]
       : [
           {
@@ -1153,7 +1126,7 @@ function renderSideChart() {
       color: ['#67C23A', '#E6A23C', '#DCDFE6'],
       series: [
         {
-          name: 'B/C端占比',
+          name: 'B/C绔崰姣?,
           type: 'pie',
           radius: ['46%', '72%'],
           center: ['50%', '45%'],
@@ -1162,10 +1135,10 @@ function renderSideChart() {
           label: { formatter: '{b}\n{c}', fontSize: 11 },
           data: hasData
             ? [
-                { name: 'B端企业', value: company },
-                { name: 'C端求职者', value: jobSeeker }
+                { name: 'B绔紒涓?, value: company },
+                { name: 'C绔眰鑱岃€?, value: jobSeeker }
               ]
-            : [{ name: '暂无数据', value: 1 }]
+            : [{ name: '鏆傛棤鏁版嵁', value: 1 }]
         }
       ]
     },
@@ -1177,7 +1150,7 @@ function renderPromoterChart() {
   if (!promoterChartRef.value) return;
   if (!promoterChart) promoterChart = echarts.init(promoterChartRef.value);
   const rows = statisticsRows.value.slice(0, 8).reverse();
-  const labels = rows.length ? rows.map((item) => item.name || item.phonenumber || '-') : ['暂无数据'];
+  const labels = rows.length ? rows.map((item) => item.name || item.phonenumber || '-') : ['鏆傛棤鏁版嵁'];
   const values = rows.length ? rows.map((item) => rowMetric(item)) : [0];
   promoterChart.setOption(
     {
@@ -1212,13 +1185,13 @@ function renderIdentityChart() {
       color: ['#409EFF', '#E6A23C', '#67C23A', '#DCDFE6'],
       series: [
         {
-          name: '身份分布',
+          name: '韬唤鍒嗗竷',
           type: 'pie',
           radius: ['42%', '68%'],
           center: ['50%', '43%'],
           itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
           label: { formatter: '{b}\n{c}', fontSize: 11 },
-          data: hasData ? groups.map((item) => ({ name: item.label || item.key || '-', value: groupMetric(item) })) : [{ name: '暂无数据', value: 1 }]
+          data: hasData ? groups.map((item) => ({ name: item.label || item.key || '-', value: groupMetric(item) })) : [{ name: '鏆傛棤鏁版嵁', value: 1 }]
         }
       ]
     },
@@ -1314,48 +1287,6 @@ function renderIdentityDistributionChart() {
   );
 }
 
-function renderIdentityLineChart() {
-  if (!identityLineChartRef.value) return;
-  if (!identityLineChart) identityLineChart = echarts.init(identityLineChartRef.value);
-  const rows = identityPeriodRows.value;
-  const labels = rows.length ? rows.map((item) => item.label || item.key || '-') : ['暂无数据'];
-  const currentSide = statisticsSide.value === 'all' ? undefined : statisticsSide.value;
-  const internalValues = rows.length ? rows.map((item) => identityPeriodInternalMetric(item, currentSide)) : [0];
-  const channelValues = rows.length ? rows.map((item) => identityPeriodChannelMetric(item, currentSide)) : [0];
-  identityLineChart.setOption(
-    {
-      tooltip: { trigger: 'axis' },
-      legend: { top: 0, right: 0 },
-      grid: { left: '3%', right: '4%', top: 42, bottom: 24, containLabel: true },
-      xAxis: { type: 'category', boundaryGap: false, data: labels, axisLabel: { fontSize: 11 } },
-      yAxis: { type: 'value', minInterval: 1, axisLabel: { fontSize: 11 } },
-      series: [
-        {
-          name: '内部人员',
-          type: 'line',
-          smooth: true,
-          data: internalValues,
-          symbolSize: 7,
-          lineStyle: { width: 3, color: '#67C23A' },
-          itemStyle: { color: '#67C23A' },
-          areaStyle: { color: 'rgba(103, 194, 58, 0.12)' }
-        },
-        {
-          name: '渠道',
-          type: 'line',
-          smooth: true,
-          data: channelValues,
-          symbolSize: 7,
-          lineStyle: { width: 3, color: '#409EFF' },
-          itemStyle: { color: '#409EFF' },
-          areaStyle: { color: 'rgba(64, 158, 255, 0.12)' }
-        }
-      ]
-    },
-    true
-  );
-}
-
 function renderStatusChart() {
   if (!statusChartRef.value) return;
   if (!statusChart) statusChart = echarts.init(statusChartRef.value);
@@ -1368,7 +1299,7 @@ function renderStatusChart() {
       color: ['#67C23A', '#F56C6C', '#DCDFE6'],
       series: [
         {
-          name: '状态分布',
+          name: '鐘舵€佸垎甯?,
           type: 'pie',
           radius: ['42%', '68%'],
           center: ['50%', '43%'],
@@ -1376,7 +1307,7 @@ function renderStatusChart() {
           label: { formatter: '{b}\n{c}', fontSize: 11 },
           data: hasData
             ? groups.map((item) => ({ name: item.label || statusText(item.key), value: toCount(item.promoterCount) }))
-            : [{ name: '暂无数据', value: 1 }]
+            : [{ name: '鏆傛棤鏁版嵁', value: 1 }]
         }
       ]
     },
@@ -1395,7 +1326,6 @@ function renderStatisticsCharts() {
 function renderIdentityCharts() {
   renderIdentityPeriodChart();
   renderIdentityDistributionChart();
-  renderIdentityLineChart();
 }
 
 function handleResize() {
@@ -1403,7 +1333,6 @@ function handleResize() {
   sideChart?.resize();
   identityPeriodChart?.resize();
   identityDistributionChart?.resize();
-  identityLineChart?.resize();
   promoterChart?.resize();
   identityChart?.resize();
   statusChart?.resize();
@@ -1421,7 +1350,6 @@ onUnmounted(() => {
   sideChart?.dispose();
   identityPeriodChart?.dispose();
   identityDistributionChart?.dispose();
-  identityLineChart?.dispose();
   promoterChart?.dispose();
   identityChart?.dispose();
   statusChart?.dispose();
