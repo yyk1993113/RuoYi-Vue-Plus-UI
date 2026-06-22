@@ -5,6 +5,8 @@ import path from 'path';
 
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd());
+  // 开发代理目标由 .env.development 注入，默认走本机 ruoyi-gateway。
+  const backendProxyTarget = env.VITE_PROXY_TARGET || 'http://127.0.0.1:8088';
   return {
     // 部署生产环境和开发环境下的URL。
     // 默认情况下，vite 会假设你的应用是被部署在一个域名的根路径上
@@ -24,7 +26,7 @@ export default defineConfig(({ mode, command }) => {
       open: true,
       proxy: {
         [env.VITE_APP_BASE_API]: {
-          target: 'http://localhost:8080',
+          target: backendProxyTarget,
           changeOrigin: true,
           ws: true,
           rewrite: (path) => path.replace(new RegExp('^' + env.VITE_APP_BASE_API), '')
