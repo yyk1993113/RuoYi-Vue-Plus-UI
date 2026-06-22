@@ -233,7 +233,7 @@
               </div>
               <div class="mini-right">
                 <el-tag :type="getApplyStatusTagType(apply.status)" size="small" effect="dark">
-                  {{ apply.statusName }}
+                  {{ applyStatusDisplayName(apply.statusName || apply.status) }}
                 </el-tag>
                 <span class="mini-time">{{ formatDate(apply.applyTime) }}</span>
               </div>
@@ -374,6 +374,10 @@ function formatDate(val: string) {
 
 function getApplyStatusTagType(status: string) {
   const map: Record<string, string> = {
+    submitted: 'info',
+    interview: 'warning',
+    hired: 'success',
+    rejected: 'danger',
     '0': 'info',
     '1': 'warning',
     '2': 'success',
@@ -440,10 +444,32 @@ function initJobTypeChart() {
   }, true);
 }
 
+// 后端为避免 SQL 字符集问题返回英文安全键，这里只负责前端展示翻译。
+const APPLY_STATUS_NAME_MAP: Record<string, string> = {
+  submitted: '已投递',
+  interview: '面试邀请',
+  hired: '已录用',
+  rejected: '已拒绝',
+  unknown: '未知',
+  '0': '已投递',
+  '1': '面试邀请',
+  '2': '已录用',
+  '3': '已拒绝',
+};
+
+function applyStatusDisplayName(name?: string | null) {
+  if (!name) return '未知';
+  return APPLY_STATUS_NAME_MAP[name] || name;
+}
+
 function initApplyStatusChart() {
   if (!applyStatusChartRef.value) return;
   if (!applyStatusChart) applyStatusChart = echarts.init(applyStatusChartRef.value);
   const statusColors: Record<string, string> = {
+    submitted: '#409EFF',
+    interview: '#E6A23C',
+    hired: '#67C23A',
+    rejected: '#F56C6C',
     '已投递': '#409EFF',
     '面试邀请': '#E6A23C',
     '已录用': '#67C23A',
@@ -463,7 +489,7 @@ function initApplyStatusChart() {
       emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold' } },
       labelLine: { show: false },
       data: applyStatusDist.value.map(d => ({
-        name: d.name,
+        name: applyStatusDisplayName(d.name),
         value: d.value,
         itemStyle: { color: statusColors[d.name] || '#909399' },
       })),

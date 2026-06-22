@@ -264,11 +264,11 @@
         <!-- 投递统计（汇总行） -->
         <el-descriptions-item label="投递统计" :span="2">
           <div class="detail-stats">
-            <span class="detail-stat-chip total">投递 {{ currentUser.totalApplies || 0 }}</span>
-            <span class="detail-stat-chip pending">待处理 {{ currentUser.pendingApplies || 0 }}</span>
-            <span class="detail-stat-chip interview">面试 {{ currentUser.interviewApplies || 0 }}</span>
-            <span class="detail-stat-chip hired">录用 {{ currentUser.hiredApplies || 0 }}</span>
-            <span class="detail-stat-chip rejected">拒绝 {{ currentUser.rejectedApplies || 0 }}</span>
+            <span class="detail-stat-chip total" @click="handleViewApplies(currentUser)">投递 {{ currentUser.totalApplies || 0 }}</span>
+            <span class="detail-stat-chip pending" @click="handleViewApplies(currentUser, '0')">待处理 {{ currentUser.pendingApplies || 0 }}</span>
+            <span class="detail-stat-chip interview" @click="handleViewApplies(currentUser, '1')">面试 {{ currentUser.interviewApplies || 0 }}</span>
+            <span class="detail-stat-chip hired" @click="handleViewApplies(currentUser, '2')">录用 {{ currentUser.hiredApplies || 0 }}</span>
+            <span class="detail-stat-chip rejected" @click="handleViewApplies(currentUser, '3')">拒绝 {{ currentUser.rejectedApplies || 0 }}</span>
           </div>
         </el-descriptions-item>
         <el-descriptions-item label="简历附件" :span="2">
@@ -329,6 +329,62 @@
       </template>
     </el-dialog>
 
+    <!-- ========== 区块六：投递记录弹窗 ========== -->
+    <el-dialog v-model="applyDialogVisible" :title="applyDialogTitle" width="1040px" append-to-body>
+      <el-form :model="applyQueryParams" :inline="true" class="apply-dialog-query">
+        <el-form-item label="岗位名称">
+          <el-input v-model="applyQueryParams.jobName" placeholder="请输入岗位名称" clearable style="width: 180px" @keyup.enter="handleApplyDialogQuery" />
+        </el-form-item>
+        <el-form-item label="企业名称">
+          <el-input v-model="applyQueryParams.companyName" placeholder="请输入企业名称" clearable style="width: 180px" @keyup.enter="handleApplyDialogQuery" />
+        </el-form-item>
+        <el-form-item label="投递状态">
+          <el-select v-model="applyQueryParams.status" placeholder="全部" clearable style="width: 140px">
+            <el-option label="已投递" value="0" />
+            <el-option label="面试邀请" value="1" />
+            <el-option label="已录用" value="2" />
+            <el-option label="已拒绝" value="3" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" icon="Search" @click="handleApplyDialogQuery">搜索</el-button>
+          <el-button icon="Refresh" @click="resetApplyDialogQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
+
+      <el-table v-loading="applyDialogLoading" :data="applyDialogData" border stripe max-height="460">
+        <el-table-column label="投递ID" prop="applyId" width="120" align="center" />
+        <el-table-column label="岗位名称" prop="jobName" min-width="170" show-overflow-tooltip />
+        <el-table-column label="企业名称" prop="companyName" min-width="170" show-overflow-tooltip />
+        <el-table-column label="手机号" prop="phonenumber" width="130" align="center" />
+        <el-table-column label="薪资" prop="salary" width="130" show-overflow-tooltip />
+        <el-table-column label="投递状态" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag :type="getApplyTagType(row.status)" size="small">
+              {{ row.statusName || applyStatusMeta(row.status).label }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="已读状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.isRead === '1' ? 'info' : 'warning'" size="small">
+              {{ row.isRead === '1' ? '已读' : '未读' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="投递时间" prop="applyTime" width="170" align="center" />
+        <el-table-column label="备注" prop="message" min-width="180" show-overflow-tooltip />
+      </el-table>
+
+      <pagination
+        v-show="applyDialogTotal > 0"
+        v-model:page="applyQueryParams.pageNum"
+        v-model:limit="applyQueryParams.pageSize"
+        :total="applyDialogTotal"
+        @pagination="loadApplyDialogData"
+      />
+    </el-dialog>
+
   </div>
 </template>
 
@@ -339,19 +395,28 @@ import {
   statisticsUser,
   listUsersWithStats,
   getRecruitmentUserDetail,
+  listApply,
   silenceUser,
   unsilenceUser,
+  type ApplyVO,
   type RecruitmentUserVO,
 } from '@/api/recruitment';
 import { download } from '@/utils/request';
 import { unwrapList } from './helpers';
+import { applyStatusMeta } from './constants';
 
 const loading = ref(false);
 const total = ref(0);
 const tableData = ref<RecruitmentUserVO[]>([]);
 const detailVisible = ref(false);
 const silenceVisible = ref(false);
+const applyDialogVisible = ref(false);
+const applyDialogLoading = ref(false);
 const currentUser = ref<RecruitmentUserVO | null>(null);
+const applyDialogUser = ref<RecruitmentUserVO | null>(null);
+const applyDialogData = ref<ApplyVO[]>([]);
+const applyDialogTotal = ref(0);
+const applyDialogInitialStatus = ref('');
 const queryFormRef = ref();
 const silenceFormRef = ref();
 type StatFilter = 'total' | 'normal' | 'applied' | 'pending' | 'silenced';
@@ -366,6 +431,15 @@ const queryParams = reactive({
   applyFilter: '',
 });
 
+const applyQueryParams = reactive({
+  pageNum: 1,
+  pageSize: 10,
+  userId: undefined as number | undefined,
+  status: '',
+  jobName: '',
+  companyName: '',
+});
+
 const stats = reactive({
   totalCount: 0,
   silencedCount: 0,
@@ -378,6 +452,12 @@ const stats = reactive({
 const totalInterviews = computed(() =>
   tableData.value.reduce((sum, u) => sum + (u.interviewApplies || 0), 0)
 );
+
+const applyDialogTitle = computed(() => {
+  const userName = applyDialogUser.value?.nickName || applyDialogUser.value?.userName || '求职者';
+  const statusText = applyQueryParams.status ? ` - ${applyStatusMeta(applyQueryParams.status).label}` : '';
+  return `${userName}的投递记录${statusText}`;
+});
 
 const silenceForm = reactive<RecruitmentUserVO & { reason: string }>({
   userId: 0,
@@ -589,8 +669,63 @@ async function handleUnsilence(row: RecruitmentUserVO | null) {
   }
 }
 
-function handleViewApplies(row: RecruitmentUserVO, status?: string) {
-  ElMessage.info(`查看 ${row.nickName || row.userName} 的投递记录（功能开发中）`);
+function handleViewApplies(row: RecruitmentUserVO | null, status?: string) {
+  if (!row?.userId) {
+    ElMessage.warning('缺少求职者用户ID，无法查询投递记录');
+    return;
+  }
+  applyDialogUser.value = row;
+  applyDialogInitialStatus.value = status || '';
+  applyQueryParams.pageNum = 1;
+  applyQueryParams.pageSize = 10;
+  applyQueryParams.userId = row.userId;
+  applyQueryParams.status = status || '';
+  applyQueryParams.jobName = '';
+  applyQueryParams.companyName = '';
+  applyDialogVisible.value = true;
+  loadApplyDialogData();
+}
+
+async function loadApplyDialogData() {
+  if (!applyQueryParams.userId) return;
+  applyDialogLoading.value = true;
+  try {
+    const res = await listApply({
+      pageNum: applyQueryParams.pageNum,
+      pageSize: applyQueryParams.pageSize,
+      userId: applyQueryParams.userId,
+      status: applyQueryParams.status || undefined,
+      jobName: applyQueryParams.jobName || undefined,
+      companyName: applyQueryParams.companyName || undefined,
+    });
+    const list = unwrapList<ApplyVO>(res);
+    applyDialogData.value = list.rows;
+    applyDialogTotal.value = list.total;
+  } catch (e) {
+    applyDialogData.value = [];
+    applyDialogTotal.value = 0;
+    console.error('[求职者管理] 投递记录加载失败:', e);
+    ElMessage.error('投递记录加载失败');
+  } finally {
+    applyDialogLoading.value = false;
+  }
+}
+
+function handleApplyDialogQuery() {
+  applyQueryParams.pageNum = 1;
+  loadApplyDialogData();
+}
+
+function resetApplyDialogQuery() {
+  applyQueryParams.pageNum = 1;
+  applyQueryParams.status = applyDialogInitialStatus.value;
+  applyQueryParams.jobName = '';
+  applyQueryParams.companyName = '';
+  loadApplyDialogData();
+}
+
+function getApplyTagType(status?: string | null) {
+  return (applyStatusMeta(status).type || 'info') as 'warning' | 'primary' | 'success' | 'info' | 'danger';
 }
 
 onMounted(() => {
@@ -706,7 +841,10 @@ function handleExport() {
   border-radius: 6px;
   font-size: 13px;
   font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s;
 }
+.detail-stat-chip:hover { transform: translateY(-1px); }
 .detail-stat-chip.total { background: #F0F9EB; color: #67C23A; }
 .detail-stat-chip.pending { background: #FDF6EC; color: #E6A23C; }
 .detail-stat-chip.interview { background: #ECF5FF; color: #409EFF; }
@@ -726,6 +864,14 @@ function handleExport() {
 }
 
 .text-muted { color: #C0C4CC; }
+
+.apply-dialog-query {
+  padding: 14px 16px 2px;
+  margin-bottom: 12px;
+  background: #F8FAFC;
+  border: 1px solid #EBEEF5;
+  border-radius: 8px;
+}
 
 /* 注册/最后登录合并列：上行注册时间、下行最近登录（灰色小字） */
 .time-cell { font-size: 12px; line-height: 1.6; }

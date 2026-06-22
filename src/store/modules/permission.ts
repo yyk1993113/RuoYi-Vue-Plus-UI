@@ -3,6 +3,7 @@ import router, { constantRoutes, dynamicRoutes } from '@/router';
 import store from '@/store';
 import { getRouters } from '@/api/menu';
 import auth from '@/plugins/auth';
+import { useUserStore } from '@/store/modules/user';
 import { RouteRecordRaw } from 'vue-router';
 import Layout from '@/layout/index.vue';
 import ParentView from '@/components/ParentView/index.vue';
@@ -13,6 +14,25 @@ import { ElNotification } from 'element-plus/es';
 
 // 匹配views里面所有的.vue文件
 const modules = import.meta.glob('./../../views/**/*.vue');
+const isAdminRole = () => useUserStore().roles.some((role) => ['superadmin', 'admin'].includes(role));
+const filterNonAdminConstantRoutes = (source: RouteRecordRaw[]): RouteRecordRaw[] => {
+  return source.reduce<RouteRecordRaw[]>((result, route) => {
+    if (route.path === '/index' || route.name === 'Index') {
+      return result;
+    }
+    const nextRoute: RouteRecordRaw = { ...route };
+    if (route.children) {
+      nextRoute.children = filterNonAdminConstantRoutes(route.children);
+      if (!nextRoute.children.length && !route.hidden) {
+        return result;
+      }
+    }
+    result.push(nextRoute);
+    return result;
+  }, []);
+};
+const getVisibleConstantRoutes = () => (isAdminRole() ? constantRoutes : filterNonAdminConstantRoutes(constantRoutes));
+
 export const usePermissionStore = defineStore('permission', () => {
   const routes = ref<RouteRecordRaw[]>([]);
   const addRoutes = ref<RouteRecordRaw[]>([]);
@@ -35,10 +55,10 @@ export const usePermissionStore = defineStore('permission', () => {
 
   const setRoutes = (newRoutes: RouteRecordRaw[]): void => {
     addRoutes.value = newRoutes;
-    routes.value = constantRoutes.concat(newRoutes);
+    routes.value = getVisibleConstantRoutes().concat(newRoutes);
   };
   const setDefaultRoutes = (routes: RouteRecordRaw[]): void => {
-    defaultRoutes.value = constantRoutes.concat(routes);
+    defaultRoutes.value = getVisibleConstantRoutes().concat(routes);
   };
   const setTopbarRoutes = (routes: RouteRecordRaw[]): void => {
     topbarRouters.value = routes;
@@ -62,7 +82,7 @@ export const usePermissionStore = defineStore('permission', () => {
       router.addRoute(route);
     });
     setRoutes(rewriteRoutes);
-    setSidebarRouters(constantRoutes.concat(sidebarRoutes));
+    setSidebarRouters(getVisibleConstantRoutes().concat(sidebarRoutes));
     setDefaultRoutes(sidebarRoutes);
     setTopbarRoutes(defaultRoutes);
     // 路由name重复检查

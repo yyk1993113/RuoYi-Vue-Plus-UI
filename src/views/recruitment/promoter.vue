@@ -1,7 +1,7 @@
 <template>
   <!--
     平台后台 路 渠道推广管理页。    职责：用页签拆分推广统计看板与推广人员维护；统计数据来自
-    GET /admin/recruitment/promoter/statistics锛屽垪琛?琛ㄥ崟来自同模块CRUD 鎺ュ彛銆?  -->
+    GET /admin/recruitment/promoter/statistics，列表/表单来自同模块 CRUD 接口。  -->
   <div class="promoter-page">
     <div class="promoter-tabs-shell">
       <el-tabs v-model="activeTab" class="promoter-tabs" @tab-change="handleTabChange">
@@ -238,6 +238,15 @@
                 <el-table-column label="C端求职者" prop="jobSeekerCount" width="120" align="center">
                   <template #default="{ row }">{{ row.jobSeekerCount || 0 }}</template>
                 </el-table-column>
+                <el-table-column label="授权手机号" prop="authorizedCount" width="110" align="center">
+                  <template #default="{ row }">{{ row.authorizedCount || 0 }}</template>
+                </el-table-column>
+                <el-table-column label="完成简历" prop="resumeCount" width="100" align="center">
+                  <template #default="{ row }">{{ row.resumeCount || 0 }}</template>
+                </el-table-column>
+                <el-table-column label="产生投递" prop="applyCount" width="100" align="center">
+                  <template #default="{ row }">{{ row.applyCount || 0 }}</template>
+                </el-table-column>
                 <el-table-column label="合计" width="100" align="center">
                   <template #default="{ row }">{{ rowMetric(row) }}</template>
                 </el-table-column>
@@ -333,6 +342,15 @@
                 <el-table-column label="C端求职者数" prop="jobSeekerCount" width="120" align="center">
                   <template #default="{ row }">{{ row.jobSeekerCount || 0 }}</template>
                 </el-table-column>
+                <el-table-column label="授权手机号" prop="authorizedCount" width="110" align="center">
+                  <template #default="{ row }">{{ row.authorizedCount || 0 }}</template>
+                </el-table-column>
+                <el-table-column label="完成简历" prop="resumeCount" width="100" align="center">
+                  <template #default="{ row }">{{ row.resumeCount || 0 }}</template>
+                </el-table-column>
+                <el-table-column label="产生投递" prop="applyCount" width="100" align="center">
+                  <template #default="{ row }">{{ row.applyCount || 0 }}</template>
+                </el-table-column>
                 <el-table-column label="合计" width="100" align="center">
                   <template #default="{ row }">{{ rowMetric(row) }}</template>
                 </el-table-column>
@@ -352,7 +370,7 @@
             </template>
             <el-form ref="queryFormRef" :model="queryParams" :inline="true" label-width="88px" class="query-form">
               <el-form-item label="姓名/昵称" prop="name">
-                <el-input v-model="queryParams.name" placeholder="璇疯緭鍏ュ鍚?昵称" clearable style="width: 200px" @keyup.enter="handleQuery" />
+                <el-input v-model="queryParams.name" placeholder="请输入姓名/昵称" clearable style="width: 200px" @keyup.enter="handleQuery" />
               </el-form-item>
               <el-form-item label="手机号" prop="phonenumber">
                 <el-input v-model="queryParams.phonenumber" placeholder="请输入手机号" clearable style="width: 200px" @keyup.enter="handleQuery" />
@@ -396,18 +414,16 @@
               <div class="table-head">
                 <div>
                   <span class="table-title">推广人员管理</span>
-                   <span class="table-subtitle">维护推广账号、推广码与B/C端数量</span>
+                  <span class="table-subtitle">维护推广账号、推广码与B/C端数量</span>
                 </div>
                 <div class="table-actions">
                   <el-button type="primary" plain icon="Plus" @click="handleAdd">新增</el-button>
-                  <el-button type="danger" plain icon="Delete" :disabled="selectedIds.length === 0" @click="handleDelete()">删除</el-button>
                   <el-button plain icon="Refresh" @click="loadData">刷新</el-button>
                 </div>
               </div>
             </template>
 
-            <el-table v-loading="loading" :data="tableData" border stripe @selection-change="handleSelectionChange">
-              <el-table-column type="selection" width="50" align="center" />
+            <el-table v-loading="loading" :data="tableData" border stripe>
               <el-table-column label="推广人" min-width="170" show-overflow-tooltip>
                 <template #default="{ row }">
                   <div class="name-cell">
@@ -455,11 +471,10 @@
                 <template #default="{ row }">{{ row.remark || '-' }}</template>
               </el-table-column>
               <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
-              <el-table-column label="操作" width="230" fixed="right" align="center">
+              <el-table-column label="操作" width="170" fixed="right" align="center">
                 <template #default="{ row }">
                   <el-button link type="primary" icon="Download" @click="handleDownloadQrCode(row)">下载码</el-button>
                   <el-button link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
-                  <el-button link type="danger" icon="Delete" @click="handleDelete(row)">删除</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -529,11 +544,10 @@
 <script setup name="RecruitmentPromoter" lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import * as echarts from 'echarts';
-import { ElMessage, ElMessageBox, type FormRules } from 'element-plus';
+import { ElMessage, type FormRules } from 'element-plus';
 import {
   addPromoter,
   changePromoterStatus,
-  delPromoter,
   getPromoter,
   getPromoterStatistics,
   listPromoter,
@@ -559,7 +573,6 @@ const loading = ref(false);
 const submitting = ref(false);
 const tableData = ref<PromoterVO[]>([]);
 const total = ref(0);
-const selectedIds = ref<Array<string | number>>([]);
 const dialogVisible = ref(false);
 const isEdit = ref(false);
 const showMoreQuery = ref(false);
@@ -575,10 +588,11 @@ const listDateRange = ref<[string, string] | []>([]);
 const statisticsTimeUnit = ref<PromoterStatisticsTimeUnit>('month');
 const statisticsSide = ref<StatisticsSide>('all');
 const statisticsTimeUnitOptions: { label: string; value: PromoterStatisticsTimeUnit }[] = [
-  { label: '年', value: 'year' },
-  { label: '半年', value: 'halfYear' },
-  { label: '季度', value: 'quarter' },
-  { label: '月', value: 'month' }
+  { label: '按日', value: 'day' },
+  { label: '按年', value: 'year' },
+  { label: '按半年', value: 'halfYear' },
+  { label: '按季度', value: 'quarter' },
+  { label: '按月', value: 'month' }
 ];
 
 const statisticsQuery = reactive<PromoterQuery>({
@@ -695,6 +709,8 @@ const metricCards = computed(() => [
   { key: 'promoter', label: '推广人', value: statisticsData.totalPromoterCount || 0, sub: '当前筛选结果', tone: 'primary' },
   { key: 'company', label: 'B端企业', value: statisticsData.totalCompanyCount || 0, sub: '企业注册/线索量', tone: 'success' },
   { key: 'jobSeeker', label: 'C端求职者', value: statisticsData.totalJobSeekerCount || 0, sub: '求职者注册/线索量', tone: 'warning' },
+  { key: 'resume', label: '简历完成', value: sumRowMetric('resumeCount'), sub: '归因简历量', tone: 'info' },
+  { key: 'apply', label: '产生投递', value: sumRowMetric('applyCount'), sub: '归因投递人数', tone: 'success' },
   { key: 'enabled', label: '启用账号', value: statusCount('1'), sub: '推广人账号', tone: 'info' },
   { key: 'disabled', label: '禁用账号', value: statusCount('0'), sub: '推广人账号', tone: 'danger' }
 ]);
@@ -757,17 +773,15 @@ function rowMetric(row: PromoterVO) {
   return groupMetric(row);
 }
 
-function identityInternalValue(item: {
-  internalCompanyCount?: number;
-  internalJobSeekerCount?: number;
-}) {
+function sumRowMetric(key: 'authorizedCount' | 'resumeCount' | 'applyCount') {
+  return (statisticsData.rows || []).reduce((sum, row) => sum + toCount(row[key]), 0);
+}
+
+function identityInternalValue(item: { internalCompanyCount?: number; internalJobSeekerCount?: number }) {
   return toCount(item.internalCompanyCount) + toCount(item.internalJobSeekerCount);
 }
 
-function identityChannelValue(item: {
-  channelCompanyCount?: number;
-  channelJobSeekerCount?: number;
-}) {
+function identityChannelValue(item: { channelCompanyCount?: number; channelJobSeekerCount?: number }) {
   return toCount(item.channelCompanyCount) + toCount(item.channelJobSeekerCount);
 }
 
@@ -855,10 +869,7 @@ watch(
 );
 
 watch(statisticsSide, () => {
-  nextTick(() => {
-    renderStatisticsCharts();
-    renderIdentityCharts();
-  });
+  scheduleActiveTabCharts();
 });
 
 watch(isAdminUser, (allowed) => {
@@ -870,9 +881,9 @@ watch(isAdminUser, (allowed) => {
 
 function handleTabChange(name: string | number) {
   if (name === 'identity') {
-    nextTick(renderIdentityCharts);
+    scheduleIdentityCharts();
   } else if (name === 'statistics') {
-    nextTick(renderStatisticsCharts);
+    scheduleStatisticsCharts();
   }
 }
 
@@ -947,8 +958,7 @@ async function loadStatistics() {
       ...(res?.data || {})
     });
     await nextTick();
-    renderIdentityCharts();
-    renderStatisticsCharts();
+    scheduleActiveTabCharts();
   } finally {
     statisticsLoading.value = false;
   }
@@ -974,10 +984,6 @@ function resetQuery() {
   listDateRange.value = [];
   queryParams.pageNum = 1;
   loadData();
-}
-
-function handleSelectionChange(rows: PromoterVO[]) {
-  selectedIds.value = rows.map((row) => row.promoterId!).filter(Boolean);
 }
 
 function handleAdd() {
@@ -1082,29 +1088,41 @@ async function handleStatusChange(row: PromoterVO, status: string) {
   }
 }
 
-async function handleDelete(row?: PromoterVO) {
-  const ids = row?.promoterId ? [row.promoterId] : selectedIds.value;
-  if (!ids.length) return;
-  try {
-    await ElMessageBox.confirm(`纭畾鍒犻櫎閫変腑鐨?${ids.length} 条推广人员吗？`, '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
+function getVisibleChartEl(el: HTMLElement | null) {
+  if (!el) return null;
+  const { clientWidth, clientHeight } = el;
+  return clientWidth > 0 && clientHeight > 0 ? el : null;
+}
+
+function scheduleChartRender(render: () => void) {
+  nextTick(() => {
+    window.requestAnimationFrame(() => {
+      render();
     });
-    await delPromoter(ids);
-    ElMessage.success('删除成功');
-    await loadData();
-    loadStatistics();
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败');
-    }
+  });
+}
+
+function scheduleStatisticsCharts() {
+  scheduleChartRender(renderStatisticsCharts);
+}
+
+function scheduleIdentityCharts() {
+  scheduleChartRender(renderIdentityCharts);
+}
+
+function scheduleActiveTabCharts() {
+  if (activeTab.value === 'statistics' || activeTab.value === 'statisticsDetail') {
+    scheduleStatisticsCharts();
+  }
+  if (activeTab.value === 'identity') {
+    scheduleIdentityCharts();
   }
 }
 
 function renderTrendChart() {
-  if (!trendChartRef.value) return;
-  if (!trendChart) trendChart = echarts.init(trendChartRef.value);
+  const el = getVisibleChartEl(trendChartRef.value);
+  if (!el) return;
+  if (!trendChart) trendChart = echarts.init(el);
   const groups = statisticsData.timeStats || [];
   const labels = groups.length ? groups.map((item) => item.label || item.key || '-') : ['暂无数据'];
   const companyData = groups.length ? groups.map((item) => toCount(item.companyCount)) : [0];
@@ -1141,8 +1159,9 @@ function renderTrendChart() {
 }
 
 function renderSideChart() {
-  if (!sideChartRef.value) return;
-  if (!sideChart) sideChart = echarts.init(sideChartRef.value);
+  const el = getVisibleChartEl(sideChartRef.value);
+  if (!el) return;
+  if (!sideChart) sideChart = echarts.init(el);
   const company = statisticsData.totalCompanyCount || 0;
   const jobSeeker = statisticsData.totalJobSeekerCount || 0;
   const hasData = company + jobSeeker > 0;
@@ -1174,8 +1193,9 @@ function renderSideChart() {
 }
 
 function renderPromoterChart() {
-  if (!promoterChartRef.value) return;
-  if (!promoterChart) promoterChart = echarts.init(promoterChartRef.value);
+  const el = getVisibleChartEl(promoterChartRef.value);
+  if (!el) return;
+  if (!promoterChart) promoterChart = echarts.init(el);
   const rows = statisticsRows.value.slice(0, 8).reverse();
   const labels = rows.length ? rows.map((item) => item.name || item.phonenumber || '-') : ['暂无数据'];
   const values = rows.length ? rows.map((item) => rowMetric(item)) : [0];
@@ -1201,8 +1221,9 @@ function renderPromoterChart() {
 }
 
 function renderIdentityChart() {
-  if (!identityChartRef.value) return;
-  if (!identityChart) identityChart = echarts.init(identityChartRef.value);
+  const el = getVisibleChartEl(identityChartRef.value);
+  if (!el) return;
+  if (!identityChart) identityChart = echarts.init(el);
   const groups = statisticsData.identityStats || [];
   const hasData = groups.some((item) => groupMetric(item) > 0);
   identityChart.setOption(
@@ -1227,8 +1248,9 @@ function renderIdentityChart() {
 }
 
 function renderIdentityPeriodChart() {
-  if (!identityPeriodChartRef.value) return;
-  if (!identityPeriodChart) identityPeriodChart = echarts.init(identityPeriodChartRef.value);
+  const el = getVisibleChartEl(identityPeriodChartRef.value);
+  if (!el) return;
+  if (!identityPeriodChart) identityPeriodChart = echarts.init(el);
   const rows = identityPeriodRows.value;
   const labels = rows.length ? rows.map((item) => item.label || item.key || '-') : ['暂无数据'];
   const internalValues = rows.length
@@ -1269,8 +1291,9 @@ function renderIdentityPeriodChart() {
 }
 
 function renderIdentityDistributionChart() {
-  if (!identityDistributionChartRef.value) return;
-  if (!identityDistributionChart) identityDistributionChart = echarts.init(identityDistributionChartRef.value);
+  const el = getVisibleChartEl(identityDistributionChartRef.value);
+  if (!el) return;
+  if (!identityDistributionChart) identityDistributionChart = echarts.init(el);
   const rows = identityPeriodRows.value;
   const internalTotal = rows.reduce(
     (sum, item) => sum + identityPeriodInternalMetric(item, statisticsSide.value === 'all' ? undefined : statisticsSide.value),
@@ -1315,8 +1338,9 @@ function renderIdentityDistributionChart() {
 }
 
 function renderIdentityLineChart() {
-  if (!identityLineChartRef.value) return;
-  if (!identityLineChart) identityLineChart = echarts.init(identityLineChartRef.value);
+  const el = getVisibleChartEl(identityLineChartRef.value);
+  if (!el) return;
+  if (!identityLineChart) identityLineChart = echarts.init(el);
   const rows = identityPeriodRows.value;
   const labels = rows.length ? rows.map((item) => item.label || item.key || '-') : ['暂无数据'];
   const currentSide = statisticsSide.value === 'all' ? undefined : statisticsSide.value;
@@ -1357,8 +1381,9 @@ function renderIdentityLineChart() {
 }
 
 function renderStatusChart() {
-  if (!statusChartRef.value) return;
-  if (!statusChart) statusChart = echarts.init(statusChartRef.value);
+  const el = getVisibleChartEl(statusChartRef.value);
+  if (!el) return;
+  if (!statusChart) statusChart = echarts.init(el);
   const groups = statisticsData.statusStats || [];
   const hasData = groups.some((item) => toCount(item.promoterCount) > 0);
   statusChart.setOption(

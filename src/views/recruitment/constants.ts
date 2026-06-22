@@ -94,6 +94,10 @@ export const jobTypeMeta = (jobType?: string | null): StatusMeta => resolve(JOB_
 //      属该列特有逻辑，仍保留在视图内，不并入此通用映射；本表只承载「投递状态 → 标准文案/颜色」。
 // 未命中（含 undefined）兜底为「未知 / info」，与原 getStatusLabel 的 '未知' 默认一致。
 const APPLY_STATUS: Record<string, StatusMeta> = {
+  submitted: { label: '已投递', type: 'info' },
+  interview: { label: '面试邀请', type: 'primary' },
+  hired: { label: '已录用', type: 'success' },
+  rejected: { label: '已拒绝', type: 'danger' },
   '0': { label: '已投递', type: 'info' },
   '1': { label: '面试邀请', type: 'primary' },
   '2': { label: '已录用', type: 'success' },

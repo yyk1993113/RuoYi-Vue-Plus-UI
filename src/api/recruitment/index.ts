@@ -583,9 +583,14 @@ export interface PromoterQuery {
 }
 
 export type PromoterForm = PromoterVO;
-export type PromoterStatisticsTimeUnit = 'month' | 'quarter' | 'halfYear' | 'year';
+export type PromoterStatisticsTimeUnit = 'day' | 'month' | 'quarter' | 'halfYear' | 'year';
 
-export interface PromoterStatisticsRow extends PromoterVO {}
+export interface PromoterStatisticsRow extends PromoterVO {
+  authorizedCount?: number;
+  resumeCount?: number;
+  applyCount?: number;
+  totalCount?: number;
+}
 
 export interface PromoterStatisticsGroup {
   key?: string;

@@ -86,8 +86,13 @@
                 <p>分享给企业，企业可通过电脑打开</p>
               </div>
             </div>
+            <div class="code-box">
+              <span>推广码</span>
+              <strong>{{ promotionCodeText }}</strong>
+              <el-button link type="primary" :icon="DocumentCopy" @click="copyText(promotionCodeText)">复制推广码</el-button>
+            </div>
             <el-input v-model="bPromotionLink" readonly type="textarea" :rows="5" />
-            <el-button type="primary" :icon="DocumentCopy" @click="copyText(bPromotionLink)">复制链接</el-button>
+            <el-button type="primary" :icon="DocumentCopy" @click="copyText(bPromotionCopyText)">复制链接和推广码</el-button>
           </div>
 
           <div class="tool-panel">
@@ -123,7 +128,25 @@ const workbench = ref<PromoterWorkbenchVO>({});
 const cQrUrl = ref('');
 const bQrUrl = ref('');
 
-const bPromotionLink = computed(() => workbench.value.bPromotionLink || '');
+const promotionCodeText = computed(() => workbench.value.promotionCode || '');
+const bPromotionLink = computed(() => {
+  const code = promotionCodeText.value;
+  const link = workbench.value.bPromotionLink || '';
+  if (!code) return link;
+  if (!link) {
+    return `https://recruiter.zgypzp.com/register?userType=B&source=promoter&promoterCode=${encodeURIComponent(code)}`;
+  }
+  if (link.includes('promoterCode=')) return link;
+  const separator = link.includes('?') ? '&' : '?';
+  return `${link}${separator}promoterCode=${encodeURIComponent(code)}`;
+});
+const bPromotionCopyText = computed(() => {
+  const lines = [`B端推广链接：${bPromotionLink.value}`];
+  if (promotionCodeText.value) {
+    lines.push(`推广码：${promotionCodeText.value}`);
+  }
+  return lines.join('\n');
+});
 
 const todayMetrics = computed(() => [
   { label: '新增企业', value: workbench.value.todayCompanyCount ?? 0 },
@@ -374,6 +397,28 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+.code-box {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: #f8fbff;
+  border: 1px solid #d9e6f8;
+  border-radius: 8px;
+
+  span {
+    color: #768196;
+    font-size: 13px;
+  }
+
+  strong {
+    color: #1d63d9;
+    font-size: 18px;
+    word-break: break-all;
+  }
+}
+
 .remark-alert {
   margin-top: 14px;
 }
@@ -397,6 +442,11 @@ onBeforeUnmount(() => {
   .metric-grid,
   .tools-section {
     grid-template-columns: 1fr;
+  }
+
+  .code-box {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
   }
 }
 </style>

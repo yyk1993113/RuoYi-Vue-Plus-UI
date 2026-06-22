@@ -7,7 +7,7 @@ Vue 3 + Vite + Element Plus + UnoCSS + TypeScript + Pinia，包管理 **pnpm**�
 
 ## 前置依赖
 - **Node ≥ 20.19、pnpm**
-- 后端 API 在 `http://localhost:8080`（登录与全部数据靠它，必须先起）
+- 后端 API 在 `http://localhost:8088`（登录与全部数据靠它，必须先起）
 
 ## 快速开始
 
@@ -24,7 +24,7 @@ mysql -u root -proot find_work < ruoyi_recruitment_full.sql
 for f in v1_complete/*.sql; do mysql -u root -proot find_work < "$f"; done
 cd ../.. && export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 mvn install -DskipTests -pl ruoyi-admin -am
-mvn spring-boot:run -pl ruoyi-admin -Dspring-boot.run.profiles=dev   # → :8080
+mvn spring-boot:run -pl ruoyi-gateway -Dspring-boot.run.profiles=dev   # → :8088
 ```
 > MySQL `root/root`、Redis 密码 `ruoyi123` 是后端 `application-dev.yml` 的本地默认值。
 
@@ -39,7 +39,7 @@ pnpm dev            # → http://localhost:8081
 `admin` / `admin123`，租户 `000000`。其它角色测试号：`test`(运营) / `test_auditor`(审核) / `test_finance`(财务)，密码同为 `admin123`。
 
 ## 接口代理 / 配置
-- **开发**：`VITE_APP_BASE_API=/dev-api`（`.env.development`），Vite 把 `/dev-api/*` 反代到 `http://localhost:8080` 并剥掉前缀（见 `vite.config.ts`）。
+- **开发**：`VITE_APP_BASE_API=/dev-api`（`.env.development`），Vite 把 `/dev-api/*` 反代到 `http://localhost:8088` 并剥掉前缀（见 `vite.config.ts`）。
 - **生产**：`VITE_APP_BASE_API=/prod-api`，由 nginx（`admin.zgypzp.com`）反代到后端。
 - **接口加解密**：`VITE_APP_ENCRYPT=true`（RSA/AES），需与后端密钥匹配，勿单方面改。
 - dev 端口由 `.env.development` 的 `VITE_APP_PORT=8081` 决定。
