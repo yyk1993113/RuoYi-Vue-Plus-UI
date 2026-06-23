@@ -7,7 +7,7 @@ import { RouteRecordRaw } from 'vue-router';
 import Layout from '@/layout/index.vue';
 import ParentView from '@/components/ParentView/index.vue';
 import InnerLink from '@/layout/components/InnerLink/index.vue';
-import { ref } from 'vue';
+import { defineComponent, h, ref } from 'vue';
 import { createCustomNameComponent } from '@/utils/createCustomNameComponent';
 import { ElNotification } from 'element-plus/es';
 
@@ -165,8 +165,47 @@ export const loadView = (view: any, name: string) => {
       return res;
     }
   }
-  return res;
+  // 动态菜单依赖后端 component 字段映射到 src/views 下的真实文件。
+  // 若新增页面后未重启 Vite、或数据库 component 写错，原逻辑会返回 undefined 并造成内容区白屏。
+  console.error(`[permission] Cannot resolve route component: ${view}, route name: ${name}`);
+  return createMissingRouteComponent(view, name);
 };
+
+const createMissingRouteComponent = (view: any, name: string) =>
+  defineComponent({
+    name: `MissingRoute_${name || 'Unknown'}`,
+    setup() {
+      return () =>
+        h(
+          'div',
+          {
+            style: {
+              padding: '24px',
+              color: '#606266'
+            }
+          },
+          [
+            h(
+              'div',
+              {
+                style: {
+                  maxWidth: '720px',
+                  padding: '20px 24px',
+                  border: '1px solid #dcdfe6',
+                  borderRadius: '6px',
+                  background: '#fff'
+                }
+              },
+              [
+                h('h3', { style: { margin: '0 0 12px', color: '#303133', fontSize: '18px' } }, '页面组件加载失败'),
+                h('p', { style: { margin: '0 0 8px' } }, `路由组件：${view || '-'}`),
+                h('p', { style: { margin: '0' } }, '请检查菜单 component 是否与 src/views 下的 Vue 文件路径一致，新增页面后需要重启前端开发服务。')
+              ]
+            )
+          ]
+        );
+    }
+  });
 
 // 非setup
 export const usePermissionStoreHook = () => {

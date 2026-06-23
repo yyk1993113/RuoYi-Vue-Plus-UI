@@ -331,17 +331,19 @@
             <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
         </el-form-item>
-        <el-form-item label="省份" prop="province">
-          <el-input v-model="editForm.province" placeholder="请输入省份" maxlength="30" />
-        </el-form-item>
-        <el-form-item label="城市" prop="city">
-          <el-input v-model="editForm.city" placeholder="请输入城市" maxlength="30" />
-        </el-form-item>
-        <el-form-item label="区县" prop="district">
-          <el-input v-model="editForm.district" placeholder="请输入区县" maxlength="30" />
+        <el-form-item label="省市区" prop="regionPath">
+          <el-cascader
+            v-model="editForm.regionPath"
+            :options="regionOptions"
+            filterable
+            clearable
+            placeholder="请选择省 / 市 / 区县"
+            style="width: 100%"
+            @change="syncEditRegionFromPath"
+          />
         </el-form-item>
         <el-form-item label="工作地点" prop="workAddress">
-          <el-input v-model="editForm.workAddress" placeholder="请输入工作地点" maxlength="200" />
+          <el-input v-model="editForm.workAddress" placeholder="请输入详细地址" maxlength="200" />
         </el-form-item>
         <el-form-item label="薪资区间" prop="salaryMin">
           <div style="display: flex; align-items: center; gap: 8px; width: 100%">
@@ -478,6 +480,7 @@ import {
 } from '@/api/recruitment';
 import type { JobFullVO } from '@/api/recruitment';
 import { download } from '@/utils/request';
+import { REGIONS } from '@/utils/region-data';
 import { unwrapList, splitToArray } from './helpers';
 import { jobStatusMeta, jobTypeMeta } from './constants';
 
@@ -590,6 +593,7 @@ const editForm = reactive({
   jobName: '',
   jobType: '0',
   category: '',
+  regionPath: [] as string[],
   province: '',
   city: '',
   district: '',
@@ -646,12 +650,25 @@ const educationOptions = [
   { value: '7', label: '博士' }
 ];
 
+// 运营后台编辑岗位同样使用三级联动数据源，地区字段只由 cascader 拆分生成。
+const regionOptions = REGIONS.map((province: any) => ({
+  label: province.name,
+  value: province.name,
+  children: (province.cities || []).map((city: any) => ({
+    label: city.name,
+    value: city.name,
+    children: (city.areas || []).map((area: string) => ({
+      label: area,
+      value: area
+    }))
+  }))
+}));
+
 const editRules = {
   jobName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
   jobType: [{ required: true, message: '请选择用工性质', trigger: 'change' }],
   category: [{ required: true, message: '请选择职位类目', trigger: 'change' }],
-  province: [{ required: true, message: '请输入省份', trigger: 'blur' }],
-  city: [{ required: true, message: '请输入城市', trigger: 'blur' }],
+  regionPath: [{ required: true, type: 'array', min: 3, message: '请选择省市区', trigger: 'change' }],
   workAddress: [{ required: true, message: '请输入工作地点', trigger: 'blur' }],
   experience: [{ required: true, message: '请选择经验要求', trigger: 'change' }],
   education: [{ required: true, message: '请选择学历要求', trigger: 'change' }],
@@ -715,6 +732,7 @@ async function handleEdit(row: any) {
     editForm.province = d.province ?? '';
     editForm.city = d.city ?? '';
     editForm.district = d.district ?? '';
+    editForm.regionPath = [d.province, d.city, d.district].filter(Boolean);
     editForm.salaryMin = d.salaryMin ?? undefined;
     editForm.salaryMax = d.salaryMax ?? undefined;
     editForm.salaryUnit = normalizeSalaryUnit(d.salaryUnit);
@@ -742,6 +760,7 @@ async function submitEdit() {
     if (!valid) return;
     editSubmitting.value = true;
     try {
+      syncEditRegionFromPath();
       await updateJob({
         jobId: editForm.jobId,
         jobName: editForm.jobName,
@@ -773,6 +792,13 @@ async function submitEdit() {
       editSubmitting.value = false;
     }
   });
+}
+
+function syncEditRegionFromPath() {
+  const [province = '', city = '', district = ''] = editForm.regionPath || [];
+  editForm.province = province;
+  editForm.city = city;
+  editForm.district = district;
 }
 
 async function loadData() {

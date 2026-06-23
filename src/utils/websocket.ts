@@ -1,12 +1,23 @@
 import { getToken } from '@/utils/auth';
 import { useNoticeStore } from '@/store/modules/notice';
 
+const buildRealtimeAuthUrl = (url: string) => {
+  const params = new URLSearchParams({
+    Authorization: `Bearer ${getToken() || ''}`,
+    clientid: import.meta.env.VITE_APP_CLIENT_ID || ''
+  });
+  return `${url}${url.includes('?') ? '&' : '?'}${params.toString()}`;
+};
+
 // 初始化socket
 export const initWebSocket = (url: any) => {
   if (import.meta.env.VITE_APP_WEBSOCKET === 'false') {
     return;
   }
-  url = url + '?Authorization=Bearer ' + getToken() + '&clientid=' + import.meta.env.VITE_APP_CLIENT_ID;
+  if (!getToken()) {
+    return;
+  }
+  url = buildRealtimeAuthUrl(url);
   useWebSocket(url, {
     autoReconnect: {
       // 重连最大次数
@@ -18,7 +29,7 @@ export const initWebSocket = (url: any) => {
       }
     },
     heartbeat: {
-      message: JSON.stringify({ type: 'ping' }),
+      message: 'ping',
       // 发送心跳的间隔
       interval: 10000,
       // 接收到心跳response的超时时间
@@ -31,7 +42,7 @@ export const initWebSocket = (url: any) => {
       console.log('websocket已经断开');
     },
     onMessage: (_, e) => {
-      if (e.data.indexOf('ping') > 0) {
+      if (e.data === 'pong') {
         return;
       }
       useNoticeStore().addNotice({

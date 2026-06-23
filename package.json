@@ -8,8 +8,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite serve --mode development",
-    "build:prod": "vite build --mode production",
-    "build:dev": "vite build --mode development",
+    "build:prod": "pnpm run check:route-components && vite build --mode production",
+    "build:dev": "pnpm run check:route-components && vite build --mode development",
+    "check:route-components": "node scripts/check-route-components.mjs",
     "preview": "vite preview",
     "lint:eslint": "eslint",
     "lint:eslint:fix": "eslint --fix",

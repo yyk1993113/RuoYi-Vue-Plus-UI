@@ -396,7 +396,7 @@
               <div class="table-head">
                 <div>
                   <span class="table-title">推广人员管理</span>
-                   <span class="table-subtitle">维护推广账号、推广码与B/C端数量</span>
+                  <span class="table-subtitle">维护推广账号、推广码与B/C端数量</span>
                 </div>
                 <div class="table-actions">
                   <el-button type="primary" plain icon="Plus" @click="handleAdd">新增</el-button>
@@ -719,6 +719,8 @@ let identityLineChart: echarts.ECharts | null = null;
 let promoterChart: echarts.ECharts | null = null;
 let identityChart: echarts.ECharts | null = null;
 let statusChart: echarts.ECharts | null = null;
+let chartResizeObserver: ResizeObserver | null = null;
+let pendingChartFrame = 0;
 const chartColors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#13C2C2', '#909399', '#9B59B6'];
 
 function identityTypeText(value?: string) {
@@ -757,17 +759,11 @@ function rowMetric(row: PromoterVO) {
   return groupMetric(row);
 }
 
-function identityInternalValue(item: {
-  internalCompanyCount?: number;
-  internalJobSeekerCount?: number;
-}) {
+function identityInternalValue(item: { internalCompanyCount?: number; internalJobSeekerCount?: number }) {
   return toCount(item.internalCompanyCount) + toCount(item.internalJobSeekerCount);
 }
 
-function identityChannelValue(item: {
-  channelCompanyCount?: number;
-  channelJobSeekerCount?: number;
-}) {
+function identityChannelValue(item: { channelCompanyCount?: number; channelJobSeekerCount?: number }) {
   return toCount(item.channelCompanyCount) + toCount(item.channelJobSeekerCount);
 }
 
@@ -855,10 +851,7 @@ watch(
 );
 
 watch(statisticsSide, () => {
-  nextTick(() => {
-    renderStatisticsCharts();
-    renderIdentityCharts();
-  });
+  scheduleVisibleChartsRender();
 });
 
 watch(isAdminUser, (allowed) => {
@@ -870,9 +863,9 @@ watch(isAdminUser, (allowed) => {
 
 function handleTabChange(name: string | number) {
   if (name === 'identity') {
-    nextTick(renderIdentityCharts);
+    scheduleVisibleChartsRender();
   } else if (name === 'statistics') {
-    nextTick(renderStatisticsCharts);
+    scheduleVisibleChartsRender();
   }
 }
 
@@ -947,8 +940,7 @@ async function loadStatistics() {
       ...(res?.data || {})
     });
     await nextTick();
-    renderIdentityCharts();
-    renderStatisticsCharts();
+    scheduleVisibleChartsRender();
   } finally {
     statisticsLoading.value = false;
   }
@@ -1103,8 +1095,9 @@ async function handleDelete(row?: PromoterVO) {
 }
 
 function renderTrendChart() {
-  if (!trendChartRef.value) return;
-  if (!trendChart) trendChart = echarts.init(trendChartRef.value);
+  const chart = ensureChartReady(trendChartRef.value, trendChart);
+  if (!chart) return;
+  trendChart = chart;
   const groups = statisticsData.timeStats || [];
   const labels = groups.length ? groups.map((item) => item.label || item.key || '-') : ['暂无数据'];
   const companyData = groups.length ? groups.map((item) => toCount(item.companyCount)) : [0];
@@ -1127,7 +1120,7 @@ function renderTrendChart() {
           }
         ];
 
-  trendChart.setOption(
+  chart.setOption(
     {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       legend: { top: 0, right: 0 },
@@ -1141,12 +1134,13 @@ function renderTrendChart() {
 }
 
 function renderSideChart() {
-  if (!sideChartRef.value) return;
-  if (!sideChart) sideChart = echarts.init(sideChartRef.value);
+  const chart = ensureChartReady(sideChartRef.value, sideChart);
+  if (!chart) return;
+  sideChart = chart;
   const company = statisticsData.totalCompanyCount || 0;
   const jobSeeker = statisticsData.totalJobSeekerCount || 0;
   const hasData = company + jobSeeker > 0;
-  sideChart.setOption(
+  chart.setOption(
     {
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
       legend: { bottom: 0, textStyle: { fontSize: 11 } },
@@ -1174,12 +1168,13 @@ function renderSideChart() {
 }
 
 function renderPromoterChart() {
-  if (!promoterChartRef.value) return;
-  if (!promoterChart) promoterChart = echarts.init(promoterChartRef.value);
+  const chart = ensureChartReady(promoterChartRef.value, promoterChart);
+  if (!chart) return;
+  promoterChart = chart;
   const rows = statisticsRows.value.slice(0, 8).reverse();
   const labels = rows.length ? rows.map((item) => item.name || item.phonenumber || '-') : ['暂无数据'];
   const values = rows.length ? rows.map((item) => rowMetric(item)) : [0];
-  promoterChart.setOption(
+  chart.setOption(
     {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       grid: { left: '3%', right: '6%', top: 12, bottom: 12, containLabel: true },
@@ -1201,11 +1196,12 @@ function renderPromoterChart() {
 }
 
 function renderIdentityChart() {
-  if (!identityChartRef.value) return;
-  if (!identityChart) identityChart = echarts.init(identityChartRef.value);
+  const chart = ensureChartReady(identityChartRef.value, identityChart);
+  if (!chart) return;
+  identityChart = chart;
   const groups = statisticsData.identityStats || [];
   const hasData = groups.some((item) => groupMetric(item) > 0);
-  identityChart.setOption(
+  chart.setOption(
     {
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
       legend: { bottom: 0, textStyle: { fontSize: 11 } },
@@ -1227,8 +1223,9 @@ function renderIdentityChart() {
 }
 
 function renderIdentityPeriodChart() {
-  if (!identityPeriodChartRef.value) return;
-  if (!identityPeriodChart) identityPeriodChart = echarts.init(identityPeriodChartRef.value);
+  const chart = ensureChartReady(identityPeriodChartRef.value, identityPeriodChart);
+  if (!chart) return;
+  identityPeriodChart = chart;
   const rows = identityPeriodRows.value;
   const labels = rows.length ? rows.map((item) => item.label || item.key || '-') : ['暂无数据'];
   const internalValues = rows.length
@@ -1250,7 +1247,7 @@ function renderIdentityPeriodChart() {
       )
     : [0];
   const hasData = internalValues.some((value) => value > 0) || channelValues.some((value) => value > 0);
-  identityPeriodChart.setOption(
+  chart.setOption(
     {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       legend: { top: 0, right: 0 },
@@ -1269,8 +1266,9 @@ function renderIdentityPeriodChart() {
 }
 
 function renderIdentityDistributionChart() {
-  if (!identityDistributionChartRef.value) return;
-  if (!identityDistributionChart) identityDistributionChart = echarts.init(identityDistributionChartRef.value);
+  const chart = ensureChartReady(identityDistributionChartRef.value, identityDistributionChart);
+  if (!chart) return;
+  identityDistributionChart = chart;
   const rows = identityPeriodRows.value;
   const internalTotal = rows.reduce(
     (sum, item) => sum + identityPeriodInternalMetric(item, statisticsSide.value === 'all' ? undefined : statisticsSide.value),
@@ -1287,7 +1285,7 @@ function renderIdentityDistributionChart() {
     0
   );
   const hasData = internalTotal + channelTotal > 0;
-  identityDistributionChart.setOption(
+  chart.setOption(
     {
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
       legend: { bottom: 0, textStyle: { fontSize: 11 } },
@@ -1315,14 +1313,15 @@ function renderIdentityDistributionChart() {
 }
 
 function renderIdentityLineChart() {
-  if (!identityLineChartRef.value) return;
-  if (!identityLineChart) identityLineChart = echarts.init(identityLineChartRef.value);
+  const chart = ensureChartReady(identityLineChartRef.value, identityLineChart);
+  if (!chart) return;
+  identityLineChart = chart;
   const rows = identityPeriodRows.value;
   const labels = rows.length ? rows.map((item) => item.label || item.key || '-') : ['暂无数据'];
   const currentSide = statisticsSide.value === 'all' ? undefined : statisticsSide.value;
   const internalValues = rows.length ? rows.map((item) => identityPeriodInternalMetric(item, currentSide)) : [0];
   const channelValues = rows.length ? rows.map((item) => identityPeriodChannelMetric(item, currentSide)) : [0];
-  identityLineChart.setOption(
+  chart.setOption(
     {
       tooltip: { trigger: 'axis' },
       legend: { top: 0, right: 0 },
@@ -1357,11 +1356,12 @@ function renderIdentityLineChart() {
 }
 
 function renderStatusChart() {
-  if (!statusChartRef.value) return;
-  if (!statusChart) statusChart = echarts.init(statusChartRef.value);
+  const chart = ensureChartReady(statusChartRef.value, statusChart);
+  if (!chart) return;
+  statusChart = chart;
   const groups = statisticsData.statusStats || [];
   const hasData = groups.some((item) => toCount(item.promoterCount) > 0);
-  statusChart.setOption(
+  chart.setOption(
     {
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
       legend: { bottom: 0, textStyle: { fontSize: 11 } },
@@ -1398,25 +1398,95 @@ function renderIdentityCharts() {
   renderIdentityLineChart();
 }
 
+function renderVisibleCharts() {
+  if (activeTab.value === 'identity') {
+    renderIdentityCharts();
+    return;
+  }
+  if (activeTab.value === 'statistics') {
+    renderStatisticsCharts();
+  }
+}
+
+function scheduleVisibleChartsRender() {
+  if (pendingChartFrame) {
+    cancelAnimationFrame(pendingChartFrame);
+  }
+  nextTick(() => {
+    pendingChartFrame = requestAnimationFrame(() => {
+      pendingChartFrame = 0;
+      renderVisibleCharts();
+      handleResize();
+    });
+  });
+}
+
+function canRenderChart(element: HTMLElement | null) {
+  if (!element) return false;
+  const rect = element.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function ensureChartReady(element: HTMLElement | null, instance: echarts.ECharts | null) {
+  // 图表 Tab 切换时 DOM 可能已挂载但 display:none，必须等容器有真实宽高再初始化 ECharts。
+  if (!canRenderChart(element)) return null;
+  return instance || echarts.init(element);
+}
+
+function resizeChart(instance: echarts.ECharts | null, element: HTMLElement | null) {
+  if (instance && canRenderChart(element)) {
+    instance.resize();
+  }
+}
+
 function handleResize() {
-  trendChart?.resize();
-  sideChart?.resize();
-  identityPeriodChart?.resize();
-  identityDistributionChart?.resize();
-  identityLineChart?.resize();
-  promoterChart?.resize();
-  identityChart?.resize();
-  statusChart?.resize();
+  resizeChart(trendChart, trendChartRef.value);
+  resizeChart(sideChart, sideChartRef.value);
+  resizeChart(identityPeriodChart, identityPeriodChartRef.value);
+  resizeChart(identityDistributionChart, identityDistributionChartRef.value);
+  resizeChart(identityLineChart, identityLineChartRef.value);
+  resizeChart(promoterChart, promoterChartRef.value);
+  resizeChart(identityChart, identityChartRef.value);
+  resizeChart(statusChart, statusChartRef.value);
+}
+
+function observeChartContainers() {
+  if (!('ResizeObserver' in window)) return;
+  chartResizeObserver = new ResizeObserver((entries) => {
+    const hasRenderableChart = entries.some((entry) => entry.contentRect.width > 0 && entry.contentRect.height > 0);
+    if (hasRenderableChart) {
+      scheduleVisibleChartsRender();
+    }
+  });
+  [
+    trendChartRef,
+    sideChartRef,
+    identityPeriodChartRef,
+    identityDistributionChartRef,
+    identityLineChartRef,
+    promoterChartRef,
+    identityChartRef,
+    statusChartRef
+  ].forEach((chartRef) => {
+    if (chartRef.value) {
+      chartResizeObserver?.observe(chartRef.value);
+    }
+  });
 }
 
 onMounted(() => {
   loadData();
   loadStatistics();
   window.addEventListener('resize', handleResize);
+  nextTick(observeChartContainers);
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
+  if (pendingChartFrame) {
+    cancelAnimationFrame(pendingChartFrame);
+  }
+  chartResizeObserver?.disconnect();
   trendChart?.dispose();
   sideChart?.dispose();
   identityPeriodChart?.dispose();
@@ -1592,6 +1662,7 @@ onUnmounted(() => {
 
 .chart-panel,
 .detail-panel {
+  min-width: 0;
   padding: 14px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 8px;
@@ -1605,6 +1676,8 @@ onUnmounted(() => {
 }
 
 .chart-main {
+  width: 100%;
+  min-width: 0;
   height: 300px;
 }
 

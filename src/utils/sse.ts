@@ -1,13 +1,24 @@
 import { getToken } from '@/utils/auth';
 import { useNoticeStore } from '@/store/modules/notice';
 
+const buildRealtimeAuthUrl = (url: string) => {
+  const params = new URLSearchParams({
+    Authorization: `Bearer ${getToken() || ''}`,
+    clientid: import.meta.env.VITE_APP_CLIENT_ID || ''
+  });
+  return `${url}${url.includes('?') ? '&' : '?'}${params.toString()}`;
+};
+
 // 初始化
 export const initSSE = (url: any) => {
   if (import.meta.env.VITE_APP_SSE === 'false') {
     return;
   }
+  if (!getToken()) {
+    return;
+  }
 
-  url = url + '?Authorization=Bearer ' + getToken() + '&clientid=' + import.meta.env.VITE_APP_CLIENT_ID;
+  url = buildRealtimeAuthUrl(url);
   const { data, error } = useEventSource(url, [], {
     autoReconnect: {
       retries: 5,
