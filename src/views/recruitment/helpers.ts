@@ -35,3 +35,15 @@ export function splitToArray(value?: string | null): string[] {
     .map((s) => s.trim())
     .filter(Boolean);
 }
+
+/**
+ * 岗位薪资展示：只接受结构化 salaryMin / salaryMax / salaryUnit。
+ */
+export function formatSalary(min?: number | string | null, max?: number | string | null, unit?: string | null): string {
+  const salaryMin = Number(min) || 0;
+  const salaryMax = Number(max) || 0;
+  if (!salaryMin && !salaryMax) return '薪资面议';
+  const unitText = ({ '0': '元/天', '1': '元/月', '2': '元/次', '3': '元/小时' } as Record<string, string>)[String(unit ?? '1')] || '元/月';
+  if (salaryMin && salaryMax) return `${salaryMin}-${salaryMax}${unitText}`;
+  return `${salaryMin || salaryMax}${unitText}`;
+}

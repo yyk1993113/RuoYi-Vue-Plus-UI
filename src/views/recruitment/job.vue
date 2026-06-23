@@ -78,9 +78,6 @@
         <el-form-item v-show="showMoreQuery" label="工作地点" prop="workAddress">
           <el-input v-model="queryParams.workAddress" placeholder="请输入工作地点" clearable style="width: 180px" @keyup.enter="handleQuery" />
         </el-form-item>
-        <el-form-item v-show="showMoreQuery" label="薪资" prop="salary">
-          <el-input v-model="queryParams.salary" placeholder="请输入薪资关键词" clearable style="width: 170px" @keyup.enter="handleQuery" />
-        </el-form-item>
         <el-form-item v-show="showMoreQuery" label="投递人数" prop="applyCount">
           <el-input-number v-model="queryParams.applyCount" :min="0" :precision="0" controls-position="right" placeholder="投递人数" style="width: 130px" />
         </el-form-item>
@@ -130,7 +127,7 @@
                 <span class="job-name">{{ row.jobName }}</span>
                 <el-tag :type="jobTypeMeta(row.jobType).type" size="small">{{ jobTypeMeta(row.jobType).label }}</el-tag>
               </div>
-              <div class="job-salary">{{ row.salary }}</div>
+              <div class="job-salary">{{ formatSalary(row.salaryMin, row.salaryMax, row.salaryUnit) }}</div>
               <div class="job-location">
                 <el-icon><Location /></el-icon>
                 {{ row.workAddress || '未知地点' }}
@@ -234,7 +231,7 @@
             <el-tag :type="jobTypeMeta(currentJob.jobType).type">{{ jobTypeMeta(currentJob.jobType).label }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="职位类目">{{ currentJob.category || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="薪资范围">{{ currentJob.salary || '面议' }}</el-descriptions-item>
+          <el-descriptions-item label="薪资范围">{{ formatSalary(currentJob.salaryMin, currentJob.salaryMax, currentJob.salaryUnit) }}</el-descriptions-item>
           <el-descriptions-item label="招聘人数">{{ currentJob.recruitNumber != null ? currentJob.recruitNumber + ' 人' : '-' }}</el-descriptions-item>
           <el-descriptions-item label="经验要求">{{ currentJob.experienceName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="学历要求">{{ currentJob.educationName || '-' }}</el-descriptions-item>
@@ -310,8 +307,7 @@
     </el-dialog>
 
     <!-- 岗位编辑对话框：运营修正岗位核心信息。
-         数据来源 getJobFullDetail 全量回显；提交走 PUT /admin/recruitment/job（updateById 按非空字段更新），
-         薪资改动时前端同步合成 salary 展示串（后端 update 不重算该串，不传会导致列表显示旧薪资）。 -->
+         数据来源 getJobFullDetail 全量回显；提交走 PUT /admin/recruitment/job，只发送结构化薪资字段。 -->
     <el-dialog v-model="editVisible" title="编辑岗位" width="640px" append-to-body>
       <!-- 字段集与排序对齐 B 端发布岗位表单：名称/性质/类目/地点/薪资/经验/学历/人数/描述 -->
       <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="100px" v-loading="editLoading" scroll-to-error>
@@ -416,7 +412,7 @@
             <template #default="{ row }">
               <div class="job-cell">
                 <div class="job-name">{{ row.jobName || (row.jobId ? '岗位#' + row.jobId : '-') }}</div>
-                <div class="salary">{{ row.salary || '' }}</div>
+                <div class="salary">{{ formatSalary(row.salaryMin, row.salaryMax, row.salaryUnit) }}</div>
               </div>
             </template>
           </el-table-column>
@@ -439,12 +435,7 @@
           </el-table-column>
           <el-table-column label="联系方式" width="150" align="center">
             <template #default="{ row }">
-              <el-tag
-                v-if="row.exchanged === true || row.exchanged === '1' || (typeof row.exchanged === 'number' && row.exchanged > 0)"
-                type="success"
-                size="small"
-              >已交换</el-tag
-              >
+              <el-tag v-if="row.exchangeStatus === 'accepted' || row.exchangeStatus === 'exchanged'" type="success" size="small">已交换</el-tag>
               <span v-else class="text-muted">-</span>
             </template>
           </el-table-column>
@@ -481,7 +472,7 @@ import {
 import type { JobFullVO } from '@/api/recruitment';
 import { download } from '@/utils/request';
 import { REGIONS } from '@/utils/region-data';
-import { unwrapList, splitToArray } from './helpers';
+import { unwrapList, splitToArray, formatSalary } from './helpers';
 import { jobStatusMeta, jobTypeMeta } from './constants';
 
 const loading = ref(false);
@@ -553,7 +544,6 @@ const queryParams = reactive({
   isRecommend: '',
   isHot: '',
   workAddress: '',
-  salary: '',
   applyCount: undefined as number | undefined
 });
 
@@ -691,31 +681,16 @@ const editRules = {
   ]
 };
 
-// 薪资单位归一：编辑提交只发新契约 0天/1月/2次/3小时；中文仅用于兼容存量回显。
+// 薪资单位归一：编辑提交只发新契约 0天/1月/2次/3小时。
 function normalizeSalaryUnit(u?: string): string {
   const unit = String(u || '').trim();
   const codeMap: Record<string, string> = {
     '0': '0',
     '1': '1',
     '2': '2',
-    '3': '3',
-    天: '0',
-    日: '0',
-    月: '1',
-    次: '2',
-    时: '3',
-    小时: '3',
-    '元/天': '0',
-    '元/月': '1',
-    '元/次': '2',
-    '元/时': '3',
-    '元/小时': '3'
+    '3': '3'
   };
   return codeMap[unit] || '1';
-}
-
-function salaryUnitSuffix(unit: string): string {
-  return ({ '0': '天', '1': '月', '2': '次', '3': '小时' } as Record<string, string>)[unit] || '月';
 }
 
 // 打开编辑：拉全量详情回显（列表行字段不全，缺 salaryMin/Max/recruitNumber/description 等）
@@ -754,7 +729,7 @@ async function handleEdit(row: any) {
   }
 }
 
-// 保存编辑：只提交结构化地区和 workAddress；salary 展示串同步合成，salaryUnit 仅提交新契约码值。
+// 保存编辑：只提交结构化地区、薪资和 workAddress。
 async function submitEdit() {
   editFormRef.value?.validate(async (valid: boolean) => {
     if (!valid) return;
@@ -772,7 +747,6 @@ async function submitEdit() {
         salaryMin: editForm.salaryMin,
         salaryMax: editForm.salaryMax,
         salaryUnit: editForm.salaryUnit,
-        salary: `${editForm.salaryMin}-${editForm.salaryMax}/${salaryUnitSuffix(editForm.salaryUnit)}`,
         workAddress: editForm.workAddress,
         experience: editForm.experience,
         education: editForm.education,
@@ -884,7 +858,6 @@ function clearQueryFilters() {
   queryParams.isRecommend = '';
   queryParams.isHot = '';
   queryParams.workAddress = '';
-  queryParams.salary = '';
   queryParams.applyCount = undefined;
   dateRange.value = [];
 }

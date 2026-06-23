@@ -134,7 +134,7 @@
             <div class="sidebar-block">
               <div class="block-title">岗位信息</div>
               <div class="info-card">
-                <div class="salary-box">{{ job.salaryText || '薪资面议' }}</div>
+                <div class="salary-box">{{ formatSalary(job.salaryMin, job.salaryMax, job.salaryUnit) }}</div>
                 <div class="company-detail">
                   <p>
                     <el-icon><Briefcase /></el-icon> {{ job.jobName || '-' }}
@@ -242,7 +242,7 @@ import { ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { getApply2Detail } from '@/api/recruitment';
 import type { ApplyDetailVO } from '@/api/recruitment';
-import { splitToArray } from '../helpers';
+import { splitToArray, formatSalary } from '../helpers';
 import { applyStatusMeta } from '../constants';
 
 const visible = ref(false);

@@ -160,7 +160,7 @@
           <template #default="{ row }">
             <div class="job-cell">
               <div class="job-name">{{ row.jobName || (row.jobId ? '岗位#' + row.jobId : '-') }}</div>
-              <div class="salary">{{ row.salary || '' }}</div>
+              <div class="salary">{{ formatSalary(row.salaryMin, row.salaryMax, row.salaryUnit) }}</div>
             </div>
           </template>
         </el-table-column>
@@ -188,12 +188,7 @@
         </el-table-column>
         <el-table-column label="联系方式" width="80" align="center">
           <template #default="{ row }">
-            <el-tag
-              v-if="row.exchanged === true || row.exchanged === '1' || (typeof row.exchanged === 'number' && row.exchanged > 0)"
-              type="success"
-              size="small"
-              >已交换</el-tag
-            >
+            <el-tag v-if="row.exchangeStatus === 'accepted' || row.exchangeStatus === 'exchanged'" type="success" size="small">已交换</el-tag>
             <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
@@ -339,7 +334,7 @@
               <div class="sidebar-block">
                 <div class="block-title">岗位信息</div>
                 <div class="info-card">
-                  <div class="salary-box">{{ job.salaryText || '薪资面议' }}</div>
+                  <div class="salary-box">{{ formatSalary(job.salaryMin, job.salaryMax, job.salaryUnit) }}</div>
                   <div class="company-detail">
                     <p>
                       <el-icon><Briefcase /></el-icon> {{ job.jobName || '-' }}
@@ -476,7 +471,7 @@ import {
 import { listApply, listApply2, getApplyStatistics, getApply2Detail } from '@/api/recruitment';
 import type { ApplyDetailVO } from '@/api/recruitment';
 import { download } from '@/utils/request';
-import { unwrapList, splitToArray } from './helpers';
+import { unwrapList, splitToArray, formatSalary } from './helpers';
 import { applyStatusMeta } from './constants';
 
 const loading = ref(false);

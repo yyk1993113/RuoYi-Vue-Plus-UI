@@ -107,7 +107,7 @@
           <template #default="{ row }">
             <div class="job-cell">
               <div class="job-name">{{ row.jobName || '-' }}</div>
-              <div class="salary">{{ row.salary || '' }}</div>
+              <div class="salary">{{ formatSalary(row.salaryMin, row.salaryMax, row.salaryUnit) }}</div>
             </div>
           </template>
         </el-table-column>
@@ -150,7 +150,7 @@
         <el-descriptions-item label="联系电话">{{ currentTask.workerPhone || '-' }}</el-descriptions-item>
         <el-descriptions-item label="岗位名称">{{ currentTask.jobName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="企业名称">{{ currentTask.companyName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="薪资">{{ currentTask.salary || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="薪资">{{ formatSalary(currentTask.salaryMin, currentTask.salaryMax, currentTask.salaryUnit) }}</el-descriptions-item>
         <el-descriptions-item label="工作地点">{{ currentTask.address || '-' }}</el-descriptions-item>
         <el-descriptions-item label="工作时间">{{ currentTask.workTime || '-' }}</el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ currentTask.createTime }}</el-descriptions-item>
@@ -205,7 +205,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Refresh } from '@element-plus/icons-vue';
 import { listTask, getTaskStatistics, getTask, verifyTask } from '@/api/recruitment';
-import { unwrapList, splitToArray } from './helpers';
+import { unwrapList, splitToArray, formatSalary } from './helpers';
 import { taskStatusMeta } from './constants';
 
 const loading = ref(false);

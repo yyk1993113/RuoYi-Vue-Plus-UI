@@ -418,10 +418,9 @@ async function loadPositions() {
   positionLoading.value = true;
   try {
     const res: any = await listJobPosition(positionQuery);
-    // TableDataInfo 兼容：rows/total 可能在顶层或 data 内
-    const body = res?.rows !== undefined ? res : res?.data || {};
-    positionList.value = body.rows || [];
-    positionTotal.value = body.total || 0;
+    // 职位列表只接受 TableDataInfo 顶层 rows/total。
+    positionList.value = Array.isArray(res?.rows) ? res.rows : [];
+    positionTotal.value = Number(res?.total) || 0;
   } catch (error) {
     ElMessage.error('加载职位列表失败');
     showTableDiagnostic();

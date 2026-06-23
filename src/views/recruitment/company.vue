@@ -567,8 +567,8 @@
             <el-tag :type="jobTypeMeta(row.jobType).type">{{ row.jobTypeName || jobTypeMeta(row.jobType).label }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="薪资" prop="salary" min-width="120" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.salary || '-' }}</template>
+        <el-table-column label="薪资" min-width="120" show-overflow-tooltip>
+          <template #default="{ row }">{{ formatSalary(row.salaryMin, row.salaryMax, row.salaryUnit) }}</template>
         </el-table-column>
         <el-table-column label="工作地点" min-width="140" show-overflow-tooltip>
           <template #default="{ row }">{{ row.workAddress || '-' }}</template>
@@ -654,7 +654,7 @@ import {
 import ApplyDetailDialog from './components/ApplyDetailDialog.vue';
 import { download } from '@/utils/request';
 import { listByIds } from '@/api/system/oss';
-import { unwrapList, splitToArray } from './helpers';
+import { unwrapList, splitToArray, formatSalary } from './helpers';
 import { companyStatusMeta, certStatusMeta, applyStatusMeta, jobStatusMeta, jobTypeMeta } from './constants';
 import { UserForm } from '@/api/system/user/types';
 import { updateUserProfile } from '@/api/system/user';

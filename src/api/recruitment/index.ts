@@ -49,7 +49,9 @@ export interface JobVO {
   companyId?: number;
   companyName?: string;
   jobName?: string;
-  salary?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryUnit?: string;
   province?: string;
   city?: string;
   district?: string;
@@ -84,7 +86,6 @@ export interface JobFullVO {
   jobType?: string;
   jobTypeName?: string;
   // 薪资
-  salary?: string;
   salaryMin?: number;
   salaryMax?: number;
   salaryUnit?: string;
@@ -145,7 +146,9 @@ export interface ApplyVO {
   applyId?: number;
   jobId?: number;
   jobName?: string;
-  salary?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryUnit?: string;
   companyName?: string;
   userId?: number;
   userName?: string;
@@ -158,7 +161,7 @@ export interface ApplyVO {
   createTime?: string;
   avatar?: string;
   avatarUrl?: string;
-  exchanged?: boolean;
+  exchangeStatus?: string;
   contactPerson?: string;
   contactPhone?: string;
   recruiterContact?: string;
@@ -188,6 +191,9 @@ export interface TaskVO {
   taskId?: number;
   jobId?: number;
   jobName?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryUnit?: string;
   applyId?: number;
   userId?: number;
   workerName?: string;
@@ -378,7 +384,9 @@ export interface HotJobVO {
   companyName?: string;
   applyCount?: number;
   browseCount?: number;
-  salary?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryUnit?: string;
   workAddress?: string;
   createTime?: string;
 }
@@ -432,7 +440,6 @@ export interface JobQuery {
   isRecommend?: string;
   isHot?: string;
   workAddress?: string;
-  salary?: string;
   applyCount?: number | string;
   params?: Record<string, any>;
 }
@@ -942,7 +949,9 @@ export interface ApplyDetailJob {
   jobId?: number;
   jobName?: string;
   jobType?: string; // 0全职 1兼职 2临时工 3项目制
-  salaryText?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryUnit?: string;
   province?: string;
   city?: string;
   district?: string;

@@ -195,7 +195,7 @@ function revokeUrl(url: string) {
 }
 
 function unwrapData<T>(res: any): T {
-  return res?.data ?? res;
+  return res?.data;
 }
 
 onMounted(loadWorkbench);
