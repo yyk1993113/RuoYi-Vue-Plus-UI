@@ -1,7 +1,7 @@
 import request from '@/utils/request';
 
 // ========== 运营台·内容配置（首页内容位） ==========
-// 对接后端 AdminContentController（基路径 /admin/content，@SaCheckRole("admin")，仅运营角色）。
+// 对接后端 AdminContentController（基路径 /admin/content，@SaCheckRole(superadmin/operator)，仅运营角色）。
 // 含五类首页内容位：轮播图 banner / 金刚区 kingkong / 技能课程 course / 求职干货 article / 求职服务 jobService。
 // 五类接口风格完全一致：list(GET 分页) / get(GET 详情) / add(POST) / update(PUT) / del(DELETE 批量) / changeStatus(POST 切上下架/显隐)。
 //

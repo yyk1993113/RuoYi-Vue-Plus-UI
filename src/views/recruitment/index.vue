@@ -607,7 +607,7 @@ async function loadAllData() {
     jobTypeDist.value = jobTypeRes.data || [];
     hotJobs.value = hotJobsRes.data || [];
     Object.assign(exchangeStat, exchangeRes.data || {});
-    // 列表拆包统一走 unwrapList（顶层 rows 优先，兼容历史 data.rows 形状）
+    // 列表拆包统一走 unwrapList（rows/total）
     exceptionApplies.value = unwrapList<ExceptionApplyVO>(exceptionRes).rows;
     recentJobs.value = unwrapList(recentJobsRes).rows;
     recentApplies.value = unwrapList(recentAppliesRes).rows;

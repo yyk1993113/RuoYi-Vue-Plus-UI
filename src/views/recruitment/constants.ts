@@ -17,16 +17,17 @@ function resolve(map: Record<string, StatusMeta>, status: string | undefined | n
   return (status != null && map[status]) || fallback;
 }
 
-// ========== 任务状态 task：0进行中 / 1待核验 / 2已通过 / 3已拒绝 / 4已结算 ==========
-// 来源：task.vue 表格列与详情弹窗的 el-tag 阶梯；原 v-else 兜底为「已结算 / info」。
+// ========== 任务状态 task：pending_confirm / in_progress / submitted / rejected / completed / cancelled ==========
+// 来源：履约 1.0 新契约。运营台只识别语义状态,避免旧数字码继续扩散。
 const TASK_STATUS: Record<string, StatusMeta> = {
-  '0': { label: '进行中', type: 'primary' },
-  '1': { label: '待核验', type: 'warning' },
-  '2': { label: '已通过', type: 'success' },
-  '3': { label: '已拒绝', type: 'danger' },
-  '4': { label: '已结算', type: 'info' }
+  pending_confirm: { label: '待确认', type: 'warning' },
+  in_progress: { label: '进行中', type: 'primary' },
+  submitted: { label: '待核验', type: 'warning' },
+  rejected: { label: '已退回', type: 'danger' },
+  completed: { label: '已完成', type: 'success' },
+  cancelled: { label: '已取消', type: 'info' }
 };
-export const taskStatusMeta = (status?: string | null): StatusMeta => resolve(TASK_STATUS, status, TASK_STATUS['4']);
+export const taskStatusMeta = (status?: string | null): StatusMeta => resolve(TASK_STATUS, status, { label: '未知', type: 'info' });
 
 // ========== 发票状态 invoice：0未开票 / 1已开票 / 2已作废 ==========
 // 来源：invoice.vue 表格列与详情弹窗的 el-tag 阶梯；原 v-else 兜底为「已作废 / danger」。
@@ -77,9 +78,7 @@ export const jobStatusMeta = (status?: string | null): StatusMeta => resolve(JOB
 
 // ========== 用工性质 jobType：0全职 / 1兼职 / 2临时工 / 3项目制 ==========
 // 来源：job.vue 表格列与详情弹窗的 el-tag 阶梯。
-// 注意：后端旧数据可能只填 employment_type（job_type 为 null），两字段值口径一致
-//      （见后端 Job.java / JobMapper.xml 的 COALESCE 逻辑），调用方需传 jobType ?? employmentType。
-//      兜底为「未知 / info」——此前兜底到「项目制」会把字段缺失伪装成正常业务值，掩盖取错字段的问题。
+// 兜底为「未知 / info」，避免把字段缺失伪装成正常业务值。
 const JOB_TYPE: Record<string, StatusMeta> = {
   '0': { label: '全职', type: 'success' },
   '1': { label: '兼职', type: 'warning' },

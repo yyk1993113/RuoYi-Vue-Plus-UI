@@ -513,7 +513,7 @@ function handleSelectionChange(rows: any[]) {
 // 用当前 tab 的字段集 + 默认值重建表单（保证切 tab 后字段干净）
 function buildEmptyForm() {
   const cfg = currentConfig.value;
-  // 先清空旧字段
+  // 切换 tab 时先清空当前表单字段
   Object.keys(form).forEach((k) => delete form[k]);
   cfg.fields.forEach((f) => {
     form[f.prop] = '';

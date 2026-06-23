@@ -571,7 +571,7 @@
           <template #default="{ row }">{{ row.salary || '-' }}</template>
         </el-table-column>
         <el-table-column label="工作地点" min-width="140" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.location || row.workAddress || '-' }}</template>
+          <template #default="{ row }">{{ row.workAddress || '-' }}</template>
         </el-table-column>
         <el-table-column label="投递数" prop="applyCount" width="90" align="center">
           <template #default="{ row }">{{ row.applyCount || 0 }}</template>
@@ -601,8 +601,8 @@
         <el-table-column label="求职者" prop="userName" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">{{ row.userName || row.realName || '-' }}</template>
         </el-table-column>
-        <el-table-column label="联系电话" prop="phonenumber" width="140" align="center">
-          <template #default="{ row }">{{ row.phonenumber || '-' }}</template>
+        <el-table-column label="联系电话" prop="phone" width="140" align="center">
+          <template #default="{ row }">{{ row.phone || '-' }}</template>
         </el-table-column>
         <el-table-column label="应聘职位" prop="jobName" min-width="140" show-overflow-tooltip>
           <template #default="{ row }">{{ row.jobName || '-' }}</template>

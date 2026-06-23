@@ -212,7 +212,7 @@ const stats = reactive<Partial<OperationStatsVO>>({});
 const funnelCards = computed(() => [
   { key: 'applyCount', label: '投递数', value: stats.applyCount, color: 'primary' },
   { key: 'interviewInviteCount', label: '面试邀请', value: stats.interviewInviteCount, color: 'warning' },
-  { key: 'partTimeSelectionCount', label: '兼职选用', value: stats.partTimeSelectionCount, color: 'success' },
+  { key: 'partTimeSelectionCount', label: '履约选择', value: stats.partTimeSelectionCount, color: 'success' },
   { key: 'fulfillmentCompletedCount', label: '履约完成', value: stats.fulfillmentCompletedCount, color: 'success' },
   { key: 'ledgerGeneratedCount', label: '台账生成', value: stats.ledgerGeneratedCount, color: 'primary' },
   { key: 'invoiceUploadedCount', label: '发票上传', value: stats.invoiceUploadedCount, color: 'danger' },
@@ -234,14 +234,14 @@ function rateColor(v?: number): string {
 }
 
 // ---------- 图表 ----------
-// 业务转化漏斗：投递 -> 面试邀请 -> 兼职选用 -> 履约完成 -> 台账生成 -> 发票上传。
+// 业务转化漏斗：投递 -> 面试邀请 -> 履约选择 -> 履约完成 -> 台账生成 -> 发票上传。
 function renderFunnelChart() {
   if (!funnelChartRef.value) return;
   if (!funnelChart) funnelChart = echarts.init(funnelChartRef.value);
   const data = [
     { name: '投递数', value: stats.applyCount ?? 0 },
     { name: '面试邀请', value: stats.interviewInviteCount ?? 0 },
-    { name: '兼职选用', value: stats.partTimeSelectionCount ?? 0 },
+    { name: '履约选择', value: stats.partTimeSelectionCount ?? 0 },
     { name: '履约完成', value: stats.fulfillmentCompletedCount ?? 0 },
     { name: '台账生成', value: stats.ledgerGeneratedCount ?? 0 },
     { name: '发票上传', value: stats.invoiceUploadedCount ?? 0 },

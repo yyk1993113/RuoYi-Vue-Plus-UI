@@ -77,8 +77,8 @@
         <el-form-item label="用户昵称" prop="userName">
           <el-input v-model="queryParams.userName" placeholder="昵称 / 账号" clearable style="width: 160px" @keyup.enter="handleQuery" />
         </el-form-item>
-        <el-form-item label="手机号" prop="phonenumber">
-          <el-input v-model="queryParams.phonenumber" placeholder="请输入手机号" clearable style="width: 140px" @keyup.enter="handleQuery" />
+        <el-form-item label="手机号" prop="phone">
+          <el-input v-model="queryParams.phone" placeholder="请输入手机号" clearable style="width: 140px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item label="用户状态" prop="isSilenced">
           <el-select v-model="queryParams.isSilenced" placeholder="全部" clearable style="width: 130px">
@@ -132,7 +132,7 @@
             <div class="contact-info">
               <div class="contact-item">
                 <el-icon><Phone /></el-icon>
-                <span>{{ row.phonenumber || '-' }}</span>
+                <span>{{ displayPhone(row) }}</span>
               </div>
               <div class="contact-item" v-if="row.email">
                 <el-icon><Message /></el-icon>
@@ -255,7 +255,7 @@
           <el-tag v-if="currentUser.status === '0'" type="success">正常</el-tag>
           <el-tag v-else type="danger">停用</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="手机号" :span="2">{{ currentUser.phonenumber || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="手机号" :span="2">{{ displayPhone(currentUser) }}</el-descriptions-item>
         <el-descriptions-item label="邮箱" :span="2">{{ currentUser.email || '-' }}</el-descriptions-item>
         <el-descriptions-item label="登录IP">{{ currentUser.loginIp || '-' }}</el-descriptions-item>
         <el-descriptions-item label="最后登录">{{ currentUser.loginDate || '-' }}</el-descriptions-item>
@@ -310,7 +310,7 @@
           <el-input :model-value="silenceForm.nickName || silenceForm.userName" disabled />
         </el-form-item>
         <el-form-item label="手机号">
-          <el-input :model-value="silenceForm.phonenumber" disabled />
+          <el-input :model-value="displayPhone(silenceForm)" disabled />
         </el-form-item>
         <el-form-item label="禁言原因" prop="reason" required>
           <el-input
@@ -361,7 +361,7 @@ const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
   userName: '',
-  phonenumber: '',
+  phone: '',
   isSilenced: '',
   applyFilter: '',
 });
@@ -379,12 +379,16 @@ const totalInterviews = computed(() =>
   tableData.value.reduce((sum, u) => sum + (u.interviewApplies || 0), 0)
 );
 
+function displayPhone(row?: { phone?: string } | null) {
+  return row?.phone || '-';
+}
+
 const silenceForm = reactive<RecruitmentUserVO & { reason: string }>({
   userId: 0,
   userName: '',
   nickName: '',
   userType: '',
-  phonenumber: '',
+  phone: '',
   email: '',
   sex: '',
   sexName: '',
@@ -416,11 +420,11 @@ async function loadData() {
       pageNum: queryParams.pageNum,
       pageSize: queryParams.pageSize,
       userName: queryParams.userName || undefined,
-      phonenumber: queryParams.phonenumber || undefined,
+      phone: queryParams.phone || undefined,
       isRecruitmentSilenced: queryParams.isSilenced || undefined,
       applyFilter: queryParams.applyFilter || undefined,
     });
-    // 列表拆包统一走 unwrapList（顶层 rows/total 优先，兼容历史 data.rows 形状）
+    // 列表拆包统一走 unwrapList（rows/total）
     // 安全：不要打印整包响应，避免把求职者手机号/邮箱/登录IP 等 PII 暴露到浏览器控制台
     const list = unwrapList<RecruitmentUserVO>(res);
     tableData.value = list.rows;
@@ -483,7 +487,7 @@ function resetQuery() {
   queryFormRef.value?.resetFields();
   queryParams.pageNum = 1;
   queryParams.userName = '';
-  queryParams.phonenumber = '';
+  queryParams.phone = '';
   queryParams.isSilenced = '';
   queryParams.applyFilter = '';
   activeStat.value = 'total';
@@ -601,7 +605,7 @@ onMounted(() => {
 function handleExport() {
   download('/admin/recruitment/user/export', {
     userName: queryParams.userName || undefined,
-    phonenumber: queryParams.phonenumber || undefined,
+    phone: queryParams.phone || undefined,
     isRecruitmentSilenced: queryParams.isSilenced || undefined,
     applyFilter: queryParams.applyFilter || undefined,
   }, `求职者数据_${new Date().getTime()}.xlsx`);

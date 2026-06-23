@@ -23,33 +23,39 @@
         </el-card>
       </el-col>
       <el-col :xs="12" :sm="8" :md="4">
+        <el-card shadow="hover" class="stat-card warning">
+          <div class="stat-value warning">{{ statistics.pendingConfirm || 0 }}</div>
+          <div class="stat-label">待确认</div>
+        </el-card>
+      </el-col>
+      <el-col :xs="12" :sm="8" :md="4">
         <el-card shadow="hover" class="stat-card primary">
-          <div class="stat-value primary">{{ statistics.inProgressCount || 0 }}</div>
+          <div class="stat-value primary">{{ statistics.inProgress || 0 }}</div>
           <div class="stat-label">进行中</div>
         </el-card>
       </el-col>
       <el-col :xs="12" :sm="8" :md="4">
         <el-card shadow="hover" class="stat-card warning">
-          <div class="stat-value warning">{{ statistics.pendingVerifyCount || 0 }}</div>
+          <div class="stat-value warning">{{ statistics.submitted || 0 }}</div>
           <div class="stat-label">待核验</div>
         </el-card>
       </el-col>
       <el-col :xs="12" :sm="8" :md="4">
         <el-card shadow="hover" class="stat-card success">
-          <div class="stat-value success">{{ statistics.verifiedCount || 0 }}</div>
-          <div class="stat-label">已核验通过</div>
+          <div class="stat-value success">{{ statistics.completed || 0 }}</div>
+          <div class="stat-label">已完成</div>
         </el-card>
       </el-col>
       <el-col :xs="12" :sm="8" :md="4">
         <el-card shadow="hover" class="stat-card danger">
-          <div class="stat-value danger">{{ statistics.rejectedCount || 0 }}</div>
-          <div class="stat-label">已核验拒绝</div>
+          <div class="stat-value danger">{{ statistics.rejected || 0 }}</div>
+          <div class="stat-label">已退回</div>
         </el-card>
       </el-col>
       <el-col :xs="12" :sm="8" :md="4">
         <el-card shadow="hover" class="stat-card info">
-          <div class="stat-value info">{{ statistics.settledCount || 0 }}</div>
-          <div class="stat-label">已结算</div>
+          <div class="stat-value info">{{ statistics.cancelled || 0 }}</div>
+          <div class="stat-label">已取消</div>
         </el-card>
       </el-col>
     </el-row>
@@ -65,11 +71,12 @@
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 140px">
-            <el-option label="进行中" value="0" />
-            <el-option label="待核验" value="1" />
-            <el-option label="已通过" value="2" />
-            <el-option label="已拒绝" value="3" />
-            <el-option label="已结算" value="4" />
+            <el-option label="待确认" value="pending_confirm" />
+            <el-option label="进行中" value="in_progress" />
+            <el-option label="待核验" value="submitted" />
+            <el-option label="已退回" value="rejected" />
+            <el-option label="已完成" value="completed" />
+            <el-option label="已取消" value="cancelled" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -116,8 +123,8 @@
           <template #default="{ row }">
             <div style="display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap;">
               <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
-              <el-button v-if="row.status === '1'" link type="success" icon="CircleCheck" @click="handleVerify(row, '2')">通过</el-button>
-              <el-button v-if="row.status === '1'" link type="danger" icon="Close" @click="handleVerify(row, '3')">拒绝</el-button>
+              <el-button v-if="row.status === 'submitted'" link type="success" icon="CircleCheck" @click="handleVerify(row, 'completed')">通过</el-button>
+              <el-button v-if="row.status === 'submitted'" link type="danger" icon="Close" @click="handleVerify(row, 'rejected')">拒绝</el-button>
             </div>
           </template>
         </el-table-column>
@@ -153,10 +160,10 @@
         <el-descriptions-item label="核验备注" :span="2">{{ currentTask.remark || '暂无' }}</el-descriptions-item>
       </el-descriptions>
       <!-- 工作照片 -->
-      <div v-if="currentTask?.photoPath" class="photo-section">
+      <div v-if="taskPhotos.length" class="photo-section">
         <div class="photo-title">工作照片</div>
         <div class="photo-list">
-          <!-- 工作照片：photoPath 为逗号分隔多图地址，统一切割一次（原模板对同串 split 了两次） -->
+          <!-- 工作照片：按履约 V2 三段照片字段合并展示。 -->
           <el-image
             v-for="(photo, index) in taskPhotos"
             :key="index"
@@ -177,8 +184,8 @@
       <el-form ref="verifyFormRef" :model="verifyForm" label-width="80px">
         <el-form-item label="核验结果">
           <el-radio-group v-model="verifyForm.status">
-            <el-radio label="2">核验通过</el-radio>
-            <el-radio label="3">核验拒绝</el-radio>
+            <el-radio label="completed">核验通过</el-radio>
+            <el-radio label="rejected">核验拒绝</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="备注">
@@ -223,21 +230,29 @@ const queryParams = reactive({
 
 const statistics = reactive({
   totalCount: 0,
-  inProgressCount: 0,
-  pendingVerifyCount: 0,
-  verifiedCount: 0,
-  rejectedCount: 0,
-  settledCount: 0,
+  pendingConfirm: 0,
+  inProgress: 0,
+  submitted: 0,
+  completed: 0,
+  rejected: 0,
+  cancelled: 0,
 });
 
 const verifyForm = reactive({
   taskId: 0 as number,
-  status: '2',
+  status: 'completed',
   remark: '',
 });
 
-// 当前任务的工作照片列表（逗号分隔地址 → 数组），供详情弹窗图片墙与预览复用，避免模板内重复 split
-const taskPhotos = computed(() => splitToArray(currentTask.value?.photoPath));
+// 当前任务的工作照片列表：履约 1.0 arrival/mid/finish 三段字段合并，供图片墙与预览复用。
+const taskPhotos = computed(() => {
+  const task = currentTask.value || {};
+  return [
+    ...splitToArray(task.arrivalPhotos),
+    ...splitToArray(task.midPhotos),
+    ...splitToArray(task.finishPhotos),
+  ];
+});
 
 async function loadData() {
   loading.value = true;

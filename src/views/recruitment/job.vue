@@ -128,16 +128,12 @@
             <div class="job-info">
               <div class="job-header">
                 <span class="job-name">{{ row.jobName }}</span>
-                <!-- 旧数据 jobType 可能为 null/空串，回退到同口径的 employmentType（见 constants.ts JOB_TYPE 注释） -->
-                <el-tag :type="jobTypeMeta(row.jobType || row.employmentType).type" size="small">{{
-                  jobTypeMeta(row.jobType || row.employmentType).label
-                }}</el-tag>
+                <el-tag :type="jobTypeMeta(row.jobType).type" size="small">{{ jobTypeMeta(row.jobType).label }}</el-tag>
               </div>
               <div class="job-salary">{{ row.salary }}</div>
               <div class="job-location">
                 <el-icon><Location /></el-icon>
-                <!-- 地点真实值在 workAddress，location 为旧字段，与详情弹窗口径保持一致 -->
-                {{ row.workAddress || row.location || '未知地点' }}
+                {{ row.workAddress || '未知地点' }}
               </div>
             </div>
           </template>
@@ -235,11 +231,7 @@
           <el-descriptions-item label="岗位名称" :span="2">{{ currentJob.jobName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="企业名称" :span="2">{{ currentJob.companyName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="用工性质">
-            <!-- 文案/颜色统一走本地 JOB_TYPE 映射；后端不返回 jobTypeName，且 employmentTypeText 只认全职/兼职两值，均不可靠。
-                 旧数据 jobType 可能为 null/空串，回退到同口径的 employmentType -->
-            <el-tag :type="jobTypeMeta(currentJob.jobType || currentJob.employmentType).type">{{
-              jobTypeMeta(currentJob.jobType || currentJob.employmentType).label
-            }}</el-tag>
+            <el-tag :type="jobTypeMeta(currentJob.jobType).type">{{ jobTypeMeta(currentJob.jobType).label }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="职位类目">{{ currentJob.category || '-' }}</el-descriptions-item>
           <el-descriptions-item label="薪资范围">{{ currentJob.salary || '面议' }}</el-descriptions-item>
@@ -247,7 +239,8 @@
           <el-descriptions-item label="经验要求">{{ currentJob.experienceName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="学历要求">{{ currentJob.educationName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="期望到岗时间">{{ formatStartDate(currentJob.expectedStartDate) }}</el-descriptions-item>
-          <el-descriptions-item label="工作地点" :span="2">{{ currentJob.workAddress || currentJob.location || '未知' }}</el-descriptions-item>
+          <el-descriptions-item label="省市区">{{ [currentJob.province, currentJob.city, currentJob.district].filter(Boolean).join(' / ') || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="工作地点">{{ currentJob.workAddress || '未知' }}</el-descriptions-item>
 
           <!-- 兼职工作时间（仅在有数据时展示，benefits/workTime 为 JSON，已在 computed 中解析） -->
           <el-descriptions-item v-if="workTimeList.length" label="兼职工作时间" :span="2">
@@ -338,8 +331,17 @@
             <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
         </el-form-item>
-        <el-form-item label="工作地点" prop="location">
-          <el-input v-model="editForm.location" placeholder="请输入工作地点" maxlength="200" />
+        <el-form-item label="省份" prop="province">
+          <el-input v-model="editForm.province" placeholder="请输入省份" maxlength="30" />
+        </el-form-item>
+        <el-form-item label="城市" prop="city">
+          <el-input v-model="editForm.city" placeholder="请输入城市" maxlength="30" />
+        </el-form-item>
+        <el-form-item label="区县" prop="district">
+          <el-input v-model="editForm.district" placeholder="请输入区县" maxlength="30" />
+        </el-form-item>
+        <el-form-item label="工作地点" prop="workAddress">
+          <el-input v-model="editForm.workAddress" placeholder="请输入工作地点" maxlength="200" />
         </el-form-item>
         <el-form-item label="薪资区间" prop="salaryMin">
           <div style="display: flex; align-items: center; gap: 8px; width: 100%">
@@ -347,10 +349,10 @@
             <span>至</span>
             <el-input-number v-model="editForm.salaryMax" :min="0" :max="9999999" controls-position="right" placeholder="最高" style="width: 150px" />
             <el-select v-model="editForm.salaryUnit" style="width: 100px">
-              <el-option label="元/月" value="月" />
-              <el-option label="元/天" value="天" />
-              <el-option label="元/时" value="时" />
-              <el-option label="元/次" value="次" />
+              <el-option label="元/月" value="1" />
+              <el-option label="元/天" value="0" />
+              <el-option label="元/小时" value="3" />
+              <el-option label="元/次" value="2" />
             </el-select>
           </div>
         </el-form-item>
@@ -403,7 +405,7 @@
                 </el-avatar>
                 <div class="user-detail">
                   <div class="name">{{ row.userName || (row.userId ? '用户#' + row.userId : '未知用户') }}</div>
-                  <div class="phone">{{ row.phonenumber || '-' }}</div>
+                  <div class="phone">{{ displayPhone(row) }}</div>
                 </div>
               </div>
             </template>
@@ -588,10 +590,13 @@ const editForm = reactive({
   jobName: '',
   jobType: '0',
   category: '',
+  province: '',
+  city: '',
+  district: '',
   salaryMin: undefined as number | undefined,
   salaryMax: undefined as number | undefined,
-  salaryUnit: '天',
-  location: '',
+  salaryUnit: '1',
+  workAddress: '',
   experience: '',
   education: '',
   recruitNumber: undefined as number | undefined,
@@ -645,7 +650,9 @@ const editRules = {
   jobName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
   jobType: [{ required: true, message: '请选择用工性质', trigger: 'change' }],
   category: [{ required: true, message: '请选择职位类目', trigger: 'change' }],
-  location: [{ required: true, message: '请输入工作地点', trigger: 'blur' }],
+  province: [{ required: true, message: '请输入省份', trigger: 'blur' }],
+  city: [{ required: true, message: '请输入城市', trigger: 'blur' }],
+  workAddress: [{ required: true, message: '请输入工作地点', trigger: 'blur' }],
   experience: [{ required: true, message: '请选择经验要求', trigger: 'change' }],
   education: [{ required: true, message: '请选择学历要求', trigger: 'change' }],
   recruitNumber: [{ required: true, message: '请输入招聘人数', trigger: 'change' }],
@@ -667,10 +674,31 @@ const editRules = {
   ]
 };
 
-// 薪资单位归一：存量数据两套口径并存（数字码 '1'月/'2'次/'3'时 与中文 '月'/'天'…），统一转中文供下拉回显
+// 薪资单位归一：编辑提交只发新契约 0天/1月/2次/3小时；中文仅用于兼容存量回显。
 function normalizeSalaryUnit(u?: string): string {
-  const codeMap: Record<string, string> = { '1': '月', '2': '次', '3': '时' };
-  return codeMap[u || ''] || u || '天';
+  const unit = String(u || '').trim();
+  const codeMap: Record<string, string> = {
+    '0': '0',
+    '1': '1',
+    '2': '2',
+    '3': '3',
+    天: '0',
+    日: '0',
+    月: '1',
+    次: '2',
+    时: '3',
+    小时: '3',
+    '元/天': '0',
+    '元/月': '1',
+    '元/次': '2',
+    '元/时': '3',
+    '元/小时': '3'
+  };
+  return codeMap[unit] || '1';
+}
+
+function salaryUnitSuffix(unit: string): string {
+  return ({ '0': '天', '1': '月', '2': '次', '3': '小时' } as Record<string, string>)[unit] || '月';
 }
 
 // 打开编辑：拉全量详情回显（列表行字段不全，缺 salaryMin/Max/recruitNumber/description 等）
@@ -684,10 +712,13 @@ async function handleEdit(row: any) {
     editForm.jobName = d.jobName ?? '';
     editForm.jobType = d.jobType != null ? String(d.jobType) : '0';
     editForm.category = d.category != null ? String(d.category) : '';
+    editForm.province = d.province ?? '';
+    editForm.city = d.city ?? '';
+    editForm.district = d.district ?? '';
     editForm.salaryMin = d.salaryMin ?? undefined;
     editForm.salaryMax = d.salaryMax ?? undefined;
     editForm.salaryUnit = normalizeSalaryUnit(d.salaryUnit);
-    editForm.location = d.location || d.workAddress || '';
+    editForm.workAddress = d.workAddress || '';
     editForm.experience = d.experience != null ? String(d.experience) : '';
     editForm.education = d.education != null ? String(d.education) : '';
     editForm.recruitNumber = d.recruitNumber ?? undefined;
@@ -705,8 +736,7 @@ async function handleEdit(row: any) {
   }
 }
 
-// 保存编辑：location/workAddress 同步提交（两字段并存，列表与 B 端各读一边）；
-// salary 展示串由 min/max/unit 前端合成（后端 update 走 updateById 不重算）
+// 保存编辑：只提交结构化地区和 workAddress；salary 展示串同步合成，salaryUnit 仅提交新契约码值。
 async function submitEdit() {
   editFormRef.value?.validate(async (valid: boolean) => {
     if (!valid) return;
@@ -717,12 +747,14 @@ async function submitEdit() {
         jobName: editForm.jobName,
         jobType: editForm.jobType,
         category: editForm.category,
+        province: editForm.province,
+        city: editForm.city,
+        district: editForm.district,
         salaryMin: editForm.salaryMin,
         salaryMax: editForm.salaryMax,
         salaryUnit: editForm.salaryUnit,
-        salary: `${editForm.salaryMin}-${editForm.salaryMax}/${editForm.salaryUnit}`,
-        location: editForm.location,
-        workAddress: editForm.location,
+        salary: `${editForm.salaryMin}-${editForm.salaryMax}/${salaryUnitSuffix(editForm.salaryUnit)}`,
+        workAddress: editForm.workAddress,
         experience: editForm.experience,
         education: editForm.education,
         recruitNumber: editForm.recruitNumber,
@@ -895,11 +927,15 @@ function handleAudit(row: any, status: string) {
   auditVisible.value = true;
 }
 
-//新增查询投简历人员
+// 从岗位行进入投递人员弹窗：只透传雪花 jobId 字符串，避免大整数精度丢失。
 function handleSelectApplyUsers(row: any){
   handleSelectApplyUsersVisible.value=true;
   queryParams1.jobId = row.jobId;
   loadData1();
+}
+
+function displayPhone(row: any): string {
+  return row?.phone || '-';
 }
 
 async function submitAudit() {

@@ -151,7 +151,7 @@
               </el-avatar>
               <div class="user-detail">
                 <div class="name">{{ row.userName || (row.userId ? '用户#' + row.userId : '未知用户') }}</div>
-                <div class="phone">{{ row.phonenumber || '-' }}</div>
+                <div class="phone">{{ displayPhone(row) }}</div>
               </div>
             </div>
           </template>
@@ -262,7 +262,7 @@
                   </div>
                   <div class="grid-item">
                     <span class="label">手机号码</span>
-                    <span class="value">{{ seeker.phonenumber || '-' }}</span>
+                    <span class="value">{{ displayPhone(seeker) }}</span>
                   </div>
                   <div class="grid-item">
                     <span class="label">邮箱</span>
@@ -345,7 +345,7 @@
                       <el-icon><Briefcase /></el-icon> {{ job.jobName || '-' }}
                     </p>
                     <p>
-                      <el-icon><Location /></el-icon> {{ job.location || '-' }}
+                      <el-icon><Location /></el-icon> {{ job.workAddress || [job.city, job.district].filter(Boolean).join(' / ') || '-' }}
                     </p>
                     <p>
                       <el-icon><OfficeBuilding /></el-icon> {{ company.companyName || '-' }}
@@ -401,19 +401,19 @@
                 </div>
                 <el-empty v-else description="暂无交换记录" :image-size="50" />
 
-                <!-- ④ 兼职选用记录 -->
-                <div class="block-title mt-6">兼职选用记录</div>
+                <!-- ④ 履约服务记录 -->
+                <div class="block-title mt-6">履约服务记录</div>
                 <div class="selection-box">
                   <div class="selection-head">
-                    <el-tag size="small" :type="detail.selection && detail.selection.selected ? 'success' : 'info'">
-                      {{ detail.selection && detail.selection.selected ? '已选用' : '未选用' }}
+                    <el-tag size="small" :type="detail.fulfillment && detail.fulfillment.selected ? 'success' : 'info'">
+                      {{ detail.fulfillment && detail.fulfillment.selected ? '已录用' : '未录用' }}
                     </el-tag>
-                    <span v-if="detail.selection && detail.selection.selectionTypeName" class="selection-type">
-                      {{ detail.selection.selectionTypeName }}
+                    <span v-if="detail.fulfillment && detail.fulfillment.platformServiceName" class="selection-type">
+                      {{ detail.fulfillment.platformServiceName }}
                     </span>
                   </div>
-                  <div v-if="detail.selection && detail.selection.tasks && detail.selection.tasks.length" class="task-list">
-                    <div v-for="t in detail.selection.tasks" :key="t.taskId" class="task-item">
+                  <div v-if="detail.fulfillment && detail.fulfillment.tasks && detail.fulfillment.tasks.length" class="task-list">
+                    <div v-for="t in detail.fulfillment.tasks" :key="t.taskId" class="task-item">
                       <div class="task-head">
                         <span>任务 #{{ t.taskId }}</span>
                         <el-tag size="small" :type="taskTagType(t.status)">{{ t.statusName || t.status }}</el-tag>
@@ -523,6 +523,10 @@ const isPreciseMode = computed(() => {
 const seeker = computed(() => detail.value?.jobSeeker || ({} as NonNullable<ApplyDetailVO['jobSeeker']>));
 const company = computed(() => detail.value?.company || ({} as NonNullable<ApplyDetailVO['company']>));
 const job = computed(() => detail.value?.job || ({} as NonNullable<ApplyDetailVO['job']>));
+
+function displayPhone(row?: { phone?: string }) {
+  return row?.phone || '-';
+}
 
 async function loadData() {
   loading.value = true;

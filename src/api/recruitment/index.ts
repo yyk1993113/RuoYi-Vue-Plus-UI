@@ -50,7 +50,10 @@ export interface JobVO {
   companyName?: string;
   jobName?: string;
   salary?: string;
-  location?: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  workAddress?: string;
   jobType?: string;
   jobTypeName?: string;
   experience?: string;
@@ -80,16 +83,15 @@ export interface JobFullVO {
   // 用工性质 0:全职 1:兼职 2:临时工 3:项目制
   jobType?: string;
   jobTypeName?: string;
-  // 用工性质（兼容旧字段）0:全职 1:兼职
-  employmentType?: string;
-  employmentTypeName?: string;
   // 薪资
   salary?: string;
   salaryMin?: number;
   salaryMax?: number;
   salaryUnit?: string;
   salaryUnitName?: string;
-  location?: string;
+  province?: string;
+  city?: string;
+  district?: string;
   // 职位所属类目
   category?: string;
   // 岗位实际工作地点
@@ -147,7 +149,7 @@ export interface ApplyVO {
   companyName?: string;
   userId?: number;
   userName?: string;
-  phonenumber?: string;
+  phone?: string;
   applyTime?: string;
   status?: string;
   statusName?: string;
@@ -174,11 +176,12 @@ export interface ApplyVO {
 
 export interface TaskStatistics {
   totalCount: number;
-  inProgressCount: number;
-  pendingVerifyCount: number;
-  verifiedCount: number;
-  rejectedCount: number;
-  settledCount: number;
+  pendingConfirm: number;
+  inProgress: number;
+  submitted: number;
+  completed: number;
+  rejected: number;
+  cancelled: number;
 }
 
 export interface TaskVO {
@@ -192,7 +195,9 @@ export interface TaskVO {
   workerAvatar?: string;
   companyId?: number;
   companyName?: string;
-  photoPath?: string;
+  arrivalPhotos?: string;
+  midPhotos?: string;
+  finishPhotos?: string;
   reportContent?: string;
   workTime?: string;
   address?: string;
@@ -374,7 +379,7 @@ export interface HotJobVO {
   applyCount?: number;
   browseCount?: number;
   salary?: string;
-  location?: string;
+  workAddress?: string;
   createTime?: string;
 }
 
@@ -771,7 +776,7 @@ export interface RecruitmentUserVO {
   userName: string;
   nickName: string;
   userType: string;
-  phonenumber: string;
+  phone?: string;
   email: string;
   sex: string;
   sexName: string;
@@ -803,7 +808,7 @@ export function listUsersWithStats(params?: {
   pageNum?: number;
   pageSize?: number;
   userName?: string;
-  phonenumber?: string;
+  phone?: string;
   isRecruitmentSilenced?: string;
   applyFilter?: string;
 }) {
@@ -822,7 +827,7 @@ export function unsilenceUser(data: { userId: number }) {
   return request.post(`${baseUrl}/user/unsilence`, data);
 }
 
-export function listUsers(params?: { pageNum?: number; pageSize?: number; userName?: string; phonenumber?: string; isRecruitmentSilenced?: string }) {
+export function listUsers(params?: { pageNum?: number; pageSize?: number; userName?: string; phone?: string; isRecruitmentSilenced?: string }) {
   return request.get<any>(`${baseUrl}/user/list`, { params });
 }
 
@@ -911,7 +916,7 @@ export interface ApplyDetailJobSeeker {
   userName?: string;
   nickName?: string;
   realName?: string;
-  phonenumber?: string;
+  phone?: string;
   email?: string;
   sex?: string;
   age?: number;
@@ -938,7 +943,10 @@ export interface ApplyDetailJob {
   jobName?: string;
   jobType?: string; // 0全职 1兼职 2临时工 3项目制
   salaryText?: string;
-  location?: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  workAddress?: string;
   status?: string; // 0审核中 1已上架 2已下架
 }
 
@@ -976,16 +984,16 @@ export interface ApplyExchangeItem {
 
 export interface ApplyTaskItem {
   taskId?: number;
-  status?: string; // 0进行中 1待核验 2已核验 3已驳回 4已结算
+  status?: string; // pending_confirm/in_progress/submitted/rejected/completed/cancelled
   statusName?: string;
   workTime?: string;
   address?: string;
   remark?: string;
 }
 
-export interface ApplySelectionResult {
-  selectionType?: string; // 1仅选用自行联系 2确认选用自行结算 3确认选用并签约
-  selectionTypeName?: string;
+export interface ApplyFulfillmentResult {
+  platformService?: 0 | 1;
+  platformServiceName?: string;
   selected?: boolean;
   tasks?: ApplyTaskItem[];
 }
@@ -1000,15 +1008,15 @@ export interface ApplyDetailVO {
   statusName?: string;
   isRead?: string;
   message?: string;
-  selectionType?: string;
-  selectionTypeName?: string;
+  platformService?: 0 | 1;
+  platformServiceName?: string;
   jobSeeker?: ApplyDetailJobSeeker;
   company?: ApplyDetailCompany;
   job?: ApplyDetailJob;
   statusFlow?: ApplyStatusFlowItem[];
   interviews?: ApplyInterviewItem[];
   exchangeRecords?: ApplyExchangeItem[];
-  selection?: ApplySelectionResult;
+  fulfillment?: ApplyFulfillmentResult;
 }
 
 // 多条件精确分页查询（投递编号/企业编号/时间区间）→ TableDataInfo<Apply> 原始实体
@@ -1283,8 +1291,8 @@ export interface OperationStatsVO {
   // 业务漏斗计数
   applyCount: number; // 投递数
   interviewInviteCount: number; // 面试邀请数（apply.status=1）
-  partTimeSelectionCount: number; // 兼职选用数（apply.selection_type 非空）
-  fulfillmentCompletedCount: number; // 履约完成数（task.status in 2,4）
+  partTimeSelectionCount: number; // 履约服务选择数（apply.platform_service = 1）
+  fulfillmentCompletedCount: number; // 履约完成数（task.status=completed）
   ledgerGeneratedCount: number; // 台账生成数
   invoiceUploadedCount: number; // 发票上传数（invoice.file_path 非空）
   // 估算指标（非精确，依赖缺失的行为埋点）

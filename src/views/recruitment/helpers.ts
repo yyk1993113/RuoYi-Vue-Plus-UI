@@ -5,15 +5,12 @@
 /**
  * 统一列表响应拆包，返回 { rows, total }。
  * 背景：项目响应拦截器（utils/request.ts:164）直接 resolve 后端整包 body——
- *   标准分页接口（TableDataInfo）数据在顶层 res.rows / res.total；
- *   个别历史写法把数据包到 res.data.rows / res.data.total。
- * 本函数以「顶层优先、再退 data.*」兼容两种形状，取代各视图里
- * `res.data?.rows ?? res.rows ?? []` 一类散弹写法——对真实后端响应行为完全一致
- * （res.rows 存在时即取它，data.rows 分支仅作历史兜底，实际不会命中）。
+ *   标准分页接口（TableDataInfo）数据在顶层 rows / total。
+ * 本函数只接受顶层 rows / total，嵌套列表形态视为契约错误并返回空列表。
  */
 export function unwrapList<T = any>(res: any): { rows: T[]; total: number } {
-  const rows = res?.rows ?? res?.data?.rows ?? [];
-  const total = res?.total ?? res?.data?.total ?? 0;
+  const rows = res?.rows ?? [];
+  const total = res?.total ?? 0;
   return { rows: Array.isArray(rows) ? rows : [], total: Number(total) || 0 };
 }
 
