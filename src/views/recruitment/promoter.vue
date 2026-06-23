@@ -12,7 +12,10 @@
                 <div class="board-title">推广数据总览</div>
                 <div class="board-subtitle">按年、半年、季度、月统计 B/C 端整体转化</div>
               </div>
-              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新总览</el-button>
+              <div class="board-actions">
+                <el-button icon="Download" @click="handlePeriodStatisticsExport">导出周期统计</el-button>
+                <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新总览</el-button>
+              </div>
             </div>
 
             <div class="overview-grid">
@@ -48,7 +51,10 @@
                 <div class="board-title">内部人员 / 渠道统计</div>
                 <div class="board-subtitle">按年、半年、季度、月拆分内部人员与渠道贡献</div>
               </div>
-              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新统计</el-button>
+              <div class="board-actions">
+                <el-button icon="Download" @click="handlePeriodStatisticsExport">导出周期统计</el-button>
+                <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新统计</el-button>
+              </div>
             </div>
             <div class="chart-layout secondary">
               <div class="chart-panel">
@@ -110,7 +116,10 @@
                 <div class="board-title">渠道推广活跃统计</div>
                 <div class="board-subtitle">推广人、身份、时间、B/C端、状态</div>
               </div>
-              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新统计</el-button>
+              <div class="board-actions">
+                <el-button icon="Download" @click="handleStatisticsExport">导出汇总统计</el-button>
+                <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新统计</el-button>
+              </div>
             </div>
 
             <el-form :model="statisticsQuery" :inline="true" label-width="76px" class="statistics-filter">
@@ -257,35 +266,46 @@
         </el-tab-pane>
 
         <el-tab-pane v-if="isAdminUser" label="统计明细" name="statisticsDetail">
-          <div v-loading="statisticsLoading" class="statistics-board">
+          <div v-loading="detailLoading" class="statistics-board">
             <div class="board-head">
               <div>
-                <div class="board-title">统计明细列表</div>
-                <div class="board-subtitle">按筛选条件查看活跃统计的明细数据</div>
+                <div class="board-title">推广来源明细</div>
+                <div class="board-subtitle">按 B 端企业 / C 端求职者拆分查看授权、简历、投递转化节点</div>
               </div>
-              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新明细</el-button>
+              <div class="board-actions">
+                <el-button icon="Download" @click="handleAttributionExport">导出</el-button>
+                <el-button icon="Refresh" :loading="detailLoading" @click="loadAttributionDetails">刷新明细</el-button>
+              </div>
             </div>
 
-            <el-form :model="statisticsQuery" :inline="true" label-width="76px" class="statistics-filter">
+            <el-form :model="detailQuery" :inline="true" label-width="76px" class="statistics-filter">
+              <el-form-item label="B/C端">
+                <el-radio-group v-model="detailObjectType" @change="handleDetailTypeChange">
+                  <el-radio-button value="company">B端企业</el-radio-button>
+                  <el-radio-button value="user">C端求职者</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
               <el-form-item label="推广人">
-                <el-input v-model="statisticsQuery.name" placeholder="姓名/昵称" clearable style="width: 180px" @keyup.enter="loadStatistics" />
+                <el-input v-model="detailQuery.promoterKeyword" placeholder="姓名/手机号" clearable style="width: 180px" @keyup.enter="handleAttributionQuery" />
               </el-form-item>
               <el-form-item label="身份">
-                <el-select v-model="statisticsQuery.identityType" placeholder="全部" clearable style="width: 150px">
+                <el-select v-model="detailQuery.identityType" placeholder="全部" clearable style="width: 150px">
                   <el-option label="内部人员" value="0" />
-                  <el-option label="内部渠道" value="1" />
-                  <el-option label="外部渠道" value="2" />
+                  <el-option label="外部渠道" value="1" />
+                  <el-option label="合伙人" value="2" />
                 </el-select>
               </el-form-item>
               <el-form-item label="状态">
-                <el-select v-model="statisticsQuery.status" placeholder="全部" clearable style="width: 130px">
-                  <el-option label="启用" value="1" />
-                  <el-option label="停用" value="0" />
+                <el-select v-model="detailQuery.status" placeholder="全部" clearable style="width: 150px">
+                  <el-option v-for="item in detailStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
                 </el-select>
+              </el-form-item>
+              <el-form-item :label="detailObjectType === 'company' ? '企业' : '求职者'">
+                <el-input v-model="detailQuery.keyword" :placeholder="detailKeywordPlaceholder" clearable style="width: 210px" @keyup.enter="handleAttributionQuery" />
               </el-form-item>
               <el-form-item label="时间">
                 <el-date-picker
-                  v-model="statisticsDateRange"
+                  v-model="detailDateRange"
                   type="daterange"
                   value-format="YYYY-MM-DD"
                   start-placeholder="开始日期"
@@ -294,68 +314,84 @@
                   style="width: 240px"
                 />
               </el-form-item>
-              <el-form-item label="时间维度">
-                <el-select v-model="statisticsTimeUnit" placeholder="按月" style="width: 126px">
-                  <el-option v-for="item in statisticsTimeUnitOptions" :key="item.value" :label="item.label" :value="item.value" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="B/C端">
-                <el-radio-group v-model="statisticsSide">
-                  <el-radio-button value="all">全部</el-radio-button>
-                  <el-radio-button value="company">B端</el-radio-button>
-                  <el-radio-button value="jobSeeker">C端</el-radio-button>
-                </el-radio-group>
-              </el-form-item>
               <el-form-item>
-                <el-button type="primary" icon="Search" @click="loadStatistics">查询</el-button>
-                <el-button icon="Refresh" @click="resetStatisticsQuery">重置</el-button>
+                <el-button type="primary" icon="Search" @click="handleAttributionQuery">查询</el-button>
+                <el-button icon="Refresh" @click="resetAttributionQuery">重置</el-button>
               </el-form-item>
             </el-form>
 
             <div class="detail-panel">
               <div class="panel-head">
-                <span>统计明细</span>
-                <el-tag size="small" effect="plain">{{ statisticsRows.length }} 条</el-tag>
+                <span>{{ detailObjectTypeName }}明细</span>
+                <el-tag size="small" effect="plain">{{ detailTotal }} 条</el-tag>
               </div>
-              <el-table :data="statisticsRows" border stripe max-height="520">
-                <el-table-column label="推广人" min-width="160" show-overflow-tooltip>
+              <el-table :data="attributionDetailRows" border stripe max-height="520">
+                <el-table-column :label="detailObjectType === 'company' ? '企业' : '求职者'" min-width="180" show-overflow-tooltip>
                   <template #default="{ row }">
                     <div class="name-cell">
-                      <span class="name-text">{{ row.name || '-' }}</span>
-                      <span class="sub-text">{{ row.phonenumber || '-' }}</span>
+                      <span class="name-text">{{ row.objectName || '-' }}</span>
+                      <span class="sub-text">{{ row.phone || '-' }}</span>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="来源推广人" min-width="160" show-overflow-tooltip>
+                  <template #default="{ row }">
+                    <div class="name-cell">
+                      <span class="name-text">{{ row.promoterName || '-' }}</span>
+                      <span class="sub-text">{{ row.promoterPhone || '-' }}</span>
                     </div>
                   </template>
                 </el-table-column>
                 <el-table-column label="身份" prop="identityType" width="120" align="center">
                   <template #default="{ row }">
-                    <el-tag :type="identityTypeTag(row.identityType)" size="small">{{ identityTypeText(row.identityType) }}</el-tag>
+                    <el-tag :type="identityTypeTag(row.identityType)" size="small">{{ row.identityTypeName || identityTypeText(row.identityType) }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="状态" prop="status" width="90" align="center">
+                <el-table-column label="状态" prop="statusName" width="120" align="center">
                   <template #default="{ row }">
-                    <el-tag :type="statusTag(row.status)" size="small">{{ statusText(row.status) }}</el-tag>
+                    <el-tag :type="detailStatusTag(row)" size="small">{{ row.statusName || '-' }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="B端企业数" prop="companyCount" width="110" align="center">
-                  <template #default="{ row }">{{ row.companyCount || 0 }}</template>
+                <el-table-column v-if="detailObjectType === 'company'" label="资料完整" prop="completed" width="100" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="yesNoTag(row.completed)" size="small">{{ row.completed || '-' }}</el-tag>
+                  </template>
                 </el-table-column>
-                <el-table-column label="C端求职者数" prop="jobSeekerCount" width="120" align="center">
-                  <template #default="{ row }">{{ row.jobSeekerCount || 0 }}</template>
+                <el-table-column v-if="detailObjectType === 'company'" label="岗位数" prop="jobCount" width="90" align="center" />
+                <el-table-column v-if="detailObjectType === 'user'" label="授权" prop="authorized" width="90" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="yesNoTag(row.authorized)" size="small">{{ row.authorized || '-' }}</el-tag>
+                  </template>
                 </el-table-column>
-                <el-table-column label="授权手机号" prop="authorizedCount" width="110" align="center">
-                  <template #default="{ row }">{{ row.authorizedCount || 0 }}</template>
+                <el-table-column v-if="detailObjectType === 'user'" label="简历" prop="resumeCompleted" width="90" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="yesNoTag(row.resumeCompleted)" size="small">{{ row.resumeCompleted || '-' }}</el-tag>
+                  </template>
                 </el-table-column>
-                <el-table-column label="完成简历" prop="resumeCount" width="100" align="center">
-                  <template #default="{ row }">{{ row.resumeCount || 0 }}</template>
+                <el-table-column v-if="detailObjectType === 'user'" label="投递" prop="applied" width="90" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="yesNoTag(row.applied)" size="small">{{ row.applied || '-' }}</el-tag>
+                  </template>
                 </el-table-column>
-                <el-table-column label="产生投递" prop="applyCount" width="100" align="center">
-                  <template #default="{ row }">{{ row.applyCount || 0 }}</template>
+                <el-table-column label="首次进入" prop="promotedAt" width="170" align="center">
+                  <template #default="{ row }">{{ row.promotedAt || row.createTime || '-' }}</template>
                 </el-table-column>
-                <el-table-column label="合计" width="100" align="center">
-                  <template #default="{ row }">{{ rowMetric(row) }}</template>
+                <el-table-column v-if="detailObjectType === 'user'" label="授权时间" prop="authorizedTime" width="170" align="center" />
+                <el-table-column v-if="detailObjectType === 'user'" label="简历时间" prop="resumeCompletedTime" width="170" align="center" />
+                <el-table-column v-if="detailObjectType === 'user'" label="投递时间" prop="firstApplyTime" width="170" align="center" />
+                <el-table-column label="操作" width="110" fixed="right" align="center">
+                  <template #default="{ row }">
+                    <el-button link type="primary" icon="Edit" @click="openAdjustAttribution(row)">调整来源</el-button>
+                  </template>
                 </el-table-column>
-                <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
               </el-table>
+              <pagination
+                v-show="detailTotal > 0"
+                v-model:page="detailQuery.pageNum"
+                v-model:limit="detailQuery.pageSize"
+                :total="detailTotal"
+                @pagination="loadAttributionDetails"
+              />
             </div>
           </div>
         </el-tab-pane>
@@ -538,6 +574,21 @@
         <el-button type="primary" :loading="submitting" @click="submitForm">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="adjustDialogVisible" title="调整推广来源" width="460px" append-to-body>
+      <el-form :model="adjustForm" label-width="110px">
+        <el-form-item label="调整对象">
+          <el-input :model-value="adjustForm.objectName" disabled />
+        </el-form-item>
+        <el-form-item label="推广人ID">
+          <el-input v-model="adjustForm.promoterId" placeholder="填写推广人ID，留空则清空为自然流量" clearable />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="adjustDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="adjustSubmitting" @click="submitAdjustAttribution">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -547,11 +598,17 @@ import * as echarts from 'echarts';
 import { ElMessage, type FormRules } from 'element-plus';
 import {
   addPromoter,
+  adjustPromoterAttribution,
   changePromoterStatus,
   getPromoter,
   getPromoterStatistics,
+  listPromoterCompanyDetail,
+  listPromoterUserDetail,
   listPromoter,
   updatePromoter,
+  type PromotionAttributionAdjustForm,
+  type PromotionAttributionDetailVO,
+  type PromotionAttributionQuery,
   type PromoterForm,
   type PromoterQuery,
   type PromoterStatisticsGroup,
@@ -565,6 +622,7 @@ import { unwrapList } from './helpers';
 
 type TagType = 'primary' | 'success' | 'warning' | 'danger' | 'info';
 type StatisticsSide = 'all' | 'company' | 'jobSeeker';
+type DetailObjectType = 'company' | 'user';
 type ActiveTab = 'overview' | 'identity' | 'statistics' | 'statisticsDetail' | 'list';
 type CountLike = Pick<PromoterStatisticsGroup, 'companyCount' | 'jobSeekerCount'>;
 type OverviewPeriodMetric = 'companyCount' | 'jobSeekerCount' | 'authorizedCount' | 'resumeCount' | 'applyCount';
@@ -585,8 +643,15 @@ const activeTab = ref<ActiveTab>(isAdminUser.value ? 'overview' : 'list');
 const statisticsLoading = ref(false);
 const statisticsDateRange = ref<[string, string] | []>([]);
 const listDateRange = ref<[string, string] | []>([]);
+const detailDateRange = ref<[string, string] | []>([]);
 const statisticsTimeUnit = ref<PromoterStatisticsTimeUnit>('month');
 const statisticsSide = ref<StatisticsSide>('all');
+const detailObjectType = ref<DetailObjectType>('company');
+const detailLoading = ref(false);
+const attributionDetailRows = ref<PromotionAttributionDetailVO[]>([]);
+const detailTotal = ref(0);
+const adjustDialogVisible = ref(false);
+const adjustSubmitting = ref(false);
 const statisticsTimeUnitOptions: { label: string; value: PromoterStatisticsTimeUnit }[] = [
   { label: '按日', value: 'day' },
   { label: '按年', value: 'year' },
@@ -599,6 +664,15 @@ const statisticsQuery = reactive<PromoterQuery>({
   name: '',
   identityType: '',
   status: ''
+});
+
+const detailQuery = reactive<PromotionAttributionQuery>({
+  pageNum: 1,
+  pageSize: 10,
+  promoterKeyword: '',
+  identityType: '',
+  status: '',
+  keyword: ''
 });
 
 const statisticsData = reactive<PromoterStatisticsVO>({
@@ -643,6 +717,13 @@ const form = reactive<PromoterForm>({
   jobSeekerCount: 0,
   status: '1',
   remark: ''
+});
+
+const adjustForm = reactive<PromotionAttributionAdjustForm & { objectName?: string; promoterId?: string | number | undefined }>({
+  objectType: 'company',
+  objectId: '',
+  objectName: '',
+  promoterId: undefined
 });
 
 // 渠道推广人员的数量字段由运营手工维护，后端按 company_count/job_seeker_count 原样落库。
@@ -704,6 +785,26 @@ const metricLabel = computed(() => {
   if (statisticsSide.value === 'jobSeeker') return 'C端求职者';
   return 'B/C合计';
 });
+const detailObjectTypeName = computed(() => (detailObjectType.value === 'company' ? 'B端企业' : 'C端求职者'));
+const detailKeywordPlaceholder = computed(() => (detailObjectType.value === 'company' ? '企业名称/联系人/手机号' : '昵称/姓名/手机号'));
+const detailStatusOptions = computed(() =>
+  detailObjectType.value === 'company'
+    ? [
+        { label: '待审核', value: '0' },
+        { label: '已认证', value: '1' },
+        { label: '已禁用', value: '2' },
+        { label: '资料完整', value: 'completed' },
+        { label: '资料不完整', value: 'incomplete' },
+        { label: '已发布岗位', value: 'published' }
+      ]
+    : [
+        { label: '已授权手机号', value: 'authorized' },
+        { label: '已完善简历', value: 'resume' },
+        { label: '已投递', value: 'apply' },
+        { label: '未完善简历', value: 'unresume' },
+        { label: '未投递', value: 'unapply' }
+      ]
+);
 
 const metricCards = computed(() => [
   { key: 'promoter', label: '推广人', value: statisticsData.totalPromoterCount || 0, sub: '当前筛选结果', tone: 'primary' },
@@ -755,6 +856,23 @@ function statusText(value?: string) {
 
 function statusTag(value?: string): TagType {
   return value === '1' ? 'success' : 'danger';
+}
+
+function detailStatusTag(row: PromotionAttributionDetailVO): TagType {
+  if (detailObjectType.value === 'company') {
+    if (row.status === '1' || row.status === 'completed' || row.status === 'published') return 'success';
+    if (row.status === '0' || row.status === 'incomplete') return 'warning';
+    if (row.status === '2') return 'danger';
+    return 'info';
+  }
+  if (row.status === 'apply') return 'success';
+  if (row.status === 'resume') return 'primary';
+  if (row.status === 'authorized') return 'warning';
+  return 'info';
+}
+
+function yesNoTag(value?: string): TagType {
+  return value === '是' ? 'success' : 'info';
 }
 
 function toCount(value?: number) {
@@ -872,6 +990,11 @@ watch(statisticsSide, () => {
   scheduleActiveTabCharts();
 });
 
+watch(detailObjectType, () => {
+  detailQuery.status = '';
+  detailQuery.pageNum = 1;
+});
+
 watch(isAdminUser, (allowed) => {
   activeTab.value = allowed ? 'overview' : 'list';
   if (allowed) {
@@ -884,7 +1007,13 @@ function handleTabChange(name: string | number) {
     scheduleIdentityCharts();
   } else if (name === 'statistics') {
     scheduleStatisticsCharts();
+  } else if (name === 'statisticsDetail') {
+    loadAttributionDetails();
   }
+}
+
+function handleDetailTypeChange() {
+  loadAttributionDetails();
 }
 
 function buildQuery(): PromoterQuery {
@@ -961,6 +1090,100 @@ async function loadStatistics() {
     scheduleActiveTabCharts();
   } finally {
     statisticsLoading.value = false;
+  }
+}
+
+function buildAttributionDetailQuery(): PromotionAttributionQuery {
+  const [beginDate, endDate] = detailDateRange.value;
+  return {
+    ...detailQuery,
+    promoterKeyword: detailQuery.promoterKeyword || undefined,
+    identityType: detailQuery.identityType || undefined,
+    status: detailQuery.status || undefined,
+    keyword: detailQuery.keyword || undefined,
+    beginTime: beginDate ? `${beginDate} 00:00:00` : undefined,
+    endTime: endDate ? `${endDate} 23:59:59` : undefined
+  };
+}
+
+async function loadAttributionDetails() {
+  if (!isAdminUser.value) return;
+  detailLoading.value = true;
+  try {
+    const query = buildAttributionDetailQuery();
+    const api = detailObjectType.value === 'company' ? listPromoterCompanyDetail : listPromoterUserDetail;
+    const res = await api(query);
+    const list = unwrapList<PromotionAttributionDetailVO>(res);
+    attributionDetailRows.value = list.rows;
+    detailTotal.value = list.total;
+  } finally {
+    detailLoading.value = false;
+  }
+}
+
+function handleAttributionQuery() {
+  detailQuery.pageNum = 1;
+  loadAttributionDetails();
+}
+
+function resetAttributionQuery() {
+  detailQuery.pageNum = 1;
+  detailQuery.pageSize = 10;
+  detailQuery.promoterKeyword = '';
+  detailQuery.identityType = '';
+  detailQuery.status = '';
+  detailQuery.keyword = '';
+  detailDateRange.value = [];
+  loadAttributionDetails();
+}
+
+function handleAttributionExport() {
+  const url =
+    detailObjectType.value === 'company'
+      ? '/admin/recruitment/promoter/company-detail/export'
+      : '/admin/recruitment/promoter/user-detail/export';
+  const fileName = `${detailObjectTypeName.value}推广来源明细_${new Date().getTime()}.xlsx`;
+  download(url, buildAttributionDetailQuery(), fileName);
+}
+
+function handleStatisticsExport() {
+  download('/admin/recruitment/promoter/statistics/export', buildStatisticsQuery(), `推广人汇总统计_${new Date().getTime()}.xlsx`);
+}
+
+function handlePeriodStatisticsExport() {
+  download('/admin/recruitment/promoter/period-statistics/export', buildStatisticsQuery(), `推广周期统计_${new Date().getTime()}.xlsx`);
+}
+
+function openAdjustAttribution(row: PromotionAttributionDetailVO) {
+  if (!row.objectId || !row.objectType) {
+    ElMessage.warning('当前记录缺少对象编号，无法调整来源');
+    return;
+  }
+  adjustForm.objectType = row.objectType;
+  adjustForm.objectId = row.objectId;
+  adjustForm.objectName = `${row.objectTypeName || detailObjectTypeName.value}：${row.objectName || row.objectId}`;
+  adjustForm.promoterId = row.promoterId || undefined;
+  adjustDialogVisible.value = true;
+}
+
+async function submitAdjustAttribution() {
+  if (!adjustForm.objectId || !adjustForm.objectType) {
+    ElMessage.warning('调整对象不能为空');
+    return;
+  }
+  adjustSubmitting.value = true;
+  try {
+    await adjustPromoterAttribution({
+      objectType: adjustForm.objectType,
+      objectId: adjustForm.objectId,
+      promoterId: adjustForm.promoterId || undefined
+    });
+    ElMessage.success('推广来源已调整');
+    adjustDialogVisible.value = false;
+    await loadAttributionDetails();
+    loadStatistics();
+  } finally {
+    adjustSubmitting.value = false;
   }
 }
 
@@ -1515,6 +1738,14 @@ onUnmounted(() => {
 
 .table-title {
   margin-right: 10px;
+}
+
+.board-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .statistics-filter,

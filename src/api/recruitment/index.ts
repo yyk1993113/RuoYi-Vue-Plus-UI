@@ -435,6 +435,7 @@ export interface JobQuery {
 export interface ApplyQuery {
   pageNum?: number;
   pageSize?: number;
+  applyId?: number;
   jobId?: number;
   jobName?: string;
   userId?: number;
@@ -442,6 +443,8 @@ export interface ApplyQuery {
   status?: string;
   companyName?: string;
   isRead?: string;
+  beginTime?: string;
+  endTime?: string;
   // 企业管理「已反馈/未反馈」弹窗用：companyId 精确过滤企业；feedback=0 未反馈 / 1 已反馈
   companyId?: number;
   feedback?: string;
@@ -669,12 +672,69 @@ export interface PromoterWorkbenchVO {
   remark?: string;
 }
 
+export interface PromotionAttributionQuery {
+  pageNum?: number;
+  pageSize?: number;
+  promoterId?: string | number;
+  promoterKeyword?: string;
+  identityType?: string;
+  status?: string;
+  keyword?: string;
+  beginTime?: string;
+  endTime?: string;
+}
+
+export interface PromotionAttributionDetailVO {
+  objectType?: 'company' | 'user' | string;
+  objectTypeName?: string;
+  objectId?: string | number;
+  objectName?: string;
+  phone?: string;
+  contactPerson?: string;
+  promoterId?: string | number;
+  promoterName?: string;
+  promoterPhone?: string;
+  identityType?: string;
+  identityTypeName?: string;
+  roleName?: string;
+  status?: string;
+  statusName?: string;
+  completed?: string;
+  jobCount?: number;
+  authorized?: string;
+  resumeCompleted?: string;
+  applied?: string;
+  promotedAt?: string;
+  authorizedTime?: string;
+  resumeCompletedTime?: string;
+  firstApplyTime?: string;
+  createTime?: string;
+}
+
+export interface PromotionAttributionAdjustForm {
+  objectType: 'company' | 'user' | string;
+  objectId: string | number;
+  promoterId?: string | number;
+}
+
 export function listPromoter(query: PromoterQuery) {
   return request.get<any>(`${baseUrl}/promoter/list`, { params: query });
 }
 
 export function getPromoterStatistics(query: PromoterQuery) {
   return request.get<PromoterStatisticsVO>(`${baseUrl}/promoter/statistics`, { params: query });
+}
+
+export function listPromoterCompanyDetail(query: PromotionAttributionQuery) {
+  return request.get<any>(`${baseUrl}/promoter/company-detail/list`, { params: query });
+}
+
+export function listPromoterUserDetail(query: PromotionAttributionQuery) {
+  return request.get<any>(`${baseUrl}/promoter/user-detail/list`, { params: query });
+}
+
+export function adjustPromoterAttribution(data: PromotionAttributionAdjustForm) {
+  return request.post(`${baseUrl}/promoter/attribution/adjust`, data);
 }
 
 export function getPromoter(promoterId: string | number) {

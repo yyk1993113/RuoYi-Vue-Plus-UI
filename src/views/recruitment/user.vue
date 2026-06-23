@@ -146,8 +146,8 @@
              双重身份用户的 userType 可在详情弹窗查看） -->
         <el-table-column label="性别" width="70" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.sex === '0'" type="" size="small" plain>男</el-tag>
-            <el-tag v-else-if="row.sex === '1'" type="" size="small" plain>女</el-tag>
+            <el-tag v-if="row.sex === '0'" size="small" plain>男</el-tag>
+            <el-tag v-else-if="row.sex === '1'" size="small" plain>女</el-tag>
             <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
@@ -330,10 +330,31 @@
     </el-dialog>
 
     <!-- ========== 区块六：投递记录弹窗 ========== -->
-    <el-dialog v-model="applyDialogVisible" :title="applyDialogTitle" width="1040px" append-to-body>
+    <el-dialog v-model="applyDialogVisible" :title="applyDialogTitle" width="1180px" append-to-body>
       <el-form :model="applyQueryParams" :inline="true" class="apply-dialog-query">
+        <el-form-item label="投递编号">
+          <el-input v-model="applyQueryParams.applyId" placeholder="精确投递ID" clearable style="width: 150px" @keyup.enter="handleApplyDialogQuery" />
+        </el-form-item>
+        <el-form-item label="企业编号">
+          <el-input v-model="applyQueryParams.companyId" placeholder="精确企业ID" clearable style="width: 150px" @keyup.enter="handleApplyDialogQuery" />
+        </el-form-item>
+        <el-form-item label="投递时间">
+          <el-date-picker
+            v-model="applyDateRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            style="width: 240px"
+            @change="handleApplyDialogQuery"
+          />
+        </el-form-item>
         <el-form-item label="岗位名称">
           <el-input v-model="applyQueryParams.jobName" placeholder="请输入岗位名称" clearable style="width: 180px" @keyup.enter="handleApplyDialogQuery" />
+        </el-form-item>
+        <el-form-item label="求职者">
+          <el-input v-model="applyQueryParams.userName" placeholder="请输入求职者" clearable style="width: 150px" @keyup.enter="handleApplyDialogQuery" />
         </el-form-item>
         <el-form-item label="企业名称">
           <el-input v-model="applyQueryParams.companyName" placeholder="请输入企业名称" clearable style="width: 180px" @keyup.enter="handleApplyDialogQuery" />
@@ -344,6 +365,12 @@
             <el-option label="面试邀请" value="1" />
             <el-option label="已录用" value="2" />
             <el-option label="已拒绝" value="3" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="已读状态">
+          <el-select v-model="applyQueryParams.isRead" placeholder="全部" clearable style="width: 110px">
+            <el-option label="未读" value="0" />
+            <el-option label="已读" value="1" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -417,6 +444,7 @@ const applyDialogUser = ref<RecruitmentUserVO | null>(null);
 const applyDialogData = ref<ApplyVO[]>([]);
 const applyDialogTotal = ref(0);
 const applyDialogInitialStatus = ref('');
+const applyDateRange = ref<[string, string] | []>([]);
 const queryFormRef = ref();
 const silenceFormRef = ref();
 type StatFilter = 'total' | 'normal' | 'applied' | 'pending' | 'silenced';
@@ -434,9 +462,13 @@ const queryParams = reactive({
 const applyQueryParams = reactive({
   pageNum: 1,
   pageSize: 10,
+  applyId: '',
+  companyId: '',
   userId: undefined as number | undefined,
   status: '',
+  isRead: '',
   jobName: '',
+  userName: '',
   companyName: '',
 });
 
@@ -678,10 +710,15 @@ function handleViewApplies(row: RecruitmentUserVO | null, status?: string) {
   applyDialogInitialStatus.value = status || '';
   applyQueryParams.pageNum = 1;
   applyQueryParams.pageSize = 10;
+  applyQueryParams.applyId = '';
+  applyQueryParams.companyId = '';
   applyQueryParams.userId = row.userId;
   applyQueryParams.status = status || '';
+  applyQueryParams.isRead = '';
   applyQueryParams.jobName = '';
+  applyQueryParams.userName = '';
   applyQueryParams.companyName = '';
+  applyDateRange.value = [];
   applyDialogVisible.value = true;
   loadApplyDialogData();
 }
@@ -693,10 +730,16 @@ async function loadApplyDialogData() {
     const res = await listApply({
       pageNum: applyQueryParams.pageNum,
       pageSize: applyQueryParams.pageSize,
+      applyId: applyQueryParams.applyId ? Number(applyQueryParams.applyId) : undefined,
+      companyId: applyQueryParams.companyId ? Number(applyQueryParams.companyId) : undefined,
       userId: applyQueryParams.userId,
       status: applyQueryParams.status || undefined,
+      isRead: applyQueryParams.isRead || undefined,
       jobName: applyQueryParams.jobName || undefined,
+      userName: applyQueryParams.userName || undefined,
       companyName: applyQueryParams.companyName || undefined,
+      beginTime: applyDateRange.value.length === 2 ? applyDateRange.value[0] : undefined,
+      endTime: applyDateRange.value.length === 2 ? applyDateRange.value[1] : undefined,
     });
     const list = unwrapList<ApplyVO>(res);
     applyDialogData.value = list.rows;
@@ -718,9 +761,14 @@ function handleApplyDialogQuery() {
 
 function resetApplyDialogQuery() {
   applyQueryParams.pageNum = 1;
+  applyQueryParams.applyId = '';
+  applyQueryParams.companyId = '';
   applyQueryParams.status = applyDialogInitialStatus.value;
+  applyQueryParams.isRead = '';
   applyQueryParams.jobName = '';
+  applyQueryParams.userName = '';
   applyQueryParams.companyName = '';
+  applyDateRange.value = [];
   loadApplyDialogData();
 }
 
