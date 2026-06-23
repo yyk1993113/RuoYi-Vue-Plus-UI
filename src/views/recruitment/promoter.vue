@@ -1,7 +1,9 @@
 <template>
   <!--
-    平台后台 路 渠道推广管理页。    职责：用页签拆分推广统计看板与推广人员维护；统计数据来自
-    GET /admin/recruitment/promoter/statistics锛屽垪琛?琛ㄥ崟来自同模块CRUD 鎺ュ彛銆?  -->
+    平台后台-渠道推广管理页。
+    职责：用页签拆分推广统计看板与推广人员维护；统计数据来自
+    GET /admin/recruitment/promoter/statistics，列表/表单来自同模块 CRUD 接口。
+  -->
   <div class="promoter-page">
     <div class="promoter-tabs-shell">
       <el-tabs v-model="activeTab" class="promoter-tabs" @tab-change="handleTabChange">
@@ -1078,7 +1080,7 @@ async function handleDelete(row?: PromoterVO) {
   const ids = row?.promoterId ? [row.promoterId] : selectedIds.value;
   if (!ids.length) return;
   try {
-    await ElMessageBox.confirm(`纭畾鍒犻櫎閫変腑鐨?${ids.length} 条推广人员吗？`, '提示', {
+    await ElMessageBox.confirm(`确定删除选中的 ${ids.length} 条推广人员吗？`, '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
