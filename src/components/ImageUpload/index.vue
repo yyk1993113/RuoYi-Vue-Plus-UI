@@ -63,6 +63,12 @@ const props = defineProps({
     type: Boolean,
     default: true
   },
+  // 输出值类型:默认保持 OSS id；运营内容图片字段使用 url，保证前端可直接渲染。
+  valueType: {
+    type: String,
+    default: 'ossId',
+    validator: (value: string) => ['ossId', 'url'].includes(value)
+  },
   // 是否支持压缩，默认否
   compressSupport: {
     type: Boolean,
@@ -93,12 +99,15 @@ const fileAccept = computed(() => props.fileType.map((type) => `.${type}`).join(
 
 watch(
   () => props.modelValue,
-  async (val: string) => {
+  async (val: string | OssVO[]) => {
     if (val) {
       // 首先将值转为数组
-      let list: OssVO[] = [];
+      let list: Array<OssVO | string> = [];
       if (Array.isArray(val)) {
         list = val as OssVO[];
+      } else if (props.valueType === 'url' && isDirectUrlValue(val)) {
+        // 内容管理保存 URL 时不再反查 OSS；历史数字 id 仍走 listByIds，保证编辑旧数据能正常预览。
+        list = val.split(',').map((item) => item.trim()).filter(Boolean);
       } else {
         const res = await listByIds(val);
 
@@ -192,7 +201,7 @@ const handleDelete = (file: UploadFile): boolean => {
   const findex = fileList.value.map((f) => f.name).indexOf(file.name);
   if (findex > -1 && uploadList.value.length === number.value) {
     const ossId = fileList.value[findex].ossId;
-    delOss(ossId);
+    if (ossId) delOss(ossId);
     fileList.value.splice(findex, 1);
     emit('update:modelValue', listToString(fileList.value));
     return false;
@@ -232,13 +241,23 @@ const handlePictureCardPreview = (file: any) => {
   dialogVisible.value = true;
 };
 
+const isDirectUrlValue = (value: string) => {
+  return String(value)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .every((item) => item.startsWith('http://') || item.startsWith('https://') || item.startsWith('/'));
+};
+
 // 对象转成指定字符串分隔
 const listToString = (list: any[], separator?: string) => {
   let strs = '';
   separator = separator || ',';
   for (const i in list) {
-    if (undefined !== list[i].ossId && list[i].url.indexOf('blob:') !== 0) {
-      strs += list[i].ossId + separator;
+    const url = list[i].url || '';
+    const value = props.valueType === 'url' ? url : list[i].ossId;
+    if (value !== undefined && value !== '' && url.indexOf('blob:') !== 0) {
+      strs += value + separator;
     }
   }
   return strs != '' ? strs.substring(0, strs.length - 1) : '';

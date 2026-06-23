@@ -355,7 +355,7 @@ export interface ExchangeStatistics {
 
 export interface ExchangeRequestVO {
   id?: number;
-  deliveryId?: number;
+  applyId?: number;
   recruiterId?: number;
   jobSeekerId?: number;
   exchangeType?: string;

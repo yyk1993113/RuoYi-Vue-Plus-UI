@@ -133,6 +133,7 @@
               v-if="field.type === 'image'"
               v-model="form[field.prop]"
               :limit="1"
+              value-type="url"
             />
             <!-- 数字 -->
             <el-input-number

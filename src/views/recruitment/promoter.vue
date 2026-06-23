@@ -1413,6 +1413,7 @@ function scheduleVisibleChartsRender() {
     cancelAnimationFrame(pendingChartFrame);
   }
   nextTick(() => {
+    observeChartContainers();
     pendingChartFrame = requestAnimationFrame(() => {
       pendingChartFrame = 0;
       renderVisibleCharts();
@@ -1423,8 +1424,8 @@ function scheduleVisibleChartsRender() {
 
 function canRenderChart(element: HTMLElement | null) {
   if (!element) return false;
-  const rect = element.getBoundingClientRect();
-  return rect.width > 0 && rect.height > 0;
+  const { clientWidth, clientHeight, offsetParent } = element;
+  return !!offsetParent && clientWidth > 0 && clientHeight > 0;
 }
 
 function ensureChartReady(element: HTMLElement | null, instance: echarts.ECharts | null) {
@@ -1452,12 +1453,14 @@ function handleResize() {
 
 function observeChartContainers() {
   if (!('ResizeObserver' in window)) return;
-  chartResizeObserver = new ResizeObserver((entries) => {
-    const hasRenderableChart = entries.some((entry) => entry.contentRect.width > 0 && entry.contentRect.height > 0);
-    if (hasRenderableChart) {
-      scheduleVisibleChartsRender();
-    }
-  });
+  if (!chartResizeObserver) {
+    chartResizeObserver = new ResizeObserver((entries) => {
+      const hasRenderableChart = entries.some((entry) => entry.target instanceof HTMLElement && canRenderChart(entry.target));
+      if (hasRenderableChart) {
+        scheduleVisibleChartsRender();
+      }
+    });
+  }
   [
     trendChartRef,
     sideChartRef,
