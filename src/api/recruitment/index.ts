@@ -664,6 +664,11 @@ export interface PromoterWorkbenchVO {
   todayAuthorizedCount?: number;
   todayResumeCount?: number;
   todayApplyCount?: number;
+  yesterdayCompanyCount?: number;
+  yesterdayJobSeekerCount?: number;
+  yesterdayAuthorizedCount?: number;
+  yesterdayResumeCount?: number;
+  yesterdayApplyCount?: number;
   totalCompanyCount?: number;
   totalJobSeekerCount?: number;
   totalAuthorizedCount?: number;
@@ -766,6 +771,10 @@ export function getPromoterWorkbenchQrCode(target: 'C' | 'B') {
     params: { target },
     responseType: 'blob'
   });
+}
+
+export function listPromoterWorkbenchDetail(query: PromotionAttributionQuery & { metric: string; period: 'today' | 'total' }) {
+  return request.get<any>(`${baseUrl}/promoter/workbench/detail/list`, { params: query });
 }
 
 // ---------- 企业管理 ----------
