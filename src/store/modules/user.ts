@@ -16,6 +16,19 @@ export const useUserStore = defineStore('user', () => {
   const roles = ref<Array<string>>([]); // 用户角色编码集合 → 判断路由权限
   const permissions = ref<Array<string>>([]); // 用户权限编码集合 → 判断按钮权限
 
+  // 本地会话状态必须能独立清理，避免冻结/过期 token 导致远端 logout 失败后前端仍反复携带坏 token。
+  const clearSession = (): void => {
+    token.value = '';
+    name.value = '';
+    nickname.value = '';
+    userId.value = '';
+    tenantId.value = '';
+    avatar.value = '';
+    roles.value = [];
+    permissions.value = [];
+    removeToken();
+  };
+
   /**
    * 登录
    * @param userInfo
@@ -59,11 +72,15 @@ export const useUserStore = defineStore('user', () => {
 
   // 注销
   const logout = async (): Promise<void> => {
-    await logoutApi();
-    token.value = '';
-    roles.value = [];
-    permissions.value = [];
-    removeToken();
+    try {
+      if (getToken()) {
+        await logoutApi();
+      }
+    } catch (error) {
+      console.warn('[user] Remote logout failed; clearing local session anyway.', error);
+    } finally {
+      clearSession();
+    }
   };
 
   const setAvatar = (value: string) => {
@@ -80,6 +97,7 @@ export const useUserStore = defineStore('user', () => {
     permissions,
     login,
     getInfo,
+    clearSession,
     logout,
     setAvatar
   };

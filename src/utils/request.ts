@@ -16,9 +16,42 @@ const encryptHeader = 'encrypt-key';
 let downloadLoadingInstance: LoadingInstance;
 // 是否显示重新登录
 export const isRelogin = { show: false };
-export const globalHeaders = () => {
+const invalidSessionKeywords = ['NotLoginException', 'token 已被冻结', 'token已被冻结', 'token 已过期', 'token已过期', 'token 无效', 'token无效'];
+
+const buildLoginRedirect = () => {
+  const currentRoute = router.currentRoute.value;
+  if (currentRoute.path === '/login') {
+    return { path: '/login' };
+  }
   return {
-    Authorization: 'Bearer ' + getToken(),
+    path: '/login',
+    query: {
+      redirect: encodeURIComponent(currentRoute.fullPath || '/')
+    }
+  };
+};
+
+const isInvalidSessionMessage = (message?: unknown) =>
+  typeof message === 'string' && invalidSessionKeywords.some((keyword) => message.includes(keyword));
+
+const handleInvalidSession = (message = '登录状态已失效，请重新登录') => {
+  // 鉴权失败必须先清本地状态；远端 token 已冻结/过期时再调用 logout 只会制造循环。
+  useUserStore().clearSession();
+  if (!isRelogin.show) {
+    isRelogin.show = true;
+    if (router.currentRoute.value.path !== '/login') {
+      ElMessage({ message, type: 'warning', duration: 3000 });
+    }
+    router.replace(buildLoginRedirect()).finally(() => {
+      isRelogin.show = false;
+    });
+  }
+};
+
+export const globalHeaders = () => {
+  const token = getToken();
+  return {
+    ...(token ? { Authorization: 'Bearer ' + token } : {}),
     clientid: import.meta.env.VITE_APP_CLIENT_ID
   };
 };
@@ -128,28 +161,8 @@ service.interceptors.response.use(
     if (res.request.responseType === 'blob' || res.request.responseType === 'arraybuffer') {
       return res.data;
     }
-    if (code === 401) {
-      // prettier-ignore
-      if (!isRelogin.show) {
-        isRelogin.show = true;
-        ElMessageBox.confirm('登录状态已过期，您可以继续留在该页面，或者重新登录', '系统提示', {
-          confirmButtonText: '重新登录',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }).then(() => {
-          isRelogin.show = false;
-          useUserStore().logout().then(() => {
-            router.replace({
-              path: '/login',
-              query: {
-                redirect: encodeURIComponent(router.currentRoute.value.fullPath || '/')
-              }
-            })
-          });
-        }).catch(() => {
-          isRelogin.show = false;
-        });
-      }
+    if (code === 401 || isInvalidSessionMessage(msg)) {
+      handleInvalidSession(msg);
       return Promise.reject('无效的会话，或者会话已过期，请重新登录。');
     } else if (code === HttpStatus.SERVER_ERROR) {
       ElMessage({ message: msg, type: 'error' });
@@ -165,7 +178,12 @@ service.interceptors.response.use(
     }
   },
   (error: any) => {
-    let { message } = error;
+    let { message = '' } = error;
+    const responseMsg = error?.response?.data?.msg || error?.response?.data?.message || '';
+    if (error?.response?.status === 401 || isInvalidSessionMessage(responseMsg || message)) {
+      handleInvalidSession(responseMsg || message);
+      return Promise.reject(error);
+    }
     if (message == 'Network Error') {
       message = '后端接口连接异常';
     } else if (message.includes('timeout')) {

@@ -16,22 +16,30 @@ const isWhiteList = (path: string) => {
   return whiteList.some((pattern) => isPathMatch(pattern, path));
 };
 
+const isInvalidSessionError = (err: unknown) => String(err).includes('无效的会话') || String(err).includes('会话已过期');
+
 router.beforeEach(async (to) => {
   NProgress.start();
   if (getToken()) {
+    const userStore = useUserStore();
     to.meta.title && useSettingsStore().setTitle(to.meta.title as string);
     /* has token*/
     if (to.path === '/login') {
       NProgress.done();
-      return { path: '/' };
+      // 登录页是重新建立会话的入口；只有已验证过用户信息的会话才允许跳回首页。
+      if (userStore.roles.length > 0) {
+        return { path: '/' };
+      }
+      userStore.clearSession();
+      return true;
     } else if (isWhiteList(to.path)) {
       return true;
     } else {
-      if (useUserStore().roles.length === 0) {
+      if (userStore.roles.length === 0) {
         isRelogin.show = true;
         try {
           // getInfo 与 generateRoutes 互不依赖（getRouters 已在后端按权限过滤），并行拉取以减少首屏等待
-          const [, accessRoutes] = await Promise.all([useUserStore().getInfo(), usePermissionStore().generateRoutes()]);
+          const [, accessRoutes] = await Promise.all([userStore.getInfo(), usePermissionStore().generateRoutes()]);
           // 根据后端返回的路由表动态添加可访问路由
           accessRoutes.forEach((route: any) => {
             if (!isHttp(route.path)) {
@@ -44,8 +52,10 @@ router.beforeEach(async (to) => {
             : { path: to.path, replace: true, query: to.query, hash: to.hash };
         } catch (err) {
           // 任一请求失败（最常见 token 失效 401）→ 登出并跳登录页，避免导航抛错导致白屏
-          await useUserStore().logout();
-          ElMessage.error(err instanceof Error ? err.message : String(err));
+          userStore.clearSession();
+          if (!isInvalidSessionError(err)) {
+            ElMessage.error(err instanceof Error ? err.message : String(err));
+          }
           return `/login?redirect=${encodeURIComponent(to.fullPath)}`;
         } finally {
           isRelogin.show = false; // 两分支重复的复位收敛到 finally
