@@ -9,6 +9,9 @@ export type RegisterForm = {
   code?: string;
   uuid?: string;
   userType?: string;
+  source?: string;
+  promoterId?: string;
+  promoterCode?: string;
 };
 
 /**

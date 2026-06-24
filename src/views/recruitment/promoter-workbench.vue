@@ -191,7 +191,8 @@ const bPromotionLink = computed(() => {
   const link = workbench.value.bPromotionLink || '';
   if (!code) return link;
   if (!link) {
-    return `https://recruiter.zgypzp.com/register?userType=B&source=promoter&promoterCode=${encodeURIComponent(code)}`;
+    // 企业端当前使用 hash 路由，推广链接必须落到 /#/register，避免 promoterCode 在前端路由解析前丢失。
+    return `https://recruiter.zgypzp.com/#/register?userType=B&source=promoter&promoterCode=${encodeURIComponent(code)}`;
   }
   if (link.includes('promoterCode=')) return link;
   const separator = link.includes('?') ? '&' : '?';
