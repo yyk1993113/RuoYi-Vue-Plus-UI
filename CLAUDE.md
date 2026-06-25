@@ -11,8 +11,8 @@ pnpm install
 pnpm exec vite serve --mode development --port 8081   # 开发（等价 pnpm dev）
 pnpm build:prod                                        # 生产构建 → dist/
 ```
-- 登录：`admin` / `admin123`（本地已重置），租户 `000000`。
-- 接口走**同源 `/prod-api`** 反代到后端（`VITE_APP_BASE_API=/prod-api`）；生产 nginx 在 `admin.zgypzp.com` 已配该反代。
+- 登录：连**隔离开发库**时用 `dev_admin` / `123456`（dev 库默认账号；旧 `admin/admin123` 只在生产库里有），租户 `000000`。
+- 接口走同源代理：**dev `/dev-api`**（`.env.development` 的 `VITE_PROXY_TARGET=http://127.0.0.1:8088` → 本机后端单体）/ **prod `/prod-api`**（生产 nginx 在 `admin.zgypzp.com` 反代）。
 
 ## 约定
 遵循全局 `~/.codex/AGENTS.md`：改 JS/TS/Vue 时加**意图性注释**（组件职责、数据来源、非显然的字段映射、重要副作用）；重大改动先列选项让用户拍板；提交信息用清晰中文。
