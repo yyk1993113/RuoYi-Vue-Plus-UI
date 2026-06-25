@@ -145,7 +145,7 @@ export interface ApplyVO {
   jobName?: string;
   salary?: string;
   companyName?: string;
-  userId?: number;
+  userId?: number | string;
   userName?: string;
   phonenumber?: string;
   applyTime?: string;
@@ -438,7 +438,7 @@ export interface ApplyQuery {
   applyId?: number;
   jobId?: number;
   jobName?: string;
-  userId?: number;
+  userId?: number | string;
   userName?: string;
   status?: string;
   companyName?: string;
@@ -624,6 +624,15 @@ export interface PromoterStatisticsPeriod {
   authorizedCount?: number;
   resumeCount?: number;
   applyCount?: number;
+  enteredCompanyCount?: number;
+  certifiedCompanyCount?: number;
+  publishedCompanyCount?: number;
+  fullTimePublishedCompanyCount?: number;
+  partTimePublishedCompanyCount?: number;
+  communicatedCompanyCount?: number;
+  interviewCompanyCount?: number;
+  hiredCompanyCount?: number;
+  settledCompanyCount?: number;
 }
 
 export interface PromoterIdentityPeriod {
@@ -841,11 +850,13 @@ export interface UserStatistics {
 }
 
 export interface RecruitmentUserVO {
-  userId: number;
+  userId: number | string;
   userName: string;
   nickName: string;
   userType: string;
-  phonenumber: string;
+  /** 后端列表接口当前返回 phone；保留 phonenumber 兼容历史页面字段。 */
+  phone: string;
+  phonenumber?: string;
   email: string;
   sex: string;
   sexName: string;
@@ -877,6 +888,7 @@ export function listUsersWithStats(params?: {
   pageNum?: number;
   pageSize?: number;
   userName?: string;
+  phone?: string;
   phonenumber?: string;
   isRecruitmentSilenced?: string;
   applyFilter?: string;
@@ -884,15 +896,15 @@ export function listUsersWithStats(params?: {
   return request.get<{ rows: RecruitmentUserVO[]; total: number }>(`${baseUrl}/user/listWithStats`, { params });
 }
 
-export function getRecruitmentUserDetail(userId: number) {
+export function getRecruitmentUserDetail(userId: number | string) {
   return request.get<RecruitmentUserVO>(`${baseUrl}/user/${userId}`);
 }
 
-export function silenceUser(data: { userId: number; reason: string }) {
+export function silenceUser(data: { userId: number | string; reason: string }) {
   return request.post(`${baseUrl}/user/silence`, data);
 }
 
-export function unsilenceUser(data: { userId: number }) {
+export function unsilenceUser(data: { userId: number | string }) {
   return request.post(`${baseUrl}/user/unsilence`, data);
 }
 

@@ -860,6 +860,7 @@ import {
   type PromoterIdentityPeriod,
   type PromoterQuery,
   type PromoterStatisticsGroup,
+  type PromoterStatisticsPeriod,
   type PromoterStatisticsRow,
   type PromoterStatisticsTimeUnit,
   type PromoterStatisticsVO,
@@ -1287,8 +1288,97 @@ function statusCount(status: string) {
   return statisticsData.statusStats?.find((item) => item.key === status)?.promoterCount || 0;
 }
 
+type NormalizedPromoterPeriodKey = 'today' | 'year' | 'halfYear' | 'quarter' | 'month';
+
+const periodAliasMap: Record<string, NormalizedPromoterPeriodKey> = {
+  // 口径对齐：把不同后端 key 映射为前端固定口径
+  today: 'today',
+  day: 'today',
+  daily: 'today',
+  todaypromotion: 'today',
+  thisday: 'today',
+  year: 'year',
+  yearly: 'year',
+  annual: 'year',
+  ytd: 'year',
+  yeartodate: 'year',
+  fullyear: 'year',
+  halfyear: 'halfYear',
+  h1: 'halfYear',
+  h2: 'halfYear',
+  quarter: 'quarter',
+  q1: 'quarter',
+  q2: 'quarter',
+  q3: 'quarter',
+  q4: 'quarter',
+  month: 'month',
+  monthly: 'month',
+  thismonth: 'month',
+  monthtodate: 'month'
+};
+
+const normalizeOverviewPeriodKey = (raw?: string): NormalizedPromoterPeriodKey | undefined => {
+  if (!raw) return undefined;
+  const normalized = String(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/-/g, '')
+    .replace(/_/g, '')
+    .replace(/([^\u4e00-\u9fff\w])/g, '');
+  return Object.prototype.hasOwnProperty.call(periodAliasMap, normalized) ? periodAliasMap[normalized] : undefined;
+};
+
+const normalizedPromoterPeriodMetricKeys: Array<keyof Omit<PromoterStatisticsPeriod, 'key' | 'label'>> = [
+  'companyCount',
+  'jobSeekerCount',
+  'authorizedCount',
+  'resumeCount',
+  'applyCount',
+  'enteredCompanyCount',
+  'certifiedCompanyCount',
+  'publishedCompanyCount',
+  'fullTimePublishedCompanyCount',
+  'partTimePublishedCompanyCount',
+  'communicatedCompanyCount',
+  'interviewCompanyCount',
+  'hiredCompanyCount',
+  'settledCompanyCount'
+];
+
+function normalizeOverviewPeriodStats(periodStats?: PromoterStatisticsPeriod[]): PromoterStatisticsPeriod[] {
+  if (!Array.isArray(periodStats) || periodStats.length === 0) return [];
+  const mergedMap = periodStats.reduce<Map<NormalizedPromoterPeriodKey, PromoterStatisticsPeriod>>((acc, item) => {
+    const key = normalizeOverviewPeriodKey(item.key || item.label);
+    if (!key) return acc;
+    const exist = acc.get(key) || ({ key, label: periodLabelMap[key] } as PromoterStatisticsPeriod);
+    const merged: PromoterStatisticsPeriod = {
+      ...exist,
+      key
+    };
+    for (const metricKey of normalizedPromoterPeriodMetricKeys) {
+      merged[metricKey] = toCount((exist as Record<string, number | undefined>)[metricKey] as number) + toCount(item[metricKey] as number);
+    }
+    acc.set(key, merged);
+    return acc;
+  }, new Map());
+  return Array.from(mergedMap.values());
+}
+
+function isNormalizedPeriodMatch(itemKey: string | undefined, target: NormalizedPromoterPeriodKey) {
+  const normalized = normalizeOverviewPeriodKey(itemKey);
+  return Boolean(normalized && normalized === target);
+}
+
 function overviewPeriodValue(periodKey: string, metric: OverviewPeriodMetric) {
-  const period = statisticsData.overview?.periodStats?.find((item) => item.key === periodKey);
+  const target = normalizeOverviewPeriodKey(periodKey);
+  if (!target) {
+    const direct = (statisticsData.overview?.periodStats || []).find((item) => item.key === periodKey || item.label === periodKey);
+    return Number(direct?.[metric] || 0);
+  }
+  const period = (statisticsData.overview?.periodStats || []).find(
+    (item) => isNormalizedPeriodMatch(item.key, target) || isNormalizedPeriodMatch(item.label, target)
+  );
   return Number(period?.[metric] || 0);
 }
 
@@ -1798,6 +1888,10 @@ async function loadStatistics() {
   statisticsLoading.value = true;
   try {
     const res: any = await getPromoterStatistics(buildStatisticsQuery());
+    const normalizedOverview = {
+      ...(res?.data?.overview || {}),
+      periodStats: normalizeOverviewPeriodStats(res?.data?.overview?.periodStats)
+    };
     Object.assign(statisticsData, {
       totalPromoterCount: 0,
       totalCompanyCount: 0,
@@ -1818,7 +1912,8 @@ async function loadStatistics() {
         periodStats: [],
         identityPeriodStats: []
       },
-      ...(res?.data || {})
+      ...(res?.data || {}),
+      overview: normalizedOverview
     });
     await nextTick();
     scheduleActiveTabCharts();

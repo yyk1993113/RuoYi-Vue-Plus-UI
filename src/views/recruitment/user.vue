@@ -132,7 +132,7 @@
             <div class="contact-info">
               <div class="contact-item">
                 <el-icon><Phone /></el-icon>
-                <span>{{ row.phonenumber || '-' }}</span>
+                <span>{{ row.phone || row.phonenumber || '-' }}</span>
               </div>
               <div class="contact-item" v-if="row.email">
                 <el-icon><Message /></el-icon>
@@ -255,7 +255,7 @@
           <el-tag v-if="currentUser.status === '0'" type="success">正常</el-tag>
           <el-tag v-else type="danger">停用</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="手机号" :span="2">{{ currentUser.phonenumber || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="手机号" :span="2">{{ currentUser.phone || currentUser.phonenumber || '-' }}</el-descriptions-item>
         <el-descriptions-item label="邮箱" :span="2">{{ currentUser.email || '-' }}</el-descriptions-item>
         <el-descriptions-item label="登录IP">{{ currentUser.loginIp || '-' }}</el-descriptions-item>
         <el-descriptions-item label="最后登录">{{ currentUser.loginDate || '-' }}</el-descriptions-item>
@@ -310,7 +310,7 @@
           <el-input :model-value="silenceForm.nickName || silenceForm.userName" disabled />
         </el-form-item>
         <el-form-item label="手机号">
-          <el-input :model-value="silenceForm.phonenumber" disabled />
+          <el-input :model-value="silenceForm.phone || silenceForm.phonenumber" disabled />
         </el-form-item>
         <el-form-item label="禁言原因" prop="reason" required>
           <el-input
@@ -383,7 +383,7 @@
         <el-table-column label="投递ID" prop="applyId" width="120" align="center" />
         <el-table-column label="岗位名称" prop="jobName" min-width="170" show-overflow-tooltip />
         <el-table-column label="企业名称" prop="companyName" min-width="170" show-overflow-tooltip />
-        <el-table-column label="手机号" prop="phonenumber" width="130" align="center" />
+        <el-table-column label="手机号" prop="phone" width="130" align="center" />
         <el-table-column label="薪资" prop="salary" width="130" show-overflow-tooltip />
         <el-table-column label="投递状态" width="110" align="center">
           <template #default="{ row }">
@@ -464,7 +464,7 @@ const applyQueryParams = reactive({
   pageSize: 10,
   applyId: '',
   companyId: '',
-  userId: undefined as number | undefined,
+  userId: undefined as string | undefined,
   status: '',
   isRead: '',
   jobName: '',
@@ -496,6 +496,7 @@ const silenceForm = reactive<RecruitmentUserVO & { reason: string }>({
   userName: '',
   nickName: '',
   userType: '',
+  phone: '',
   phonenumber: '',
   email: '',
   sex: '',
@@ -528,14 +529,19 @@ async function loadData() {
       pageNum: queryParams.pageNum,
       pageSize: queryParams.pageSize,
       userName: queryParams.userName || undefined,
-      phonenumber: queryParams.phonenumber || undefined,
+      phone: queryParams.phonenumber || undefined,
       isRecruitmentSilenced: queryParams.isSilenced || undefined,
       applyFilter: queryParams.applyFilter || undefined,
     });
     // 列表拆包统一走 unwrapList（顶层 rows/total 优先，兼容历史 data.rows 形状）
     // 安全：不要打印整包响应，避免把求职者手机号/邮箱/登录IP 等 PII 暴露到浏览器控制台
     const list = unwrapList<RecruitmentUserVO>(res);
-    tableData.value = list.rows;
+    // 后端新老接口在手机号字段上存在 phone / phonenumber 两种返回，这里统一归一化避免页面空列。
+    tableData.value = list.rows.map((item) => ({
+      ...item,
+      phone: item.phone || item.phonenumber || '',
+      phonenumber: item.phonenumber || item.phone || '',
+    }));
     total.value = list.total;
   } catch (e) {
     tableData.value = [];
@@ -712,7 +718,8 @@ function handleViewApplies(row: RecruitmentUserVO | null, status?: string) {
   applyQueryParams.pageSize = 10;
   applyQueryParams.applyId = '';
   applyQueryParams.companyId = '';
-  applyQueryParams.userId = row.userId;
+  // 后端雪花 ID 会以字符串返回，弹窗查询保持字符串透传，避免浏览器 number 精度丢失。
+  applyQueryParams.userId = String(row.userId);
   applyQueryParams.status = status || '';
   applyQueryParams.isRead = '';
   applyQueryParams.jobName = '';
@@ -784,7 +791,7 @@ onMounted(() => {
 function handleExport() {
   download('/admin/recruitment/user/export', {
     userName: queryParams.userName || undefined,
-    phonenumber: queryParams.phonenumber || undefined,
+    phone: queryParams.phonenumber || undefined,
     isRecruitmentSilenced: queryParams.isSilenced || undefined,
     applyFilter: queryParams.applyFilter || undefined,
   }, `求职者数据_${new Date().getTime()}.xlsx`);
