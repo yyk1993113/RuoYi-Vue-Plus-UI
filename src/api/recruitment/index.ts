@@ -624,11 +624,17 @@ export interface PromoterStatisticsPeriod {
   authorizedCount?: number;
   resumeCount?: number;
   applyCount?: number;
+  // 用户侧投递漏斗补充：全职/兼职投递去重人数、参与面试人数、被录用人数（后端 PeriodItem 同名字段）
+  fullTimeApplyCount?: number;
+  partTimeApplyCount?: number;
+  interviewUserCount?: number;
+  hiredUserCount?: number;
   enteredCompanyCount?: number;
   certifiedCompanyCount?: number;
   publishedCompanyCount?: number;
   fullTimePublishedCompanyCount?: number;
   partTimePublishedCompanyCount?: number;
+  promotedCompanyCount?: number;
   communicatedCompanyCount?: number;
   interviewCompanyCount?: number;
   hiredCompanyCount?: number;
@@ -756,9 +762,7 @@ export function getPromoterStatistics(query: PromoterQuery) {
   return request.get<PromoterStatisticsVO>(`${baseUrl}/promoter/statistics`, { params: query });
 }
 
-export function getCompanyOverviewStatistics(query?: PromoterQuery) {
-  return request.get<CompanyOverviewStatisticsVO>(`${baseUrl}/promoter/company-overview/statistics`, { params: query });
-}
+// 企业端概览查询已并入 getPromoterStatistics（/promoter/statistics），不再单独提供接口。
 
 export function listPromoterCompanyDetail(query: PromotionAttributionQuery) {
   return request.get<any>(`${baseUrl}/promoter/company-detail/list`, { params: query });
