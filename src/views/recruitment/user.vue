@@ -77,8 +77,8 @@
         <el-form-item label="用户昵称" prop="userName">
           <el-input v-model="queryParams.userName" placeholder="昵称 / 账号" clearable style="width: 160px" @keyup.enter="handleQuery" />
         </el-form-item>
-        <el-form-item label="手机号" prop="phone">
-          <el-input v-model="queryParams.phone" placeholder="请输入手机号" clearable style="width: 140px" @keyup.enter="handleQuery" />
+        <el-form-item label="手机号" prop="phonenumber">
+          <el-input v-model="queryParams.phonenumber" placeholder="请输入手机号" clearable style="width: 140px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item label="用户状态" prop="isSilenced">
           <el-select v-model="queryParams.isSilenced" placeholder="全部" clearable style="width: 130px">
@@ -132,7 +132,7 @@
             <div class="contact-info">
               <div class="contact-item">
                 <el-icon><Phone /></el-icon>
-                <span>{{ displayPhone(row) }}</span>
+                <span>{{ row.phone || row.phonenumber || '-' }}</span>
               </div>
               <div class="contact-item" v-if="row.email">
                 <el-icon><Message /></el-icon>
@@ -146,8 +146,8 @@
              双重身份用户的 userType 可在详情弹窗查看） -->
         <el-table-column label="性别" width="70" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.sex === '0'" type="" size="small" plain>男</el-tag>
-            <el-tag v-else-if="row.sex === '1'" type="" size="small" plain>女</el-tag>
+            <el-tag v-if="row.sex === '0'" size="small" plain>男</el-tag>
+            <el-tag v-else-if="row.sex === '1'" size="small" plain>女</el-tag>
             <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
@@ -255,7 +255,7 @@
           <el-tag v-if="currentUser.status === '0'" type="success">正常</el-tag>
           <el-tag v-else type="danger">停用</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="手机号" :span="2">{{ displayPhone(currentUser) }}</el-descriptions-item>
+        <el-descriptions-item label="手机号" :span="2">{{ currentUser.phone || currentUser.phonenumber || '-' }}</el-descriptions-item>
         <el-descriptions-item label="邮箱" :span="2">{{ currentUser.email || '-' }}</el-descriptions-item>
         <el-descriptions-item label="登录IP">{{ currentUser.loginIp || '-' }}</el-descriptions-item>
         <el-descriptions-item label="最后登录">{{ currentUser.loginDate || '-' }}</el-descriptions-item>
@@ -264,11 +264,11 @@
         <!-- 投递统计（汇总行） -->
         <el-descriptions-item label="投递统计" :span="2">
           <div class="detail-stats">
-            <span class="detail-stat-chip total">投递 {{ currentUser.totalApplies || 0 }}</span>
-            <span class="detail-stat-chip pending">待处理 {{ currentUser.pendingApplies || 0 }}</span>
-            <span class="detail-stat-chip interview">面试 {{ currentUser.interviewApplies || 0 }}</span>
-            <span class="detail-stat-chip hired">录用 {{ currentUser.hiredApplies || 0 }}</span>
-            <span class="detail-stat-chip rejected">拒绝 {{ currentUser.rejectedApplies || 0 }}</span>
+            <span class="detail-stat-chip total" @click="handleViewApplies(currentUser)">投递 {{ currentUser.totalApplies || 0 }}</span>
+            <span class="detail-stat-chip pending" @click="handleViewApplies(currentUser, '0')">待处理 {{ currentUser.pendingApplies || 0 }}</span>
+            <span class="detail-stat-chip interview" @click="handleViewApplies(currentUser, '1')">面试 {{ currentUser.interviewApplies || 0 }}</span>
+            <span class="detail-stat-chip hired" @click="handleViewApplies(currentUser, '2')">录用 {{ currentUser.hiredApplies || 0 }}</span>
+            <span class="detail-stat-chip rejected" @click="handleViewApplies(currentUser, '3')">拒绝 {{ currentUser.rejectedApplies || 0 }}</span>
           </div>
         </el-descriptions-item>
         <el-descriptions-item label="简历附件" :span="2">
@@ -310,7 +310,7 @@
           <el-input :model-value="silenceForm.nickName || silenceForm.userName" disabled />
         </el-form-item>
         <el-form-item label="手机号">
-          <el-input :model-value="displayPhone(silenceForm)" disabled />
+          <el-input :model-value="silenceForm.phone || silenceForm.phonenumber" disabled />
         </el-form-item>
         <el-form-item label="禁言原因" prop="reason" required>
           <el-input
@@ -329,6 +329,89 @@
       </template>
     </el-dialog>
 
+    <!-- ========== 区块六：投递记录弹窗 ========== -->
+    <el-dialog v-model="applyDialogVisible" :title="applyDialogTitle" width="1180px" append-to-body>
+      <el-form :model="applyQueryParams" :inline="true" class="apply-dialog-query">
+        <el-form-item label="投递编号">
+          <el-input v-model="applyQueryParams.applyId" placeholder="精确投递ID" clearable style="width: 150px" @keyup.enter="handleApplyDialogQuery" />
+        </el-form-item>
+        <el-form-item label="企业编号">
+          <el-input v-model="applyQueryParams.companyId" placeholder="精确企业ID" clearable style="width: 150px" @keyup.enter="handleApplyDialogQuery" />
+        </el-form-item>
+        <el-form-item label="投递时间">
+          <el-date-picker
+            v-model="applyDateRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            style="width: 240px"
+            @change="handleApplyDialogQuery"
+          />
+        </el-form-item>
+        <el-form-item label="岗位名称">
+          <el-input v-model="applyQueryParams.jobName" placeholder="请输入岗位名称" clearable style="width: 180px" @keyup.enter="handleApplyDialogQuery" />
+        </el-form-item>
+        <el-form-item label="求职者">
+          <el-input v-model="applyQueryParams.userName" placeholder="请输入求职者" clearable style="width: 150px" @keyup.enter="handleApplyDialogQuery" />
+        </el-form-item>
+        <el-form-item label="企业名称">
+          <el-input v-model="applyQueryParams.companyName" placeholder="请输入企业名称" clearable style="width: 180px" @keyup.enter="handleApplyDialogQuery" />
+        </el-form-item>
+        <el-form-item label="投递状态">
+          <el-select v-model="applyQueryParams.status" placeholder="全部" clearable style="width: 140px">
+            <el-option label="已投递" value="0" />
+            <el-option label="面试邀请" value="1" />
+            <el-option label="已录用" value="2" />
+            <el-option label="已拒绝" value="3" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="已读状态">
+          <el-select v-model="applyQueryParams.isRead" placeholder="全部" clearable style="width: 110px">
+            <el-option label="未读" value="0" />
+            <el-option label="已读" value="1" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" icon="Search" @click="handleApplyDialogQuery">搜索</el-button>
+          <el-button icon="Refresh" @click="resetApplyDialogQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
+
+      <el-table v-loading="applyDialogLoading" :data="applyDialogData" border stripe max-height="460">
+        <el-table-column label="投递ID" prop="applyId" width="120" align="center" />
+        <el-table-column label="岗位名称" prop="jobName" min-width="170" show-overflow-tooltip />
+        <el-table-column label="企业名称" prop="companyName" min-width="170" show-overflow-tooltip />
+        <el-table-column label="手机号" prop="phone" width="130" align="center" />
+        <el-table-column label="薪资" prop="salary" width="130" show-overflow-tooltip />
+        <el-table-column label="投递状态" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag :type="getApplyTagType(row.status)" size="small">
+              {{ row.statusName || applyStatusMeta(row.status).label }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="已读状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.isRead === '1' ? 'info' : 'warning'" size="small">
+              {{ row.isRead === '1' ? '已读' : '未读' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="投递时间" prop="applyTime" width="170" align="center" />
+        <el-table-column label="备注" prop="message" min-width="180" show-overflow-tooltip />
+      </el-table>
+
+      <pagination
+        v-show="applyDialogTotal > 0"
+        v-model:page="applyQueryParams.pageNum"
+        v-model:limit="applyQueryParams.pageSize"
+        :total="applyDialogTotal"
+        @pagination="loadApplyDialogData"
+      />
+    </el-dialog>
+
   </div>
 </template>
 
@@ -339,19 +422,29 @@ import {
   statisticsUser,
   listUsersWithStats,
   getRecruitmentUserDetail,
+  listApply,
   silenceUser,
   unsilenceUser,
+  type ApplyVO,
   type RecruitmentUserVO,
 } from '@/api/recruitment';
 import { download } from '@/utils/request';
 import { unwrapList } from './helpers';
+import { applyStatusMeta } from './constants';
 
 const loading = ref(false);
 const total = ref(0);
 const tableData = ref<RecruitmentUserVO[]>([]);
 const detailVisible = ref(false);
 const silenceVisible = ref(false);
+const applyDialogVisible = ref(false);
+const applyDialogLoading = ref(false);
 const currentUser = ref<RecruitmentUserVO | null>(null);
+const applyDialogUser = ref<RecruitmentUserVO | null>(null);
+const applyDialogData = ref<ApplyVO[]>([]);
+const applyDialogTotal = ref(0);
+const applyDialogInitialStatus = ref('');
+const applyDateRange = ref<[string, string] | []>([]);
 const queryFormRef = ref();
 const silenceFormRef = ref();
 type StatFilter = 'total' | 'normal' | 'applied' | 'pending' | 'silenced';
@@ -361,9 +454,22 @@ const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
   userName: '',
-  phone: '',
+  phonenumber: '',
   isSilenced: '',
   applyFilter: '',
+});
+
+const applyQueryParams = reactive({
+  pageNum: 1,
+  pageSize: 10,
+  applyId: '',
+  companyId: '',
+  userId: undefined as string | undefined,
+  status: '',
+  isRead: '',
+  jobName: '',
+  userName: '',
+  companyName: '',
 });
 
 const stats = reactive({
@@ -379,9 +485,11 @@ const totalInterviews = computed(() =>
   tableData.value.reduce((sum, u) => sum + (u.interviewApplies || 0), 0)
 );
 
-function displayPhone(row?: { phone?: string } | null) {
-  return row?.phone || '-';
-}
+const applyDialogTitle = computed(() => {
+  const userName = applyDialogUser.value?.nickName || applyDialogUser.value?.userName || '求职者';
+  const statusText = applyQueryParams.status ? ` - ${applyStatusMeta(applyQueryParams.status).label}` : '';
+  return `${userName}的投递记录${statusText}`;
+});
 
 const silenceForm = reactive<RecruitmentUserVO & { reason: string }>({
   userId: 0,
@@ -389,6 +497,7 @@ const silenceForm = reactive<RecruitmentUserVO & { reason: string }>({
   nickName: '',
   userType: '',
   phone: '',
+  phonenumber: '',
   email: '',
   sex: '',
   sexName: '',
@@ -420,14 +529,19 @@ async function loadData() {
       pageNum: queryParams.pageNum,
       pageSize: queryParams.pageSize,
       userName: queryParams.userName || undefined,
-      phone: queryParams.phone || undefined,
+      phone: queryParams.phonenumber || undefined,
       isRecruitmentSilenced: queryParams.isSilenced || undefined,
       applyFilter: queryParams.applyFilter || undefined,
     });
-    // 列表拆包统一走 unwrapList（rows/total）
+    // 列表拆包统一走 unwrapList（顶层 rows/total 优先，兼容历史 data.rows 形状）
     // 安全：不要打印整包响应，避免把求职者手机号/邮箱/登录IP 等 PII 暴露到浏览器控制台
     const list = unwrapList<RecruitmentUserVO>(res);
-    tableData.value = list.rows;
+    // 后端新老接口在手机号字段上存在 phone / phonenumber 两种返回，这里统一归一化避免页面空列。
+    tableData.value = list.rows.map((item) => ({
+      ...item,
+      phone: item.phone || item.phonenumber || '',
+      phonenumber: item.phonenumber || item.phone || '',
+    }));
     total.value = list.total;
   } catch (e) {
     tableData.value = [];
@@ -487,7 +601,7 @@ function resetQuery() {
   queryFormRef.value?.resetFields();
   queryParams.pageNum = 1;
   queryParams.userName = '';
-  queryParams.phone = '';
+  queryParams.phonenumber = '';
   queryParams.isSilenced = '';
   queryParams.applyFilter = '';
   activeStat.value = 'total';
@@ -593,8 +707,80 @@ async function handleUnsilence(row: RecruitmentUserVO | null) {
   }
 }
 
-function handleViewApplies(row: RecruitmentUserVO, status?: string) {
-  ElMessage.info(`查看 ${row.nickName || row.userName} 的投递记录（功能开发中）`);
+function handleViewApplies(row: RecruitmentUserVO | null, status?: string) {
+  if (!row?.userId) {
+    ElMessage.warning('缺少求职者用户ID，无法查询投递记录');
+    return;
+  }
+  applyDialogUser.value = row;
+  applyDialogInitialStatus.value = status || '';
+  applyQueryParams.pageNum = 1;
+  applyQueryParams.pageSize = 10;
+  applyQueryParams.applyId = '';
+  applyQueryParams.companyId = '';
+  // 后端雪花 ID 会以字符串返回，弹窗查询保持字符串透传，避免浏览器 number 精度丢失。
+  applyQueryParams.userId = String(row.userId);
+  applyQueryParams.status = status || '';
+  applyQueryParams.isRead = '';
+  applyQueryParams.jobName = '';
+  applyQueryParams.userName = '';
+  applyQueryParams.companyName = '';
+  applyDateRange.value = [];
+  applyDialogVisible.value = true;
+  loadApplyDialogData();
+}
+
+async function loadApplyDialogData() {
+  if (!applyQueryParams.userId) return;
+  applyDialogLoading.value = true;
+  try {
+    const res = await listApply({
+      pageNum: applyQueryParams.pageNum,
+      pageSize: applyQueryParams.pageSize,
+      applyId: applyQueryParams.applyId ? Number(applyQueryParams.applyId) : undefined,
+      companyId: applyQueryParams.companyId ? Number(applyQueryParams.companyId) : undefined,
+      userId: applyQueryParams.userId,
+      status: applyQueryParams.status || undefined,
+      isRead: applyQueryParams.isRead || undefined,
+      jobName: applyQueryParams.jobName || undefined,
+      userName: applyQueryParams.userName || undefined,
+      companyName: applyQueryParams.companyName || undefined,
+      beginTime: applyDateRange.value.length === 2 ? applyDateRange.value[0] : undefined,
+      endTime: applyDateRange.value.length === 2 ? applyDateRange.value[1] : undefined,
+    });
+    const list = unwrapList<ApplyVO>(res);
+    applyDialogData.value = list.rows;
+    applyDialogTotal.value = list.total;
+  } catch (e) {
+    applyDialogData.value = [];
+    applyDialogTotal.value = 0;
+    console.error('[求职者管理] 投递记录加载失败:', e);
+    ElMessage.error('投递记录加载失败');
+  } finally {
+    applyDialogLoading.value = false;
+  }
+}
+
+function handleApplyDialogQuery() {
+  applyQueryParams.pageNum = 1;
+  loadApplyDialogData();
+}
+
+function resetApplyDialogQuery() {
+  applyQueryParams.pageNum = 1;
+  applyQueryParams.applyId = '';
+  applyQueryParams.companyId = '';
+  applyQueryParams.status = applyDialogInitialStatus.value;
+  applyQueryParams.isRead = '';
+  applyQueryParams.jobName = '';
+  applyQueryParams.userName = '';
+  applyQueryParams.companyName = '';
+  applyDateRange.value = [];
+  loadApplyDialogData();
+}
+
+function getApplyTagType(status?: string | null) {
+  return (applyStatusMeta(status).type || 'info') as 'warning' | 'primary' | 'success' | 'info' | 'danger';
 }
 
 onMounted(() => {
@@ -605,7 +791,7 @@ onMounted(() => {
 function handleExport() {
   download('/admin/recruitment/user/export', {
     userName: queryParams.userName || undefined,
-    phone: queryParams.phone || undefined,
+    phone: queryParams.phonenumber || undefined,
     isRecruitmentSilenced: queryParams.isSilenced || undefined,
     applyFilter: queryParams.applyFilter || undefined,
   }, `求职者数据_${new Date().getTime()}.xlsx`);
@@ -710,7 +896,10 @@ function handleExport() {
   border-radius: 6px;
   font-size: 13px;
   font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s;
 }
+.detail-stat-chip:hover { transform: translateY(-1px); }
 .detail-stat-chip.total { background: #F0F9EB; color: #67C23A; }
 .detail-stat-chip.pending { background: #FDF6EC; color: #E6A23C; }
 .detail-stat-chip.interview { background: #ECF5FF; color: #409EFF; }
@@ -730,6 +919,14 @@ function handleExport() {
 }
 
 .text-muted { color: #C0C4CC; }
+
+.apply-dialog-query {
+  padding: 14px 16px 2px;
+  margin-bottom: 12px;
+  background: #F8FAFC;
+  border: 1px solid #EBEEF5;
+  border-radius: 8px;
+}
 
 /* 注册/最后登录合并列：上行注册时间、下行最近登录（灰色小字） */
 .time-cell { font-size: 12px; line-height: 1.6; }

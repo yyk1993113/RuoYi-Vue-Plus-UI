@@ -1,9 +1,7 @@
 <template>
   <!--
-    平台后台-渠道推广管理页。
-    职责：用页签拆分推广统计看板与推广人员维护；统计数据来自
-    GET /admin/recruitment/promoter/statistics，列表/表单来自同模块 CRUD 接口。
-  -->
+    平台后台 路 渠道推广管理页。    职责：用页签拆分推广统计看板与推广人员维护；统计数据来自
+    GET /admin/recruitment/promoter/statistics，列表/表单来自同模块 CRUD 接口。  -->
   <div class="promoter-page">
     <div class="promoter-tabs-shell">
       <el-tabs v-model="activeTab" class="promoter-tabs" @tab-change="handleTabChange">
@@ -14,11 +12,23 @@
                 <div class="board-title">推广数据总览</div>
                 <div class="board-subtitle">按年、半年、季度、月统计 B/C 端整体转化</div>
               </div>
-              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新总览</el-button>
+              <div class="board-actions">
+                <el-button icon="Download" @click="handlePeriodStatisticsExport">导出周期统计</el-button>
+                <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新总览</el-button>
+              </div>
             </div>
 
             <div class="overview-grid">
-              <div v-for="card in overviewCards" :key="card.key" class="overview-card" :class="card.tone">
+              <div
+                v-for="card in overviewCards"
+                :key="card.key"
+                class="overview-card is-clickable"
+                :class="card.tone"
+                role="button"
+                tabindex="0"
+                @click="openOverviewCardDrilldown(card)"
+                @keyup.enter="openOverviewCardDrilldown(card)"
+              >
                 <span class="metric-label">{{ card.label }}</span>
                 <strong>{{ card.value }}</strong>
                 <span class="metric-sub">{{ card.sub }}</span>
@@ -33,11 +43,80 @@
               <el-table :data="overviewRows" border stripe>
                 <el-table-column label="统计项" prop="label" min-width="180" />
                 <el-table-column label="说明" prop="description" min-width="300" show-overflow-tooltip />
-                <el-table-column label="今日" prop="today" width="110" align="center" />
-                <el-table-column label="本年" prop="year" width="110" align="center" />
-                <el-table-column label="本半年" prop="halfYear" width="110" align="center" />
-                <el-table-column label="本季度" prop="quarter" width="110" align="center" />
-                <el-table-column label="本月" prop="month" width="110" align="center" />
+                <el-table-column label="今日" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openOverviewCellDrilldown(row, 'today')">{{ row.today }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="本年" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openOverviewCellDrilldown(row, 'year')">{{ row.year }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="本半年" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openOverviewCellDrilldown(row, 'halfYear')">{{ row.halfYear }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="本季度" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openOverviewCellDrilldown(row, 'quarter')">{{ row.quarter }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="本月" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openOverviewCellDrilldown(row, 'month')">{{ row.month }}</button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane v-if="isAdminUser" label="企业端概览" name="companyOverview">
+          <div v-loading="companyOverviewLoading" class="overview-board">
+            <div class="board-head">
+              <div>
+                <div class="board-title">企业端概览</div>
+                <div class="board-subtitle">使用独立接口查询企业端关键维度数据</div>
+              </div>
+              <div class="board-actions">
+                <el-button icon="Refresh" :loading="companyOverviewLoading" @click="loadCompanyOverviewStatistics">刷新企业端概览</el-button>
+              </div>
+            </div>
+            <div class="overview-table">
+              <div class="panel-head">
+                <span>企业端指标</span>
+                <el-tag size="small" effect="plain">今日/本年/本半年/本季度/本月</el-tag>
+              </div>
+              <el-table :data="companyOverviewRows" border stripe>
+                <el-table-column label="指标" prop="label" min-width="210" />
+                <el-table-column label="说明" prop="description" min-width="280" show-overflow-tooltip />
+                <el-table-column label="今日" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openCompanyOverviewCellDrilldown(row, 'today')">{{ row.today }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="本年" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openCompanyOverviewCellDrilldown(row, 'year')">{{ row.year }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="本半年" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openCompanyOverviewCellDrilldown(row, 'halfYear')">{{ row.halfYear }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="本季度" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openCompanyOverviewCellDrilldown(row, 'quarter')">{{ row.quarter }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="本月" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openCompanyOverviewCellDrilldown(row, 'month')">{{ row.month }}</button>
+                  </template>
+                </el-table-column>
               </el-table>
             </div>
           </div>
@@ -50,7 +129,10 @@
                 <div class="board-title">内部人员 / 渠道统计</div>
                 <div class="board-subtitle">按年、半年、季度、月拆分内部人员与渠道贡献</div>
               </div>
-              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新统计</el-button>
+              <div class="board-actions">
+                <el-button icon="Download" @click="handlePeriodStatisticsExport">导出周期统计</el-button>
+                <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新统计</el-button>
+              </div>
             </div>
             <div class="chart-layout secondary">
               <div class="chart-panel">
@@ -83,14 +165,50 @@
               <el-table :data="identityPeriodRows" border stripe>
                 <el-table-column label="统计周期" prop="label" min-width="110" fixed />
                 <el-table-column label="内部人员" align="center">
-                  <el-table-column label="人数" prop="internalPromoterCount" width="90" align="center" />
-                  <el-table-column label="B端企业" prop="internalCompanyCount" width="110" align="center" />
-                  <el-table-column label="C端用户" prop="internalJobSeekerCount" width="110" align="center" />
+                  <el-table-column label="人数" prop="internalPromoterCount" width="90" align="center">
+                    <template #default="{ row }">
+                      <button type="button" class="stat-link" @click="openIdentityPromoterDrilldown(row, 'internal')">
+                        {{ row.internalPromoterCount || 0 }}
+                      </button>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="B端企业" prop="internalCompanyCount" width="110" align="center">
+                    <template #default="{ row }">
+                      <button type="button" class="stat-link" @click="openIdentityPeriodDrilldown(row, 'internal', 'company')">
+                        {{ row.internalCompanyCount || 0 }}
+                      </button>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="C端用户" prop="internalJobSeekerCount" width="110" align="center">
+                    <template #default="{ row }">
+                      <button type="button" class="stat-link" @click="openIdentityPeriodDrilldown(row, 'internal', 'user')">
+                        {{ row.internalJobSeekerCount || 0 }}
+                      </button>
+                    </template>
+                  </el-table-column>
                 </el-table-column>
                 <el-table-column label="渠道" align="center">
-                  <el-table-column label="人数" prop="channelPromoterCount" width="90" align="center" />
-                  <el-table-column label="B端企业" prop="channelCompanyCount" width="110" align="center" />
-                  <el-table-column label="C端用户" prop="channelJobSeekerCount" width="110" align="center" />
+                  <el-table-column label="人数" prop="channelPromoterCount" width="90" align="center">
+                    <template #default="{ row }">
+                      <button type="button" class="stat-link" @click="openIdentityPromoterDrilldown(row, 'channel')">
+                        {{ row.channelPromoterCount || 0 }}
+                      </button>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="B端企业" prop="channelCompanyCount" width="110" align="center">
+                    <template #default="{ row }">
+                      <button type="button" class="stat-link" @click="openIdentityPeriodDrilldown(row, 'channel', 'company')">
+                        {{ row.channelCompanyCount || 0 }}
+                      </button>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="C端用户" prop="channelJobSeekerCount" width="110" align="center">
+                    <template #default="{ row }">
+                      <button type="button" class="stat-link" @click="openIdentityPeriodDrilldown(row, 'channel', 'user')">
+                        {{ row.channelJobSeekerCount || 0 }}
+                      </button>
+                    </template>
+                  </el-table-column>
                 </el-table-column>
               </el-table>
               <el-alert
@@ -112,7 +230,10 @@
                 <div class="board-title">渠道推广活跃统计</div>
                 <div class="board-subtitle">推广人、身份、时间、B/C端、状态</div>
               </div>
-              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新统计</el-button>
+              <div class="board-actions">
+                <el-button icon="Download" @click="handleStatisticsExport">导出汇总统计</el-button>
+                <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新统计</el-button>
+              </div>
             </div>
 
             <el-form :model="statisticsQuery" :inline="true" label-width="76px" class="statistics-filter">
@@ -162,7 +283,16 @@
             </el-form>
 
             <div class="metric-grid">
-              <div v-for="card in metricCards" :key="card.key" class="metric-card" :class="card.tone">
+              <div
+                v-for="card in metricCards"
+                :key="card.key"
+                class="metric-card is-clickable"
+                :class="card.tone"
+                role="button"
+                tabindex="0"
+                @click="openMetricCardDrilldown(card)"
+                @keyup.enter="openMetricCardDrilldown(card)"
+              >
                 <span class="metric-label">{{ card.label }}</span>
                 <strong>{{ card.value }}</strong>
                 <span class="metric-sub">{{ card.sub }}</span>
@@ -235,13 +365,34 @@
                   </template>
                 </el-table-column>
                 <el-table-column label="B端企业" prop="companyCount" width="110" align="center">
-                  <template #default="{ row }">{{ row.companyCount || 0 }}</template>
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openStatisticsRowDrilldown(row, 'company')">{{ row.companyCount || 0 }}</button>
+                  </template>
                 </el-table-column>
                 <el-table-column label="C端求职者" prop="jobSeekerCount" width="120" align="center">
-                  <template #default="{ row }">{{ row.jobSeekerCount || 0 }}</template>
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openStatisticsRowDrilldown(row, 'jobSeeker')">{{ row.jobSeekerCount || 0 }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="授权手机号" prop="authorizedCount" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openStatisticsRowDrilldown(row, 'authorized')">{{ row.authorizedCount || 0 }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="完成简历" prop="resumeCount" width="100" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openStatisticsRowDrilldown(row, 'resume')">{{ row.resumeCount || 0 }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="产生投递" prop="applyCount" width="100" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openStatisticsRowDrilldown(row, 'apply')">{{ row.applyCount || 0 }}</button>
+                  </template>
                 </el-table-column>
                 <el-table-column label="合计" width="100" align="center">
-                  <template #default="{ row }">{{ rowMetric(row) }}</template>
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openStatisticsRowTotalDrilldown(row)">{{ rowMetric(row) }}</button>
+                  </template>
                 </el-table-column>
                 <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
               </el-table>
@@ -250,35 +401,46 @@
         </el-tab-pane>
 
         <el-tab-pane v-if="isAdminUser" label="统计明细" name="statisticsDetail">
-          <div v-loading="statisticsLoading" class="statistics-board">
+          <div v-loading="detailLoading" class="statistics-board">
             <div class="board-head">
               <div>
-                <div class="board-title">统计明细列表</div>
-                <div class="board-subtitle">按筛选条件查看活跃统计的明细数据</div>
+                <div class="board-title">推广来源明细</div>
+                <div class="board-subtitle">按 B 端企业 / C 端求职者拆分查看授权、简历、投递转化节点</div>
               </div>
-              <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新明细</el-button>
+              <div class="board-actions">
+                <el-button icon="Download" @click="handleAttributionExport">导出</el-button>
+                <el-button icon="Refresh" :loading="detailLoading" @click="loadAttributionDetails">刷新明细</el-button>
+              </div>
             </div>
 
-            <el-form :model="statisticsQuery" :inline="true" label-width="76px" class="statistics-filter">
+            <el-form :model="detailQuery" :inline="true" label-width="76px" class="statistics-filter">
+              <el-form-item label="B/C端">
+                <el-radio-group v-model="detailObjectType" @change="handleDetailTypeChange">
+                  <el-radio-button value="company">B端企业</el-radio-button>
+                  <el-radio-button value="user">C端求职者</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
               <el-form-item label="推广人">
-                <el-input v-model="statisticsQuery.name" placeholder="姓名/昵称" clearable style="width: 180px" @keyup.enter="loadStatistics" />
+                <el-input v-model="detailQuery.promoterKeyword" placeholder="姓名/手机号" clearable style="width: 180px" @keyup.enter="handleAttributionQuery" />
               </el-form-item>
               <el-form-item label="身份">
-                <el-select v-model="statisticsQuery.identityType" placeholder="全部" clearable style="width: 150px">
+                <el-select v-model="detailQuery.identityType" placeholder="全部" clearable style="width: 150px">
                   <el-option label="内部人员" value="0" />
-                  <el-option label="内部渠道" value="1" />
-                  <el-option label="外部渠道" value="2" />
+                  <el-option label="外部渠道" value="1" />
+                  <el-option label="合伙人" value="2" />
                 </el-select>
               </el-form-item>
               <el-form-item label="状态">
-                <el-select v-model="statisticsQuery.status" placeholder="全部" clearable style="width: 130px">
-                  <el-option label="启用" value="1" />
-                  <el-option label="停用" value="0" />
+                <el-select v-model="detailQuery.status" placeholder="全部" clearable style="width: 150px">
+                  <el-option v-for="item in detailStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
                 </el-select>
+              </el-form-item>
+              <el-form-item :label="detailObjectType === 'company' ? '企业' : '求职者'">
+                <el-input v-model="detailQuery.keyword" :placeholder="detailKeywordPlaceholder" clearable style="width: 210px" @keyup.enter="handleAttributionQuery" />
               </el-form-item>
               <el-form-item label="时间">
                 <el-date-picker
-                  v-model="statisticsDateRange"
+                  v-model="detailDateRange"
                   type="daterange"
                   value-format="YYYY-MM-DD"
                   start-placeholder="开始日期"
@@ -287,59 +449,84 @@
                   style="width: 240px"
                 />
               </el-form-item>
-              <el-form-item label="时间维度">
-                <el-select v-model="statisticsTimeUnit" placeholder="按月" style="width: 126px">
-                  <el-option v-for="item in statisticsTimeUnitOptions" :key="item.value" :label="item.label" :value="item.value" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="B/C端">
-                <el-radio-group v-model="statisticsSide">
-                  <el-radio-button value="all">全部</el-radio-button>
-                  <el-radio-button value="company">B端</el-radio-button>
-                  <el-radio-button value="jobSeeker">C端</el-radio-button>
-                </el-radio-group>
-              </el-form-item>
               <el-form-item>
-                <el-button type="primary" icon="Search" @click="loadStatistics">查询</el-button>
-                <el-button icon="Refresh" @click="resetStatisticsQuery">重置</el-button>
+                <el-button type="primary" icon="Search" @click="handleAttributionQuery">查询</el-button>
+                <el-button icon="Refresh" @click="resetAttributionQuery">重置</el-button>
               </el-form-item>
             </el-form>
 
             <div class="detail-panel">
               <div class="panel-head">
-                <span>统计明细</span>
-                <el-tag size="small" effect="plain">{{ statisticsRows.length }} 条</el-tag>
+                <span>{{ detailObjectTypeName }}明细</span>
+                <el-tag size="small" effect="plain">{{ detailTotal }} 条</el-tag>
               </div>
-              <el-table :data="statisticsRows" border stripe max-height="520">
-                <el-table-column label="推广人" min-width="160" show-overflow-tooltip>
+              <el-table :data="attributionDetailRows" border stripe max-height="520">
+                <el-table-column :label="detailObjectType === 'company' ? '企业' : '求职者'" min-width="180" show-overflow-tooltip>
                   <template #default="{ row }">
                     <div class="name-cell">
-                      <span class="name-text">{{ row.name || '-' }}</span>
-                      <span class="sub-text">{{ row.phonenumber || '-' }}</span>
+                      <span class="name-text">{{ row.objectName || '-' }}</span>
+                      <span class="sub-text">{{ row.phone || '-' }}</span>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="来源推广人" min-width="160" show-overflow-tooltip>
+                  <template #default="{ row }">
+                    <div class="name-cell">
+                      <span class="name-text">{{ row.promoterName || '-' }}</span>
+                      <span class="sub-text">{{ row.promoterPhone || '-' }}</span>
                     </div>
                   </template>
                 </el-table-column>
                 <el-table-column label="身份" prop="identityType" width="120" align="center">
                   <template #default="{ row }">
-                    <el-tag :type="identityTypeTag(row.identityType)" size="small">{{ identityTypeText(row.identityType) }}</el-tag>
+                    <el-tag :type="identityTypeTag(row.identityType)" size="small">{{ row.identityTypeName || identityTypeText(row.identityType) }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="状态" prop="status" width="90" align="center">
+                <el-table-column label="状态" prop="statusName" width="120" align="center">
                   <template #default="{ row }">
-                    <el-tag :type="statusTag(row.status)" size="small">{{ statusText(row.status) }}</el-tag>
+                    <el-tag :type="detailStatusTag(row)" size="small">{{ row.statusName || '-' }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="B端企业数" prop="companyCount" width="110" align="center">
-                  <template #default="{ row }">{{ row.companyCount || 0 }}</template>
+                <el-table-column v-if="detailObjectType === 'company'" label="资料完整" prop="completed" width="100" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="yesNoTag(row.completed)" size="small">{{ row.completed || '-' }}</el-tag>
+                  </template>
                 </el-table-column>
-                <el-table-column label="C端求职者数" prop="jobSeekerCount" width="120" align="center">
-                  <template #default="{ row }">{{ row.jobSeekerCount || 0 }}</template>
+                <el-table-column v-if="detailObjectType === 'company'" label="岗位数" prop="jobCount" width="90" align="center" />
+                <el-table-column v-if="detailObjectType === 'user'" label="授权" prop="authorized" width="90" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="yesNoTag(row.authorized)" size="small">{{ row.authorized || '-' }}</el-tag>
+                  </template>
                 </el-table-column>
-                <el-table-column label="合计" width="100" align="center">
-                  <template #default="{ row }">{{ rowMetric(row) }}</template>
+                <el-table-column v-if="detailObjectType === 'user'" label="简历" prop="resumeCompleted" width="90" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="yesNoTag(row.resumeCompleted)" size="small">{{ row.resumeCompleted || '-' }}</el-tag>
+                  </template>
                 </el-table-column>
-                <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
+                <el-table-column v-if="detailObjectType === 'user'" label="投递" prop="applied" width="90" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="yesNoTag(row.applied)" size="small">{{ row.applied || '-' }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="首次进入" prop="promotedAt" width="170" align="center">
+                  <template #default="{ row }">{{ row.promotedAt || row.createTime || '-' }}</template>
+                </el-table-column>
+                <el-table-column v-if="detailObjectType === 'user'" label="授权时间" prop="authorizedTime" width="170" align="center" />
+                <el-table-column v-if="detailObjectType === 'user'" label="简历时间" prop="resumeCompletedTime" width="170" align="center" />
+                <el-table-column v-if="detailObjectType === 'user'" label="投递时间" prop="firstApplyTime" width="170" align="center" />
+                <el-table-column label="操作" width="110" fixed="right" align="center">
+                  <template #default="{ row }">
+                    <el-button link type="primary" icon="Edit" @click="openAdjustAttribution(row)">调整来源</el-button>
+                  </template>
+                </el-table-column>
               </el-table>
+              <pagination
+                v-show="detailTotal > 0"
+                v-model:page="detailQuery.pageNum"
+                v-model:limit="detailQuery.pageSize"
+                :total="detailTotal"
+                @pagination="loadAttributionDetails"
+              />
             </div>
           </div>
         </el-tab-pane>
@@ -354,7 +541,7 @@
             </template>
             <el-form ref="queryFormRef" :model="queryParams" :inline="true" label-width="88px" class="query-form">
               <el-form-item label="姓名/昵称" prop="name">
-                <el-input v-model="queryParams.name" placeholder="璇疯緭鍏ュ鍚?昵称" clearable style="width: 200px" @keyup.enter="handleQuery" />
+                <el-input v-model="queryParams.name" placeholder="请输入姓名/昵称" clearable style="width: 200px" @keyup.enter="handleQuery" />
               </el-form-item>
               <el-form-item label="手机号" prop="phonenumber">
                 <el-input v-model="queryParams.phonenumber" placeholder="请输入手机号" clearable style="width: 200px" @keyup.enter="handleQuery" />
@@ -401,15 +588,15 @@
                   <span class="table-subtitle">维护推广账号、推广码与B/C端数量</span>
                 </div>
                 <div class="table-actions">
+                  <el-button plain icon="Download" @click="importTemplate">下载模板</el-button>
+                  <el-button type="success" plain icon="Upload" @click="handleImport">导入</el-button>
                   <el-button type="primary" plain icon="Plus" @click="handleAdd">新增</el-button>
-                  <el-button type="danger" plain icon="Delete" :disabled="selectedIds.length === 0" @click="handleDelete()">删除</el-button>
                   <el-button plain icon="Refresh" @click="loadData">刷新</el-button>
                 </div>
               </div>
             </template>
 
-            <el-table v-loading="loading" :data="tableData" border stripe @selection-change="handleSelectionChange">
-              <el-table-column type="selection" width="50" align="center" />
+            <el-table v-loading="loading" :data="tableData" border stripe>
               <el-table-column label="推广人" min-width="170" show-overflow-tooltip>
                 <template #default="{ row }">
                   <div class="name-cell">
@@ -427,10 +614,14 @@
               </el-table-column>
               <el-table-column label="岗位/角色" prop="roleName" min-width="150" show-overflow-tooltip />
               <el-table-column label="B端企业" prop="companyCount" width="105" align="center">
-                <template #default="{ row }">{{ row.companyCount ?? 0 }}</template>
+                <template #default="{ row }">
+                  <button type="button" class="stat-link" @click="openPromoterAttributionDrilldown(row, 'company')">{{ row.companyCount ?? 0 }}</button>
+                </template>
               </el-table-column>
               <el-table-column label="C端求职者" prop="jobSeekerCount" width="120" align="center">
-                <template #default="{ row }">{{ row.jobSeekerCount ?? 0 }}</template>
+                <template #default="{ row }">
+                  <button type="button" class="stat-link" @click="openPromoterAttributionDrilldown(row, 'jobSeeker')">{{ row.jobSeekerCount ?? 0 }}</button>
+                </template>
               </el-table-column>
               <el-table-column label="账号状态" prop="status" width="120" align="center">
                 <template #default="{ row }">
@@ -457,11 +648,10 @@
                 <template #default="{ row }">{{ row.remark || '-' }}</template>
               </el-table-column>
               <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
-              <el-table-column label="操作" width="230" fixed="right" align="center">
+              <el-table-column label="操作" width="170" fixed="right" align="center">
                 <template #default="{ row }">
                   <el-button link type="primary" icon="Download" @click="handleDownloadQrCode(row)">下载码</el-button>
                   <el-button link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
-                  <el-button link type="danger" icon="Delete" @click="handleDelete(row)">删除</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -525,68 +715,355 @@
         <el-button type="primary" :loading="submitting" @click="submitForm">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="drilldownVisible" :title="drilldownTitle" width="1120px" append-to-body>
+      <div class="dialog-toolbar">
+        <el-radio-group v-if="drilldownAllowSwitch" v-model="drilldownObjectType" @change="handleDrilldownTypeChange">
+          <el-radio-button value="company">B端企业</el-radio-button>
+          <el-radio-button value="user">C端求职者</el-radio-button>
+        </el-radio-group>
+        <el-tag v-else type="primary" effect="plain">{{ drilldownObjectTypeName }}</el-tag>
+        <el-button icon="Refresh" :loading="drilldownLoading" @click="loadDrilldownDetails">刷新</el-button>
+      </div>
+      <el-table v-loading="drilldownLoading" :data="drilldownRows" border stripe max-height="520">
+        <el-table-column :label="drilldownObjectType === 'company' ? '企业' : '求职者'" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div class="name-cell">
+              <span class="name-text">{{ row.objectName || '-' }}</span>
+              <span class="sub-text">{{ row.phone || '-' }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="来源推广人" min-width="160" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div class="name-cell">
+              <span class="name-text">{{ row.promoterName || '-' }}</span>
+              <span class="sub-text">{{ row.promoterPhone || '-' }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="身份" prop="identityType" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag :type="identityTypeTag(row.identityType)" size="small">{{ row.identityTypeName || identityTypeText(row.identityType) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" prop="statusName" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag :type="detailStatusTag(row, drilldownObjectType)" size="small">{{ row.statusName || '-' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="drilldownObjectType === 'company'" label="资料完整" prop="completed" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="yesNoTag(row.completed)" size="small">{{ row.completed || '-' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="drilldownObjectType === 'company'" label="岗位数" prop="jobCount" width="90" align="center" />
+        <el-table-column v-if="drilldownObjectType === 'user'" label="授权" prop="authorized" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="yesNoTag(row.authorized)" size="small">{{ row.authorized || '-' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="drilldownObjectType === 'user'" label="简历" prop="resumeCompleted" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="yesNoTag(row.resumeCompleted)" size="small">{{ row.resumeCompleted || '-' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="drilldownObjectType === 'user'" label="投递" prop="applied" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="yesNoTag(row.applied)" size="small">{{ row.applied || '-' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="首次进入" prop="promotedAt" width="170" align="center">
+          <template #default="{ row }">{{ row.promotedAt || row.createTime || '-' }}</template>
+        </el-table-column>
+        <el-table-column v-if="drilldownObjectType === 'user'" label="授权时间" prop="authorizedTime" width="170" align="center" />
+        <el-table-column v-if="drilldownObjectType === 'user'" label="简历时间" prop="resumeCompletedTime" width="170" align="center" />
+        <el-table-column v-if="drilldownObjectType === 'user'" label="投递时间" prop="firstApplyTime" width="170" align="center" />
+        <el-table-column label="操作" width="110" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button link type="primary" icon="Edit" @click="openAdjustAttribution(row)">调整来源</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <pagination
+        v-show="drilldownTotal > 0"
+        v-model:page="drilldownQuery.pageNum"
+        v-model:limit="drilldownQuery.pageSize"
+        :total="drilldownTotal"
+        @pagination="loadDrilldownDetails"
+      />
+    </el-dialog>
+
+    <el-dialog v-model="promoterDrilldownVisible" :title="promoterDrilldownTitle" width="920px" append-to-body>
+      <div class="dialog-toolbar">
+        <el-tag type="primary" effect="plain">推广渠道维护</el-tag>
+        <el-button icon="Refresh" :loading="promoterDrilldownLoading" @click="loadPromoterDrilldown">刷新</el-button>
+      </div>
+      <el-table v-loading="promoterDrilldownLoading" :data="promoterDrilldownRows" border stripe max-height="520">
+        <el-table-column label="推广人" min-width="170" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div class="name-cell">
+              <span class="name-text">{{ row.name || '-' }}</span>
+              <span class="sub-text">{{ row.phonenumber || '-' }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="身份" prop="identityType" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag :type="identityTypeTag(row.identityType)" size="small">{{ identityTypeText(row.identityType) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="岗位/角色" prop="roleName" min-width="150" show-overflow-tooltip />
+        <el-table-column label="B端企业" prop="companyCount" width="105" align="center">
+          <template #default="{ row }">
+            <button type="button" class="stat-link" @click="openPromoterAttributionDrilldown(row, 'company')">{{ row.companyCount ?? 0 }}</button>
+          </template>
+        </el-table-column>
+        <el-table-column label="C端求职者" prop="jobSeekerCount" width="120" align="center">
+          <template #default="{ row }">
+            <button type="button" class="stat-link" @click="openPromoterAttributionDrilldown(row, 'jobSeeker')">{{ row.jobSeekerCount ?? 0 }}</button>
+          </template>
+        </el-table-column>
+        <el-table-column label="账号状态" prop="status" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="statusTag(row.status)" size="small">{{ statusText(row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
+      </el-table>
+      <pagination
+        v-show="promoterDrilldownTotal > 0"
+        v-model:page="promoterDrilldownQuery.pageNum"
+        v-model:limit="promoterDrilldownQuery.pageSize"
+        :total="promoterDrilldownTotal"
+        @pagination="loadPromoterDrilldown"
+      />
+    </el-dialog>
+
+    <el-dialog v-model="adjustDialogVisible" title="调整推广来源" width="460px" append-to-body>
+      <el-form :model="adjustForm" label-width="110px">
+        <el-form-item label="调整对象">
+          <el-input :model-value="adjustForm.objectName" disabled />
+        </el-form-item>
+        <el-form-item label="推广人ID">
+          <el-input v-model="adjustForm.promoterId" placeholder="填写推广人ID，留空则清空为自然流量" clearable />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="adjustDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="adjustSubmitting" @click="submitAdjustAttribution">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="upload.open" :title="upload.title" width="420px" append-to-body>
+      <el-upload
+        ref="uploadRef"
+        :limit="1"
+        accept=".xlsx, .xls"
+        :headers="upload.headers"
+        :action="upload.url + '?updateSupport=' + upload.updateSupport"
+        :disabled="upload.isUploading"
+        :on-progress="handleFileUploadProgress"
+        :on-success="handleFileSuccess"
+        :auto-upload="false"
+        drag
+      >
+        <el-icon class="el-icon--upload">
+          <i-ep-upload-filled />
+        </el-icon>
+        <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+        <template #tip>
+          <div class="text-center el-upload__tip">
+            <div class="el-upload__tip"><el-checkbox v-model="upload.updateSupport" />更新已存在手机号的推广人员</div>
+            <span>仅允许导入 xls、xlsx 格式文件。</span>
+            <el-link type="primary" :underline="false" style="font-size: 12px; vertical-align: baseline" @click="importTemplate">下载模板</el-link>
+          </div>
+        </template>
+      </el-upload>
+      <template #footer>
+        <el-button @click="upload.open = false">取消</el-button>
+        <el-button type="primary" :loading="upload.isUploading" @click="submitFileForm">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup name="RecruitmentPromoter" lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import * as echarts from 'echarts';
-import { ElMessage, ElMessageBox, type FormRules } from 'element-plus';
+import { ElMessage, ElMessageBox, type FormRules, type UploadFile, type UploadInstance } from 'element-plus';
 import {
   addPromoter,
+  adjustPromoterAttribution,
   changePromoterStatus,
-  delPromoter,
+  getCompanyOverviewStatistics,
   getPromoter,
   getPromoterStatistics,
+  listPromoterCompanyDetail,
+  listPromoterUserDetail,
   listPromoter,
   updatePromoter,
+  type PromotionAttributionAdjustForm,
+  type PromotionAttributionDetailVO,
+  type CompanyOverviewStatisticsPeriod,
+  type CompanyOverviewStatisticsVO,
+  type PromotionAttributionQuery,
   type PromoterForm,
+  type PromoterIdentityPeriod,
   type PromoterQuery,
   type PromoterStatisticsGroup,
+  type PromoterStatisticsPeriod,
+  type PromoterStatisticsRow,
   type PromoterStatisticsTimeUnit,
   type PromoterStatisticsVO,
   type PromoterVO
 } from '@/api/recruitment';
-import { download } from '@/utils/request';
+import { download, globalHeaders } from '@/utils/request';
 import { useUserStore } from '@/store/modules/user';
 import { unwrapList } from './helpers';
 
 type TagType = 'primary' | 'success' | 'warning' | 'danger' | 'info';
 type StatisticsSide = 'all' | 'company' | 'jobSeeker';
-type ActiveTab = 'overview' | 'identity' | 'statistics' | 'statisticsDetail' | 'list';
+type DetailObjectType = 'company' | 'user';
+type ActiveTab = 'overview' | 'companyOverview' | 'identity' | 'statistics' | 'statisticsDetail' | 'list';
 type CountLike = Pick<PromoterStatisticsGroup, 'companyCount' | 'jobSeekerCount'>;
 type OverviewPeriodMetric = 'companyCount' | 'jobSeekerCount' | 'authorizedCount' | 'resumeCount' | 'applyCount';
+type DrilldownMetric = 'company' | 'jobSeeker' | 'authorized' | 'resume' | 'apply';
+type IdentityDrilldownType = 'internal' | 'channel';
+type OverviewRow = {
+  label: string;
+  description: string;
+  metric: OverviewPeriodMetric;
+  today: number;
+  year: number;
+  halfYear: number;
+  quarter: number;
+  month: number;
+};
+type CompanyOverviewMetric =
+  | 'enteredCompanyCount'
+  | 'certifiedCompanyCount'
+  | 'publishedCompanyCount'
+  | 'fullTimePublishedCompanyCount'
+  | 'partTimePublishedCompanyCount'
+  | 'promotedCompanyCount'
+  | 'interviewCompanyCount'
+  | 'hiredCompanyCount';
+type CompanyOverviewRow = {
+  label: string;
+  description: string;
+  metric: CompanyOverviewMetric;
+  today: number;
+  year: number;
+  halfYear: number;
+  quarter: number;
+  month: number;
+};
+
+interface AttributionDrilldownOptions {
+  title: string;
+  objectType?: DetailObjectType;
+  metric?: DrilldownMetric;
+  periodKey?: string;
+  promoterId?: string | number;
+  promoterKeyword?: string;
+  identityType?: string;
+  status?: string;
+  allowSwitch?: boolean;
+  useCurrentRange?: boolean;
+}
+
+interface PromoterDrilldownOptions {
+  title: string;
+  query?: PromoterQuery;
+  periodKey?: string;
+  useCurrentRange?: boolean;
+  useDateRange?: boolean;
+}
 
 const loading = ref(false);
 const submitting = ref(false);
 const tableData = ref<PromoterVO[]>([]);
 const total = ref(0);
-const selectedIds = ref<Array<string | number>>([]);
 const dialogVisible = ref(false);
 const isEdit = ref(false);
 const showMoreQuery = ref(false);
 const queryFormRef = ref();
 const formRef = ref();
+const uploadRef = ref<UploadInstance>();
 const userStore = useUserStore();
 const isAdminUser = computed(() => userStore.roles.includes('superadmin'));
 const activeTab = ref<ActiveTab>(isAdminUser.value ? 'overview' : 'list');
 
 const statisticsLoading = ref(false);
+const companyOverviewLoading = ref(false);
 const statisticsDateRange = ref<[string, string] | []>([]);
 const listDateRange = ref<[string, string] | []>([]);
+const detailDateRange = ref<[string, string] | []>([]);
 const statisticsTimeUnit = ref<PromoterStatisticsTimeUnit>('month');
 const statisticsSide = ref<StatisticsSide>('all');
+const detailObjectType = ref<DetailObjectType>('company');
+const detailLoading = ref(false);
+const attributionDetailRows = ref<PromotionAttributionDetailVO[]>([]);
+const detailTotal = ref(0);
+const drilldownVisible = ref(false);
+const drilldownTitle = ref('');
+const drilldownObjectType = ref<DetailObjectType>('company');
+const drilldownAllowSwitch = ref(false);
+const drilldownLoading = ref(false);
+const drilldownRows = ref<PromotionAttributionDetailVO[]>([]);
+const drilldownTotal = ref(0);
+const promoterDrilldownVisible = ref(false);
+const promoterDrilldownTitle = ref('');
+const promoterDrilldownLoading = ref(false);
+const promoterDrilldownRows = ref<PromoterVO[]>([]);
+const promoterDrilldownTotal = ref(0);
+const adjustDialogVisible = ref(false);
+const adjustSubmitting = ref(false);
 const statisticsTimeUnitOptions: { label: string; value: PromoterStatisticsTimeUnit }[] = [
-  { label: '年', value: 'year' },
-  { label: '半年', value: 'halfYear' },
-  { label: '季度', value: 'quarter' },
-  { label: '月', value: 'month' }
+  { label: '按日', value: 'day' },
+  { label: '按年', value: 'year' },
+  { label: '按半年', value: 'halfYear' },
+  { label: '按季度', value: 'quarter' },
+  { label: '按月', value: 'month' }
 ];
 
 const statisticsQuery = reactive<PromoterQuery>({
   name: '',
   identityType: '',
   status: ''
+});
+
+const detailQuery = reactive<PromotionAttributionQuery>({
+  pageNum: 1,
+  pageSize: 10,
+  promoterKeyword: '',
+  identityType: '',
+  status: '',
+  keyword: ''
+});
+
+const drilldownQuery = reactive<PromotionAttributionQuery>({
+  pageNum: 1,
+  pageSize: 10,
+  promoterId: undefined,
+  promoterKeyword: '',
+  identityType: '',
+  status: '',
+  keyword: '',
+  beginTime: '',
+  endTime: ''
+});
+
+const promoterDrilldownQuery = reactive<PromoterQuery>({
+  pageNum: 1,
+  pageSize: 10,
+  name: '',
+  phonenumber: '',
+  identityType: '',
+  roleName: '',
+  status: '',
+  params: {}
 });
 
 const statisticsData = reactive<PromoterStatisticsVO>({
@@ -610,6 +1087,9 @@ const statisticsData = reactive<PromoterStatisticsVO>({
     identityPeriodStats: []
   }
 });
+const companyOverviewData = reactive<CompanyOverviewStatisticsVO>({
+  periodStats: []
+});
 
 const queryParams = reactive<PromoterQuery>({
   pageNum: 1,
@@ -631,6 +1111,22 @@ const form = reactive<PromoterForm>({
   jobSeekerCount: 0,
   status: '1',
   remark: ''
+});
+
+const upload = reactive<ImportOption>({
+  open: false,
+  title: '',
+  isUploading: false,
+  updateSupport: 0,
+  headers: globalHeaders(),
+  url: import.meta.env.VITE_APP_BASE_API + '/admin/recruitment/promoter/importData'
+});
+
+const adjustForm = reactive<PromotionAttributionAdjustForm & { objectName?: string; promoterId?: string | number | undefined }>({
+  objectType: 'company',
+  objectId: '',
+  objectName: '',
+  promoterId: undefined
 });
 
 // 渠道推广人员的数量字段由运营手工维护，后端按 company_count/job_seeker_count 原样落库。
@@ -686,17 +1182,51 @@ const overviewRows = computed(() => [
   buildOverviewRow('C端简历数', '填写简历人数', 'resumeCount'),
   buildOverviewRow('C端投递数', '产生投递的人数', 'applyCount')
 ]);
+const companyOverviewRows = computed(() => [
+  // 企业端指标来自独立接口 company-overview，不与 /promoter/statistics 融合
+  buildCompanyOverviewRow('已进入', '通过推广人链接已进入，但还未申请或未审核通过的企业', 'enteredCompanyCount'),
+  buildCompanyOverviewRow('已认证企业', '已认证企业数量', 'certifiedCompanyCount'),
+  buildCompanyOverviewRow('已发布岗位企业', '已发布任意岗位的企业数量', 'publishedCompanyCount'),
+  buildCompanyOverviewRow('已发布全职岗位企业', '已发布全职岗位的企业数量', 'fullTimePublishedCompanyCount'),
+  buildCompanyOverviewRow('已发布兼职岗位企业', '已发布兼职岗位的企业数量', 'partTimePublishedCompanyCount'),
+  buildCompanyOverviewRow('推广进入企业', '通过推广进入的企业数量', 'promotedCompanyCount'),
+  buildCompanyOverviewRow('已邀请面试企业', '已邀请面试的企业数量', 'interviewCompanyCount'),
+  buildCompanyOverviewRow('已录用企业', '已录用企业数量', 'hiredCompanyCount')
+]);
 const identityPeriodRows = computed(() => statisticsData.overview?.identityPeriodStats || []);
 const metricLabel = computed(() => {
   if (statisticsSide.value === 'company') return 'B端企业';
   if (statisticsSide.value === 'jobSeeker') return 'C端求职者';
   return 'B/C合计';
 });
+const detailObjectTypeName = computed(() => (detailObjectType.value === 'company' ? 'B端企业' : 'C端求职者'));
+const drilldownObjectTypeName = computed(() => (drilldownObjectType.value === 'company' ? 'B端企业' : 'C端求职者'));
+const detailKeywordPlaceholder = computed(() => (detailObjectType.value === 'company' ? '企业名称/联系人/手机号' : '昵称/姓名/手机号'));
+const detailStatusOptions = computed(() =>
+  detailObjectType.value === 'company'
+    ? [
+        { label: '待审核', value: '0' },
+        { label: '已认证', value: '1' },
+        { label: '已禁用', value: '2' },
+        { label: '资料完整', value: 'completed' },
+        { label: '资料不完整', value: 'incomplete' },
+        { label: '已发布岗位', value: 'published' }
+      ]
+    : [
+        { label: '已授权手机号', value: 'authorized' },
+        { label: '已完善简历', value: 'resume' },
+        { label: '已投递', value: 'apply' },
+        { label: '未完善简历', value: 'unresume' },
+        { label: '未投递', value: 'unapply' }
+      ]
+);
 
 const metricCards = computed(() => [
   { key: 'promoter', label: '推广人', value: statisticsData.totalPromoterCount || 0, sub: '当前筛选结果', tone: 'primary' },
   { key: 'company', label: 'B端企业', value: statisticsData.totalCompanyCount || 0, sub: '企业注册/线索量', tone: 'success' },
   { key: 'jobSeeker', label: 'C端求职者', value: statisticsData.totalJobSeekerCount || 0, sub: '求职者注册/线索量', tone: 'warning' },
+  { key: 'resume', label: '简历完成', value: sumRowMetric('resumeCount'), sub: '归因简历量', tone: 'info' },
+  { key: 'apply', label: '产生投递', value: sumRowMetric('applyCount'), sub: '归因投递人数', tone: 'success' },
   { key: 'enabled', label: '启用账号', value: statusCount('1'), sub: '推广人账号', tone: 'info' },
   { key: 'disabled', label: '禁用账号', value: statusCount('0'), sub: '推广人账号', tone: 'danger' }
 ]);
@@ -721,9 +1251,25 @@ let identityLineChart: echarts.ECharts | null = null;
 let promoterChart: echarts.ECharts | null = null;
 let identityChart: echarts.ECharts | null = null;
 let statusChart: echarts.ECharts | null = null;
-let chartResizeObserver: ResizeObserver | null = null;
-let pendingChartFrame = 0;
 const chartColors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#13C2C2', '#909399', '#9B59B6'];
+const periodLabelMap: Record<string, string> = {
+  today: '今日',
+  year: '本年',
+  halfYear: '本半年',
+  quarter: '本季度',
+  month: '本月'
+};
+const metricLabelMap: Record<DrilldownMetric, string> = {
+  company: 'B端企业',
+  jobSeeker: 'C端求职者',
+  authorized: '授权手机号',
+  resume: '完成简历',
+  apply: '产生投递'
+};
+const identityGroupLabelMap: Record<IdentityDrilldownType, string> = {
+  internal: '内部人员',
+  channel: '渠道'
+};
 
 function identityTypeText(value?: string) {
   if (value === '1') return '外部渠道';
@@ -745,6 +1291,23 @@ function statusTag(value?: string): TagType {
   return value === '1' ? 'success' : 'danger';
 }
 
+function detailStatusTag(row: PromotionAttributionDetailVO, objectType: DetailObjectType = detailObjectType.value): TagType {
+  if (objectType === 'company') {
+    if (row.status === '1' || row.status === 'completed' || row.status === 'published') return 'success';
+    if (row.status === '0' || row.status === 'incomplete') return 'warning';
+    if (row.status === '2') return 'danger';
+    return 'info';
+  }
+  if (row.status === 'apply') return 'success';
+  if (row.status === 'resume') return 'primary';
+  if (row.status === 'authorized') return 'warning';
+  return 'info';
+}
+
+function yesNoTag(value?: string): TagType {
+  return value === '是' ? 'success' : 'info';
+}
+
 function toCount(value?: number) {
   return Number(value || 0);
 }
@@ -759,6 +1322,10 @@ function groupMetric(item: CountLike) {
 
 function rowMetric(row: PromoterVO) {
   return groupMetric(row);
+}
+
+function sumRowMetric(key: 'authorizedCount' | 'resumeCount' | 'applyCount') {
+  return (statisticsData.rows || []).reduce((sum, row) => sum + toCount(row[key]), 0);
 }
 
 function identityInternalValue(item: { internalCompanyCount?: number; internalJobSeekerCount?: number }) {
@@ -807,8 +1374,126 @@ function statusCount(status: string) {
   return statisticsData.statusStats?.find((item) => item.key === status)?.promoterCount || 0;
 }
 
+type NormalizedPromoterPeriodKey = 'today' | 'year' | 'halfYear' | 'quarter' | 'month';
+
+const periodAliasMap: Record<string, NormalizedPromoterPeriodKey> = {
+  // 口径对齐：把不同后端 key 映射为前端固定口径
+  today: 'today',
+  day: 'today',
+  daily: 'today',
+  todaypromotion: 'today',
+  thisday: 'today',
+  year: 'year',
+  yearly: 'year',
+  annual: 'year',
+  ytd: 'year',
+  yeartodate: 'year',
+  fullyear: 'year',
+  halfyear: 'halfYear',
+  h1: 'halfYear',
+  h2: 'halfYear',
+  quarter: 'quarter',
+  q1: 'quarter',
+  q2: 'quarter',
+  q3: 'quarter',
+  q4: 'quarter',
+  month: 'month',
+  monthly: 'month',
+  thismonth: 'month',
+  monthtodate: 'month'
+};
+
+const normalizeOverviewPeriodKey = (raw?: string): NormalizedPromoterPeriodKey | undefined => {
+  if (!raw) return undefined;
+  const normalized = String(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/-/g, '')
+    .replace(/_/g, '')
+    .replace(/([^\u4e00-\u9fff\w])/g, '');
+  return Object.prototype.hasOwnProperty.call(periodAliasMap, normalized) ? periodAliasMap[normalized] : undefined;
+};
+
+const normalizedPromoterPeriodMetricKeys: Array<keyof Omit<PromoterStatisticsPeriod, 'key' | 'label'>> = [
+  'companyCount',
+  'jobSeekerCount',
+  'authorizedCount',
+  'resumeCount',
+  'applyCount',
+  'enteredCompanyCount',
+  'certifiedCompanyCount',
+  'publishedCompanyCount',
+  'fullTimePublishedCompanyCount',
+  'partTimePublishedCompanyCount',
+  'communicatedCompanyCount',
+  'interviewCompanyCount',
+  'hiredCompanyCount',
+  'settledCompanyCount'
+];
+const normalizedCompanyOverviewPeriodMetricKeys: Array<keyof Omit<CompanyOverviewStatisticsPeriod, 'key' | 'label'>> = [
+  'enteredCompanyCount',
+  'certifiedCompanyCount',
+  'publishedCompanyCount',
+  'fullTimePublishedCompanyCount',
+  'partTimePublishedCompanyCount',
+  'promotedCompanyCount',
+  'interviewCompanyCount',
+  'hiredCompanyCount'
+];
+
+function normalizeOverviewPeriodStats(periodStats?: PromoterStatisticsPeriod[]): PromoterStatisticsPeriod[] {
+  if (!Array.isArray(periodStats) || periodStats.length === 0) return [];
+  const mergedMap = periodStats.reduce<Map<NormalizedPromoterPeriodKey, PromoterStatisticsPeriod>>((acc, item) => {
+    const key = normalizeOverviewPeriodKey(item.key || item.label);
+    if (!key) return acc;
+    const exist = acc.get(key) || ({ key, label: periodLabelMap[key] } as PromoterStatisticsPeriod);
+    const merged: PromoterStatisticsPeriod = {
+      ...exist,
+      key
+    };
+    for (const metricKey of normalizedPromoterPeriodMetricKeys) {
+      merged[metricKey] = toCount((exist as Record<string, number | undefined>)[metricKey] as number) + toCount(item[metricKey] as number);
+    }
+    acc.set(key, merged);
+    return acc;
+  }, new Map());
+  return Array.from(mergedMap.values());
+}
+
+function normalizeCompanyOverviewPeriodStats(periodStats?: CompanyOverviewStatisticsPeriod[]): CompanyOverviewStatisticsPeriod[] {
+  if (!Array.isArray(periodStats) || periodStats.length === 0) return [];
+  const mergedMap = periodStats.reduce<Map<NormalizedPromoterPeriodKey, CompanyOverviewStatisticsPeriod>>((acc, item) => {
+    const key = normalizeOverviewPeriodKey(item.key || item.label);
+    if (!key) return acc;
+    const exist = acc.get(key) || ({ key, label: periodLabelMap[key] } as CompanyOverviewStatisticsPeriod);
+    const merged: CompanyOverviewStatisticsPeriod = {
+      ...exist,
+      key
+    };
+    for (const metricKey of normalizedCompanyOverviewPeriodMetricKeys) {
+      merged[metricKey] = toCount((exist as Record<string, number | undefined>)[metricKey] as number) + toCount(item[metricKey] as number);
+    }
+    acc.set(key, merged);
+    return acc;
+  }, new Map());
+  return Array.from(mergedMap.values());
+}
+
+function isNormalizedPeriodMatch(itemKey: string | undefined, target: NormalizedPromoterPeriodKey) {
+  const normalized = normalizeOverviewPeriodKey(itemKey);
+  return Boolean(normalized && normalized === target);
+}
+
 function overviewPeriodValue(periodKey: string, metric: OverviewPeriodMetric) {
-  const period = statisticsData.overview?.periodStats?.find((item) => item.key === periodKey);
+  const target = normalizeOverviewPeriodKey(periodKey);
+  if (!target) {
+    const direct = (statisticsData.overview?.periodStats || []).find((item) => item.key === periodKey || item.label === periodKey);
+    return Number(direct?.[metric] || 0);
+  }
+  const period = (statisticsData.overview?.periodStats || []).find(
+    (item) => isNormalizedPeriodMatch(item.key, target) || isNormalizedPeriodMatch(item.label, target)
+  );
   return Number(period?.[metric] || 0);
 }
 
@@ -816,12 +1501,437 @@ function buildOverviewRow(label: string, description: string, metric: OverviewPe
   return {
     label,
     description,
+    metric,
     today: overviewPeriodValue('today', metric),
     year: overviewPeriodValue('year', metric),
     halfYear: overviewPeriodValue('halfYear', metric),
     quarter: overviewPeriodValue('quarter', metric),
     month: overviewPeriodValue('month', metric)
   };
+}
+
+function companyOverviewPeriodValue(periodKey: string, metric: CompanyOverviewMetric) {
+  const target = normalizeOverviewPeriodKey(periodKey);
+  if (!target) {
+    const direct = (companyOverviewData.periodStats || []).find((item) => item.key === periodKey || item.label === periodKey);
+    return Number(direct?.[metric] || 0);
+  }
+  const period = (companyOverviewData.periodStats || []).find(
+    (item) => isNormalizedPeriodMatch(item.key, target) || isNormalizedPeriodMatch(item.label, target)
+  );
+  return Number(period?.[metric] || 0);
+}
+
+function buildCompanyOverviewRow(label: string, description: string, metric: CompanyOverviewMetric) {
+  return {
+    label,
+    description,
+    metric,
+    today: companyOverviewPeriodValue('today', metric),
+    year: companyOverviewPeriodValue('year', metric),
+    halfYear: companyOverviewPeriodValue('halfYear', metric),
+    quarter: companyOverviewPeriodValue('quarter', metric),
+    month: companyOverviewPeriodValue('month', metric)
+  };
+}
+
+function periodLabel(periodKey?: string) {
+  return periodKey ? periodLabelMap[periodKey] || periodKey : '当前筛选';
+}
+
+function padDate(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+function formatDateTime(date: Date) {
+  return `${date.getFullYear()}-${padDate(date.getMonth() + 1)}-${padDate(date.getDate())} ${padDate(date.getHours())}:${padDate(date.getMinutes())}:${padDate(date.getSeconds())}`;
+}
+
+function getPeriodDateRange(periodKey?: string) {
+  if (!periodKey) return null;
+  const now = new Date();
+  let start: Date | null = null;
+  let endStart: Date | null = null;
+  if (periodKey === 'today') {
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    endStart = new Date(start);
+    endStart.setDate(endStart.getDate() + 1);
+  } else if (periodKey === 'year') {
+    start = new Date(now.getFullYear(), 0, 1);
+    endStart = new Date(now.getFullYear() + 1, 0, 1);
+  } else if (periodKey === 'halfYear') {
+    const startMonth = now.getMonth() < 6 ? 0 : 6;
+    start = new Date(now.getFullYear(), startMonth, 1);
+    endStart = new Date(now.getFullYear(), startMonth + 6, 1);
+  } else if (periodKey === 'quarter') {
+    const startMonth = Math.floor(now.getMonth() / 3) * 3;
+    start = new Date(now.getFullYear(), startMonth, 1);
+    endStart = new Date(now.getFullYear(), startMonth + 3, 1);
+  } else if (periodKey === 'month') {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    endStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  }
+  if (!start || !endStart) return null;
+  return {
+    beginTime: formatDateTime(start),
+    endTime: formatDateTime(new Date(endStart.getTime() - 1000))
+  };
+}
+
+function getTimeLabelDateRange(label?: string) {
+  if (!label || label === '-') return null;
+  const dayMatch = label.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dayMatch) {
+    const start = new Date(Number(dayMatch[1]), Number(dayMatch[2]) - 1, Number(dayMatch[3]));
+    const endStart = new Date(start);
+    endStart.setDate(endStart.getDate() + 1);
+    return { beginTime: formatDateTime(start), endTime: formatDateTime(new Date(endStart.getTime() - 1000)) };
+  }
+  const monthMatch = label.match(/^(\d{4})-(\d{2})$/);
+  if (monthMatch) {
+    const start = new Date(Number(monthMatch[1]), Number(monthMatch[2]) - 1, 1);
+    const endStart = new Date(Number(monthMatch[1]), Number(monthMatch[2]), 1);
+    return { beginTime: formatDateTime(start), endTime: formatDateTime(new Date(endStart.getTime() - 1000)) };
+  }
+  const quarterMatch = label.match(/^(\d{4})-Q([1-4])$/);
+  if (quarterMatch) {
+    const startMonth = (Number(quarterMatch[2]) - 1) * 3;
+    const start = new Date(Number(quarterMatch[1]), startMonth, 1);
+    const endStart = new Date(Number(quarterMatch[1]), startMonth + 3, 1);
+    return { beginTime: formatDateTime(start), endTime: formatDateTime(new Date(endStart.getTime() - 1000)) };
+  }
+  const halfYearMatch = label.match(/^(\d{4})-H([1-2])$/);
+  if (halfYearMatch) {
+    const startMonth = Number(halfYearMatch[2]) === 1 ? 0 : 6;
+    const start = new Date(Number(halfYearMatch[1]), startMonth, 1);
+    const endStart = new Date(Number(halfYearMatch[1]), startMonth + 6, 1);
+    return { beginTime: formatDateTime(start), endTime: formatDateTime(new Date(endStart.getTime() - 1000)) };
+  }
+  const yearMatch = label.match(/^(\d{4})$/);
+  if (yearMatch) {
+    const start = new Date(Number(yearMatch[1]), 0, 1);
+    const endStart = new Date(Number(yearMatch[1]) + 1, 0, 1);
+    return { beginTime: formatDateTime(start), endTime: formatDateTime(new Date(endStart.getTime() - 1000)) };
+  }
+  return null;
+}
+
+function currentStatisticsDateRange() {
+  const [beginDate, endDate] = statisticsDateRange.value;
+  return {
+    beginTime: beginDate ? `${beginDate} 00:00:00` : '',
+    endTime: endDate ? `${endDate} 23:59:59` : ''
+  };
+}
+
+function resolveDateRange(periodKey?: string, useCurrentRange = true) {
+  return getPeriodDateRange(periodKey) || (useCurrentRange ? currentStatisticsDateRange() : { beginTime: '', endTime: '' });
+}
+
+function metricDetailFilter(metric?: DrilldownMetric, fallbackObjectType: DetailObjectType = 'company') {
+  if (metric === 'company') return { objectType: 'company' as DetailObjectType, status: '' };
+  if (metric === 'jobSeeker') return { objectType: 'user' as DetailObjectType, status: '' };
+  if (metric === 'authorized') return { objectType: 'user' as DetailObjectType, status: 'authorized' };
+  if (metric === 'resume') return { objectType: 'user' as DetailObjectType, status: 'resume' };
+  if (metric === 'apply') return { objectType: 'user' as DetailObjectType, status: 'apply' };
+  return { objectType: fallbackObjectType, status: '' };
+}
+
+function setDrilldownQuery(options: AttributionDrilldownOptions, status: string) {
+  const dateRange = resolveDateRange(options.periodKey, options.useCurrentRange !== false);
+  drilldownQuery.pageNum = 1;
+  drilldownQuery.pageSize = 10;
+  drilldownQuery.promoterId = options.promoterId;
+  drilldownQuery.promoterKeyword = options.promoterKeyword ?? statisticsQuery.name ?? '';
+  drilldownQuery.identityType = options.identityType ?? statisticsQuery.identityType ?? '';
+  drilldownQuery.status = options.status ?? status;
+  drilldownQuery.keyword = '';
+  drilldownQuery.beginTime = dateRange.beginTime;
+  drilldownQuery.endTime = dateRange.endTime;
+}
+
+function buildDrilldownQuery(): PromotionAttributionQuery {
+  return {
+    ...drilldownQuery,
+    promoterId: drilldownQuery.promoterId || undefined,
+    promoterKeyword: drilldownQuery.promoterKeyword || undefined,
+    identityType: drilldownQuery.identityType || undefined,
+    status: drilldownQuery.status || undefined,
+    keyword: drilldownQuery.keyword || undefined,
+    beginTime: drilldownQuery.beginTime || undefined,
+    endTime: drilldownQuery.endTime || undefined
+  };
+}
+
+function openAttributionDrilldown(options: AttributionDrilldownOptions) {
+  const filter = metricDetailFilter(options.metric, options.objectType || 'company');
+  drilldownObjectType.value = options.objectType || filter.objectType;
+  drilldownAllowSwitch.value = Boolean(options.allowSwitch);
+  drilldownTitle.value = options.title;
+  setDrilldownQuery(options, filter.status);
+  drilldownVisible.value = true;
+  loadDrilldownDetails();
+}
+
+async function loadDrilldownDetails() {
+  if (!isAdminUser.value) return;
+  drilldownLoading.value = true;
+  try {
+    const api = drilldownObjectType.value === 'company' ? listPromoterCompanyDetail : listPromoterUserDetail;
+    const res = await api(buildDrilldownQuery());
+    const list = unwrapList<PromotionAttributionDetailVO>(res);
+    drilldownRows.value = list.rows;
+    drilldownTotal.value = list.total;
+  } finally {
+    drilldownLoading.value = false;
+  }
+}
+
+function handleDrilldownTypeChange() {
+  drilldownQuery.pageNum = 1;
+  drilldownQuery.status = '';
+  loadDrilldownDetails();
+}
+
+function openOverviewCardDrilldown(card: { key: string; label: string }) {
+  openAttributionDrilldown({
+    title: `${card.label}推广明细`,
+    objectType: 'company',
+    periodKey: card.key,
+    promoterKeyword: '',
+    identityType: '',
+    allowSwitch: true,
+    useCurrentRange: false
+  });
+}
+
+function openOverviewCellDrilldown(row: OverviewRow, periodKey: string) {
+  openAttributionDrilldown({
+    title: `${periodLabel(periodKey)}${row.label}明细`,
+    metric: row.metric === 'companyCount' ? 'company' : row.metric === 'jobSeekerCount' ? 'jobSeeker' : row.metric === 'authorizedCount' ? 'authorized' : row.metric === 'resumeCount' ? 'resume' : 'apply',
+    periodKey,
+    promoterKeyword: '',
+    identityType: '',
+    useCurrentRange: false
+  });
+}
+
+// 企業端概覽頁按單元格進入歸因明細，與既有總覽分開使用獨立後端口徑
+function openCompanyOverviewCellDrilldown(row: CompanyOverviewRow, periodKey: string) {
+  openAttributionDrilldown({
+    title: `${periodLabel(periodKey)}${row.label}明细`,
+    objectType: 'company',
+    periodKey,
+    promoterKeyword: '',
+    identityType: '',
+    useCurrentRange: false
+  });
+}
+
+function openIdentityPeriodDrilldown(row: PromoterIdentityPeriod, identityType: IdentityDrilldownType, objectType: DetailObjectType) {
+  openAttributionDrilldown({
+    title: `${row.label || periodLabel(row.key)}${identityGroupLabelMap[identityType]}${objectType === 'company' ? 'B端企业' : 'C端用户'}明细`,
+    objectType,
+    identityType,
+    promoterKeyword: '',
+    periodKey: row.key,
+    useCurrentRange: false
+  });
+}
+
+function setPromoterDrilldownQuery(query: PromoterQuery = {}, periodKey?: string, useCurrentRange = true, useDateRange = true) {
+  const dateRange = useDateRange ? resolveDateRange(periodKey, useCurrentRange) : { beginTime: '', endTime: '' };
+  promoterDrilldownQuery.pageNum = 1;
+  promoterDrilldownQuery.pageSize = 10;
+  promoterDrilldownQuery.name = query.name || '';
+  promoterDrilldownQuery.phonenumber = query.phonenumber || '';
+  promoterDrilldownQuery.identityType = query.identityType || '';
+  promoterDrilldownQuery.roleName = query.roleName || '';
+  promoterDrilldownQuery.status = query.status || '';
+  promoterDrilldownQuery.params = {
+    beginTime: dateRange.beginTime || undefined,
+    endTime: dateRange.endTime || undefined
+  };
+}
+
+function buildPromoterDrilldownQuery(): PromoterQuery {
+  const params = promoterDrilldownQuery.params || {};
+  return {
+    ...promoterDrilldownQuery,
+    name: promoterDrilldownQuery.name || undefined,
+    phonenumber: promoterDrilldownQuery.phonenumber || undefined,
+    identityType: promoterDrilldownQuery.identityType || undefined,
+    roleName: promoterDrilldownQuery.roleName || undefined,
+    status: promoterDrilldownQuery.status || undefined,
+    params: {
+      beginTime: params.beginTime || undefined,
+      endTime: params.endTime || undefined
+    }
+  };
+}
+
+function openPromoterDrilldown(options: PromoterDrilldownOptions) {
+  promoterDrilldownTitle.value = options.title;
+  setPromoterDrilldownQuery(options.query, options.periodKey, options.useCurrentRange !== false, options.useDateRange !== false);
+  promoterDrilldownVisible.value = true;
+  loadPromoterDrilldown();
+}
+
+function openTimeTrendDrilldown(group: PromoterStatisticsGroup) {
+  const range = getTimeLabelDateRange(group.key || group.label);
+  promoterDrilldownTitle.value = `${group.label || group.key || '时间趋势'}推广人列表`;
+  setPromoterDrilldownQuery(
+    {
+      name: statisticsQuery.name,
+      identityType: statisticsQuery.identityType,
+      status: statisticsQuery.status
+    },
+    undefined,
+    true,
+    false
+  );
+  promoterDrilldownQuery.params = {
+    beginTime: range?.beginTime || undefined,
+    endTime: range?.endTime || undefined
+  };
+  promoterDrilldownVisible.value = true;
+  loadPromoterDrilldown();
+}
+
+async function loadPromoterDrilldown() {
+  if (!isAdminUser.value) return;
+  promoterDrilldownLoading.value = true;
+  try {
+    const res = await listPromoter(buildPromoterDrilldownQuery());
+    const list = unwrapList<PromoterVO>(res);
+    promoterDrilldownRows.value = list.rows;
+    promoterDrilldownTotal.value = list.total;
+  } finally {
+    promoterDrilldownLoading.value = false;
+  }
+}
+
+function openIdentityPromoterDrilldown(row: PromoterIdentityPeriod, identityType: IdentityDrilldownType) {
+  openPromoterDrilldown({
+    title: `${row.label || periodLabel(row.key)}${identityGroupLabelMap[identityType]}推广人列表`,
+    query: { identityType },
+    useDateRange: false
+  });
+}
+
+function openMetricCardDrilldown(card: { key: string; label: string }) {
+  const baseQuery: PromoterQuery = {
+    name: statisticsQuery.name,
+    identityType: statisticsQuery.identityType,
+    status: statisticsQuery.status
+  };
+  if (card.key === 'promoter') {
+    openPromoterDrilldown({ title: '推广人列表', query: baseQuery });
+    return;
+  }
+  if (card.key === 'enabled' || card.key === 'disabled') {
+    openPromoterDrilldown({
+      title: `${card.label}列表`,
+      query: { ...baseQuery, status: card.key === 'enabled' ? '1' : '0' }
+    });
+    return;
+  }
+  const metric = card.key as DrilldownMetric;
+  openAttributionDrilldown({
+    title: `${card.label}明细`,
+    metric,
+    promoterKeyword: statisticsQuery.name,
+    identityType: statisticsQuery.identityType
+  });
+}
+
+function openStatisticsRowDrilldown(row: PromoterStatisticsRow, metric: DrilldownMetric) {
+  openAttributionDrilldown({
+    title: `${row.name || row.phonenumber || '推广人'}-${metricLabelMap[metric]}明细`,
+    metric,
+    promoterId: row.promoterId,
+    identityType: row.identityType,
+    promoterKeyword: ''
+  });
+}
+
+function openStatisticsRowTotalDrilldown(row: PromoterStatisticsRow) {
+  if (statisticsSide.value === 'company') {
+    openStatisticsRowDrilldown(row, 'company');
+    return;
+  }
+  if (statisticsSide.value === 'jobSeeker') {
+    openStatisticsRowDrilldown(row, 'jobSeeker');
+    return;
+  }
+  openAttributionDrilldown({
+    title: `${row.name || row.phonenumber || '推广人'}-B/C合计明细`,
+    objectType: 'company',
+    promoterId: row.promoterId,
+    identityType: row.identityType,
+    promoterKeyword: '',
+    allowSwitch: true
+  });
+}
+
+function openPromoterAttributionDrilldown(row: PromoterVO, metric: 'company' | 'jobSeeker') {
+  openAttributionDrilldown({
+    title: `${row.name || row.phonenumber || '推广人'}-${metricLabelMap[metric]}明细`,
+    metric,
+    promoterId: row.promoterId,
+    identityType: row.identityType,
+    promoterKeyword: '',
+    useCurrentRange: false
+  });
+}
+
+function openIdentityChartDrilldown(group: PromoterStatisticsGroup) {
+  const label = group.label || identityTypeText(group.key);
+  if (statisticsSide.value === 'company') {
+    openAttributionDrilldown({
+      title: `${label}B端企业明细`,
+      metric: 'company',
+      identityType: group.key,
+      promoterKeyword: statisticsQuery.name
+    });
+    return;
+  }
+  if (statisticsSide.value === 'jobSeeker') {
+    openAttributionDrilldown({
+      title: `${label}C端求职者明细`,
+      metric: 'jobSeeker',
+      identityType: group.key,
+      promoterKeyword: statisticsQuery.name
+    });
+    return;
+  }
+  openAttributionDrilldown({
+    title: `${label}B/C合计明细`,
+    objectType: 'company',
+    identityType: group.key,
+    promoterKeyword: statisticsQuery.name,
+    allowSwitch: true
+  });
+}
+
+function openIdentityPeriodChartDrilldown(row: PromoterIdentityPeriod, identityType: IdentityDrilldownType) {
+  if (statisticsSide.value === 'company') {
+    openIdentityPeriodDrilldown(row, identityType, 'company');
+    return;
+  }
+  if (statisticsSide.value === 'jobSeeker') {
+    openIdentityPeriodDrilldown(row, identityType, 'user');
+    return;
+  }
+  openAttributionDrilldown({
+    title: `${row.label || periodLabel(row.key)}${identityGroupLabelMap[identityType]}B/C合计明细`,
+    objectType: 'company',
+    identityType,
+    promoterKeyword: '',
+    periodKey: row.key,
+    allowSwitch: true,
+    useCurrentRange: false
+  });
 }
 
 function resetFormData() {
@@ -853,22 +1963,36 @@ watch(
 );
 
 watch(statisticsSide, () => {
-  scheduleVisibleChartsRender();
+  scheduleActiveTabCharts();
+});
+
+watch(detailObjectType, () => {
+  detailQuery.status = '';
+  detailQuery.pageNum = 1;
 });
 
 watch(isAdminUser, (allowed) => {
   activeTab.value = allowed ? 'overview' : 'list';
   if (allowed) {
     loadStatistics();
+    loadCompanyOverviewStatistics();
   }
 });
 
 function handleTabChange(name: string | number) {
   if (name === 'identity') {
-    scheduleVisibleChartsRender();
+    scheduleIdentityCharts();
+  } else if (name === 'companyOverview') {
+    loadCompanyOverviewStatistics();
   } else if (name === 'statistics') {
-    scheduleVisibleChartsRender();
+    scheduleStatisticsCharts();
+  } else if (name === 'statisticsDetail') {
+    loadAttributionDetails();
   }
+}
+
+function handleDetailTypeChange() {
+  loadAttributionDetails();
 }
 
 function buildQuery(): PromoterQuery {
@@ -919,6 +2043,10 @@ async function loadStatistics() {
   statisticsLoading.value = true;
   try {
     const res: any = await getPromoterStatistics(buildStatisticsQuery());
+    const normalizedOverview = {
+      ...(res?.data?.overview || {}),
+      periodStats: normalizeOverviewPeriodStats(res?.data?.overview?.periodStats)
+    };
     Object.assign(statisticsData, {
       totalPromoterCount: 0,
       totalCompanyCount: 0,
@@ -939,12 +2067,119 @@ async function loadStatistics() {
         periodStats: [],
         identityPeriodStats: []
       },
-      ...(res?.data || {})
+      ...(res?.data || {}),
+      overview: normalizedOverview
     });
     await nextTick();
-    scheduleVisibleChartsRender();
+    scheduleActiveTabCharts();
   } finally {
     statisticsLoading.value = false;
+  }
+}
+
+// 僅刷新企業端概覽的後端接口資料，避免混用 /promoter/statistics 的統計結果
+async function loadCompanyOverviewStatistics() {
+  if (!isAdminUser.value) return;
+  companyOverviewLoading.value = true;
+  try {
+    const res: any = await getCompanyOverviewStatistics(buildStatisticsQuery());
+    companyOverviewData.periodStats = normalizeCompanyOverviewPeriodStats(res?.data?.periodStats);
+  } finally {
+    companyOverviewLoading.value = false;
+  }
+}
+
+function buildAttributionDetailQuery(): PromotionAttributionQuery {
+  const [beginDate, endDate] = detailDateRange.value;
+  return {
+    ...detailQuery,
+    promoterKeyword: detailQuery.promoterKeyword || undefined,
+    identityType: detailQuery.identityType || undefined,
+    status: detailQuery.status || undefined,
+    keyword: detailQuery.keyword || undefined,
+    beginTime: beginDate ? `${beginDate} 00:00:00` : undefined,
+    endTime: endDate ? `${endDate} 23:59:59` : undefined
+  };
+}
+
+async function loadAttributionDetails() {
+  if (!isAdminUser.value) return;
+  detailLoading.value = true;
+  try {
+    const query = buildAttributionDetailQuery();
+    const api = detailObjectType.value === 'company' ? listPromoterCompanyDetail : listPromoterUserDetail;
+    const res = await api(query);
+    const list = unwrapList<PromotionAttributionDetailVO>(res);
+    attributionDetailRows.value = list.rows;
+    detailTotal.value = list.total;
+  } finally {
+    detailLoading.value = false;
+  }
+}
+
+function handleAttributionQuery() {
+  detailQuery.pageNum = 1;
+  loadAttributionDetails();
+}
+
+function resetAttributionQuery() {
+  detailQuery.pageNum = 1;
+  detailQuery.pageSize = 10;
+  detailQuery.promoterKeyword = '';
+  detailQuery.identityType = '';
+  detailQuery.status = '';
+  detailQuery.keyword = '';
+  detailDateRange.value = [];
+  loadAttributionDetails();
+}
+
+function handleAttributionExport() {
+  const url =
+    detailObjectType.value === 'company'
+      ? '/admin/recruitment/promoter/company-detail/export'
+      : '/admin/recruitment/promoter/user-detail/export';
+  const fileName = `${detailObjectTypeName.value}推广来源明细_${new Date().getTime()}.xlsx`;
+  download(url, buildAttributionDetailQuery(), fileName);
+}
+
+function handleStatisticsExport() {
+  download('/admin/recruitment/promoter/statistics/export', buildStatisticsQuery(), `推广人汇总统计_${new Date().getTime()}.xlsx`);
+}
+
+function handlePeriodStatisticsExport() {
+  download('/admin/recruitment/promoter/period-statistics/export', buildStatisticsQuery(), `推广周期统计_${new Date().getTime()}.xlsx`);
+}
+
+function openAdjustAttribution(row: PromotionAttributionDetailVO) {
+  if (!row.objectId || !row.objectType) {
+    ElMessage.warning('当前记录缺少对象编号，无法调整来源');
+    return;
+  }
+  adjustForm.objectType = row.objectType;
+  adjustForm.objectId = row.objectId;
+  adjustForm.objectName = `${row.objectTypeName || detailObjectTypeName.value}：${row.objectName || row.objectId}`;
+  adjustForm.promoterId = row.promoterId || undefined;
+  adjustDialogVisible.value = true;
+}
+
+async function submitAdjustAttribution() {
+  if (!adjustForm.objectId || !adjustForm.objectType) {
+    ElMessage.warning('调整对象不能为空');
+    return;
+  }
+  adjustSubmitting.value = true;
+  try {
+    await adjustPromoterAttribution({
+      objectType: adjustForm.objectType,
+      objectId: adjustForm.objectId,
+      promoterId: adjustForm.promoterId || undefined
+    });
+    ElMessage.success('推广来源已调整');
+    adjustDialogVisible.value = false;
+    await loadAttributionDetails();
+    loadStatistics();
+  } finally {
+    adjustSubmitting.value = false;
   }
 }
 
@@ -970,8 +2205,32 @@ function resetQuery() {
   loadData();
 }
 
-function handleSelectionChange(rows: PromoterVO[]) {
-  selectedIds.value = rows.map((row) => row.promoterId!).filter(Boolean);
+function handleImport() {
+  upload.title = '推广人员导入';
+  upload.open = true;
+}
+
+function importTemplate() {
+  download('/admin/recruitment/promoter/importTemplate', {}, `promoter_template_${new Date().getTime()}.xlsx`);
+}
+
+function handleFileUploadProgress() {
+  upload.isUploading = true;
+}
+
+function handleFileSuccess(response: any, file: UploadFile) {
+  upload.open = false;
+  upload.isUploading = false;
+  uploadRef.value?.handleRemove(file);
+  ElMessageBox.alert("<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" + (response?.msg || '导入完成') + '</div>', '导入结果', {
+    dangerouslyUseHTMLString: true
+  });
+  loadData();
+  loadStatistics();
+}
+
+function submitFileForm() {
+  uploadRef.value?.submit();
 }
 
 function handleAdd() {
@@ -1076,30 +2335,41 @@ async function handleStatusChange(row: PromoterVO, status: string) {
   }
 }
 
-async function handleDelete(row?: PromoterVO) {
-  const ids = row?.promoterId ? [row.promoterId] : selectedIds.value;
-  if (!ids.length) return;
-  try {
-    await ElMessageBox.confirm(`确定删除选中的 ${ids.length} 条推广人员吗？`, '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
+function getVisibleChartEl(el: HTMLElement | null) {
+  if (!el) return null;
+  const { clientWidth, clientHeight } = el;
+  return clientWidth > 0 && clientHeight > 0 ? el : null;
+}
+
+function scheduleChartRender(render: () => void) {
+  nextTick(() => {
+    window.requestAnimationFrame(() => {
+      render();
     });
-    await delPromoter(ids);
-    ElMessage.success('删除成功');
-    await loadData();
-    loadStatistics();
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败');
-    }
+  });
+}
+
+function scheduleStatisticsCharts() {
+  scheduleChartRender(renderStatisticsCharts);
+}
+
+function scheduleIdentityCharts() {
+  scheduleChartRender(renderIdentityCharts);
+}
+
+function scheduleActiveTabCharts() {
+  if (activeTab.value === 'statistics' || activeTab.value === 'statisticsDetail') {
+    scheduleStatisticsCharts();
+  }
+  if (activeTab.value === 'identity') {
+    scheduleIdentityCharts();
   }
 }
 
 function renderTrendChart() {
-  const chart = ensureChartReady(trendChartRef.value, trendChart);
-  if (!chart) return;
-  trendChart = chart;
+  const el = getVisibleChartEl(trendChartRef.value);
+  if (!el) return;
+  if (!trendChart) trendChart = echarts.init(el);
   const groups = statisticsData.timeStats || [];
   const labels = groups.length ? groups.map((item) => item.label || item.key || '-') : ['暂无数据'];
   const companyData = groups.length ? groups.map((item) => toCount(item.companyCount)) : [0];
@@ -1122,7 +2392,7 @@ function renderTrendChart() {
           }
         ];
 
-  chart.setOption(
+  trendChart.setOption(
     {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       legend: { top: 0, right: 0 },
@@ -1133,16 +2403,23 @@ function renderTrendChart() {
     },
     true
   );
+  trendChart.off('click');
+  trendChart.on('click', (params: any) => {
+    const group = groups[params.dataIndex];
+    if (group) {
+      openTimeTrendDrilldown(group);
+    }
+  });
 }
 
 function renderSideChart() {
-  const chart = ensureChartReady(sideChartRef.value, sideChart);
-  if (!chart) return;
-  sideChart = chart;
+  const el = getVisibleChartEl(sideChartRef.value);
+  if (!el) return;
+  if (!sideChart) sideChart = echarts.init(el);
   const company = statisticsData.totalCompanyCount || 0;
   const jobSeeker = statisticsData.totalJobSeekerCount || 0;
   const hasData = company + jobSeeker > 0;
-  chart.setOption(
+  sideChart.setOption(
     {
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
       legend: { bottom: 0, textStyle: { fontSize: 11 } },
@@ -1167,16 +2444,34 @@ function renderSideChart() {
     },
     true
   );
+  sideChart.off('click');
+  sideChart.on('click', (params: any) => {
+    if (params.name === 'B端企业') {
+      openAttributionDrilldown({
+        title: 'B端企业明细',
+        metric: 'company',
+        promoterKeyword: statisticsQuery.name,
+        identityType: statisticsQuery.identityType
+      });
+    } else if (params.name === 'C端求职者') {
+      openAttributionDrilldown({
+        title: 'C端求职者明细',
+        metric: 'jobSeeker',
+        promoterKeyword: statisticsQuery.name,
+        identityType: statisticsQuery.identityType
+      });
+    }
+  });
 }
 
 function renderPromoterChart() {
-  const chart = ensureChartReady(promoterChartRef.value, promoterChart);
-  if (!chart) return;
-  promoterChart = chart;
+  const el = getVisibleChartEl(promoterChartRef.value);
+  if (!el) return;
+  if (!promoterChart) promoterChart = echarts.init(el);
   const rows = statisticsRows.value.slice(0, 8).reverse();
   const labels = rows.length ? rows.map((item) => item.name || item.phonenumber || '-') : ['暂无数据'];
   const values = rows.length ? rows.map((item) => rowMetric(item)) : [0];
-  chart.setOption(
+  promoterChart.setOption(
     {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       grid: { left: '3%', right: '6%', top: 12, bottom: 12, containLabel: true },
@@ -1195,15 +2490,22 @@ function renderPromoterChart() {
     },
     true
   );
+  promoterChart.off('click');
+  promoterChart.on('click', (params: any) => {
+    const row = rows[params.dataIndex];
+    if (row) {
+      openStatisticsRowTotalDrilldown(row);
+    }
+  });
 }
 
 function renderIdentityChart() {
-  const chart = ensureChartReady(identityChartRef.value, identityChart);
-  if (!chart) return;
-  identityChart = chart;
+  const el = getVisibleChartEl(identityChartRef.value);
+  if (!el) return;
+  if (!identityChart) identityChart = echarts.init(el);
   const groups = statisticsData.identityStats || [];
   const hasData = groups.some((item) => groupMetric(item) > 0);
-  chart.setOption(
+  identityChart.setOption(
     {
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
       legend: { bottom: 0, textStyle: { fontSize: 11 } },
@@ -1222,12 +2524,19 @@ function renderIdentityChart() {
     },
     true
   );
+  identityChart.off('click');
+  identityChart.on('click', (params: any) => {
+    const group = groups[params.dataIndex];
+    if (group) {
+      openIdentityChartDrilldown(group);
+    }
+  });
 }
 
 function renderIdentityPeriodChart() {
-  const chart = ensureChartReady(identityPeriodChartRef.value, identityPeriodChart);
-  if (!chart) return;
-  identityPeriodChart = chart;
+  const el = getVisibleChartEl(identityPeriodChartRef.value);
+  if (!el) return;
+  if (!identityPeriodChart) identityPeriodChart = echarts.init(el);
   const rows = identityPeriodRows.value;
   const labels = rows.length ? rows.map((item) => item.label || item.key || '-') : ['暂无数据'];
   const internalValues = rows.length
@@ -1249,7 +2558,7 @@ function renderIdentityPeriodChart() {
       )
     : [0];
   const hasData = internalValues.some((value) => value > 0) || channelValues.some((value) => value > 0);
-  chart.setOption(
+  identityPeriodChart.setOption(
     {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       legend: { top: 0, right: 0 },
@@ -1265,12 +2574,18 @@ function renderIdentityPeriodChart() {
     },
     true
   );
+  identityPeriodChart.off('click');
+  identityPeriodChart.on('click', (params: any) => {
+    const row = rows[params.dataIndex];
+    if (!row || (params.seriesName !== '内部人员' && params.seriesName !== '渠道')) return;
+    openIdentityPeriodChartDrilldown(row, params.seriesName === '内部人员' ? 'internal' : 'channel');
+  });
 }
 
 function renderIdentityDistributionChart() {
-  const chart = ensureChartReady(identityDistributionChartRef.value, identityDistributionChart);
-  if (!chart) return;
-  identityDistributionChart = chart;
+  const el = getVisibleChartEl(identityDistributionChartRef.value);
+  if (!el) return;
+  if (!identityDistributionChart) identityDistributionChart = echarts.init(el);
   const rows = identityPeriodRows.value;
   const internalTotal = rows.reduce(
     (sum, item) => sum + identityPeriodInternalMetric(item, statisticsSide.value === 'all' ? undefined : statisticsSide.value),
@@ -1287,7 +2602,7 @@ function renderIdentityDistributionChart() {
     0
   );
   const hasData = internalTotal + channelTotal > 0;
-  chart.setOption(
+  identityDistributionChart.setOption(
     {
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
       legend: { bottom: 0, textStyle: { fontSize: 11 } },
@@ -1315,15 +2630,15 @@ function renderIdentityDistributionChart() {
 }
 
 function renderIdentityLineChart() {
-  const chart = ensureChartReady(identityLineChartRef.value, identityLineChart);
-  if (!chart) return;
-  identityLineChart = chart;
+  const el = getVisibleChartEl(identityLineChartRef.value);
+  if (!el) return;
+  if (!identityLineChart) identityLineChart = echarts.init(el);
   const rows = identityPeriodRows.value;
   const labels = rows.length ? rows.map((item) => item.label || item.key || '-') : ['暂无数据'];
   const currentSide = statisticsSide.value === 'all' ? undefined : statisticsSide.value;
   const internalValues = rows.length ? rows.map((item) => identityPeriodInternalMetric(item, currentSide)) : [0];
   const channelValues = rows.length ? rows.map((item) => identityPeriodChannelMetric(item, currentSide)) : [0];
-  chart.setOption(
+  identityLineChart.setOption(
     {
       tooltip: { trigger: 'axis' },
       legend: { top: 0, right: 0 },
@@ -1355,15 +2670,21 @@ function renderIdentityLineChart() {
     },
     true
   );
+  identityLineChart.off('click');
+  identityLineChart.on('click', (params: any) => {
+    const row = rows[params.dataIndex];
+    if (!row || (params.seriesName !== '内部人员' && params.seriesName !== '渠道')) return;
+    openIdentityPeriodChartDrilldown(row, params.seriesName === '内部人员' ? 'internal' : 'channel');
+  });
 }
 
 function renderStatusChart() {
-  const chart = ensureChartReady(statusChartRef.value, statusChart);
-  if (!chart) return;
-  statusChart = chart;
+  const el = getVisibleChartEl(statusChartRef.value);
+  if (!el) return;
+  if (!statusChart) statusChart = echarts.init(el);
   const groups = statisticsData.statusStats || [];
   const hasData = groups.some((item) => toCount(item.promoterCount) > 0);
-  chart.setOption(
+  statusChart.setOption(
     {
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
       legend: { bottom: 0, textStyle: { fontSize: 11 } },
@@ -1384,6 +2705,19 @@ function renderStatusChart() {
     },
     true
   );
+  statusChart.off('click');
+  statusChart.on('click', (params: any) => {
+    const group = groups[params.dataIndex];
+    if (!group) return;
+    openPromoterDrilldown({
+      title: `${group.label || statusText(group.key)}推广人列表`,
+      query: {
+        name: statisticsQuery.name,
+        identityType: statisticsQuery.identityType,
+        status: group.key || ''
+      }
+    });
+  });
 }
 
 function renderStatisticsCharts() {
@@ -1400,98 +2734,26 @@ function renderIdentityCharts() {
   renderIdentityLineChart();
 }
 
-function renderVisibleCharts() {
-  if (activeTab.value === 'identity') {
-    renderIdentityCharts();
-    return;
-  }
-  if (activeTab.value === 'statistics') {
-    renderStatisticsCharts();
-  }
-}
-
-function scheduleVisibleChartsRender() {
-  if (pendingChartFrame) {
-    cancelAnimationFrame(pendingChartFrame);
-  }
-  nextTick(() => {
-    observeChartContainers();
-    pendingChartFrame = requestAnimationFrame(() => {
-      pendingChartFrame = 0;
-      renderVisibleCharts();
-      handleResize();
-    });
-  });
-}
-
-function canRenderChart(element: HTMLElement | null) {
-  if (!element) return false;
-  const { clientWidth, clientHeight, offsetParent } = element;
-  return !!offsetParent && clientWidth > 0 && clientHeight > 0;
-}
-
-function ensureChartReady(element: HTMLElement | null, instance: echarts.ECharts | null) {
-  // 图表 Tab 切换时 DOM 可能已挂载但 display:none，必须等容器有真实宽高再初始化 ECharts。
-  if (!canRenderChart(element)) return null;
-  return instance || echarts.init(element);
-}
-
-function resizeChart(instance: echarts.ECharts | null, element: HTMLElement | null) {
-  if (instance && canRenderChart(element)) {
-    instance.resize();
-  }
-}
-
 function handleResize() {
-  resizeChart(trendChart, trendChartRef.value);
-  resizeChart(sideChart, sideChartRef.value);
-  resizeChart(identityPeriodChart, identityPeriodChartRef.value);
-  resizeChart(identityDistributionChart, identityDistributionChartRef.value);
-  resizeChart(identityLineChart, identityLineChartRef.value);
-  resizeChart(promoterChart, promoterChartRef.value);
-  resizeChart(identityChart, identityChartRef.value);
-  resizeChart(statusChart, statusChartRef.value);
-}
-
-function observeChartContainers() {
-  if (!('ResizeObserver' in window)) return;
-  if (!chartResizeObserver) {
-    chartResizeObserver = new ResizeObserver((entries) => {
-      const hasRenderableChart = entries.some((entry) => entry.target instanceof HTMLElement && canRenderChart(entry.target));
-      if (hasRenderableChart) {
-        scheduleVisibleChartsRender();
-      }
-    });
-  }
-  [
-    trendChartRef,
-    sideChartRef,
-    identityPeriodChartRef,
-    identityDistributionChartRef,
-    identityLineChartRef,
-    promoterChartRef,
-    identityChartRef,
-    statusChartRef
-  ].forEach((chartRef) => {
-    if (chartRef.value) {
-      chartResizeObserver?.observe(chartRef.value);
-    }
-  });
+  trendChart?.resize();
+  sideChart?.resize();
+  identityPeriodChart?.resize();
+  identityDistributionChart?.resize();
+  identityLineChart?.resize();
+  promoterChart?.resize();
+  identityChart?.resize();
+  statusChart?.resize();
 }
 
 onMounted(() => {
   loadData();
   loadStatistics();
+  loadCompanyOverviewStatistics();
   window.addEventListener('resize', handleResize);
-  nextTick(observeChartContainers);
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
-  if (pendingChartFrame) {
-    cancelAnimationFrame(pendingChartFrame);
-  }
-  chartResizeObserver?.disconnect();
   trendChart?.dispose();
   sideChart?.dispose();
   identityPeriodChart?.dispose();
@@ -1567,6 +2829,14 @@ onUnmounted(() => {
   margin-right: 10px;
 }
 
+.board-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .statistics-filter,
 .query-form {
   margin-top: 14px;
@@ -1602,6 +2872,42 @@ onUnmounted(() => {
   border-left: 4px solid var(--el-color-primary);
   border-radius: 8px;
   background: var(--el-fill-color-blank);
+}
+
+.is-clickable {
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.is-clickable:hover,
+.is-clickable:focus-visible {
+  border-color: var(--el-color-primary-light-5);
+  box-shadow: var(--el-box-shadow-light);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.stat-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  border: 0;
+  background: transparent;
+  color: var(--el-color-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.stat-link:hover,
+.stat-link:focus-visible {
+  color: var(--el-color-primary-dark-2);
+  text-decoration: underline;
+  outline: none;
 }
 
 .metric-card.success {
@@ -1667,7 +2973,6 @@ onUnmounted(() => {
 
 .chart-panel,
 .detail-panel {
-  min-width: 0;
   padding: 14px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 8px;
@@ -1681,8 +2986,6 @@ onUnmounted(() => {
 }
 
 .chart-main {
-  width: 100%;
-  min-width: 0;
   height: 300px;
 }
 
@@ -1692,6 +2995,14 @@ onUnmounted(() => {
 
 .detail-panel {
   margin-top: 12px;
+}
+
+.dialog-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .overview-table {

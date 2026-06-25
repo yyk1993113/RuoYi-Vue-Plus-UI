@@ -82,6 +82,7 @@ const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 
 const title = import.meta.env.VITE_APP_TITLE;
 const router = useRouter();
+const route = useRoute();
 
 const { t } = useI18n();
 
@@ -174,7 +175,52 @@ const initTenantList = async () => {
   }
 };
 
+const getFirstParam = (params: URLSearchParams, key: string) => {
+  const value = params.get(key);
+  return value == null || value === '' ? undefined : value;
+};
+
+const readPromotionRegisterParams = () => {
+  const merged = new URLSearchParams();
+  const appendParams = (search?: string) => {
+    if (!search) return;
+    const normalized = search.startsWith('?') ? search.substring(1) : search;
+    new URLSearchParams(normalized).forEach((value, key) => {
+      if (value !== '' && !merged.has(key)) {
+        merged.set(key, value);
+      }
+    });
+  };
+
+  appendParams(window.location.search);
+  appendParams(route.fullPath.includes('?') ? route.fullPath.substring(route.fullPath.indexOf('?') + 1) : '');
+
+  const hash = window.location.hash || '';
+  if (hash.includes('?')) {
+    appendParams(hash.substring(hash.indexOf('?') + 1));
+  }
+
+  const userType = getFirstParam(merged, 'userType');
+  const source = getFirstParam(merged, 'source');
+  const promoterId = getFirstParam(merged, 'promoterId');
+  const promoterCode = getFirstParam(merged, 'promoterCode');
+
+  if (userType) {
+    registerForm.value.userType = userType;
+  }
+  if (source) {
+    registerForm.value.source = source;
+  }
+  if (promoterId) {
+    registerForm.value.promoterId = promoterId;
+  }
+  if (promoterCode) {
+    registerForm.value.promoterCode = promoterCode;
+  }
+};
+
 onMounted(() => {
+  readPromotionRegisterParams();
   getCode();
   initTenantList();
 });

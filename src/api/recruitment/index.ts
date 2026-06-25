@@ -49,13 +49,8 @@ export interface JobVO {
   companyId?: number;
   companyName?: string;
   jobName?: string;
-  salaryMin?: number;
-  salaryMax?: number;
-  salaryUnit?: string;
-  province?: string;
-  city?: string;
-  district?: string;
-  workAddress?: string;
+  salary?: string;
+  location?: string;
   jobType?: string;
   jobTypeName?: string;
   experience?: string;
@@ -85,14 +80,16 @@ export interface JobFullVO {
   // 用工性质 0:全职 1:兼职 2:临时工 3:项目制
   jobType?: string;
   jobTypeName?: string;
+  // 用工性质（兼容旧字段）0:全职 1:兼职
+  employmentType?: string;
+  employmentTypeName?: string;
   // 薪资
+  salary?: string;
   salaryMin?: number;
   salaryMax?: number;
   salaryUnit?: string;
   salaryUnitName?: string;
-  province?: string;
-  city?: string;
-  district?: string;
+  location?: string;
   // 职位所属类目
   category?: string;
   // 岗位实际工作地点
@@ -146,13 +143,11 @@ export interface ApplyVO {
   applyId?: number;
   jobId?: number;
   jobName?: string;
-  salaryMin?: number;
-  salaryMax?: number;
-  salaryUnit?: string;
+  salary?: string;
   companyName?: string;
-  userId?: number;
+  userId?: number | string;
   userName?: string;
-  phone?: string;
+  phonenumber?: string;
   applyTime?: string;
   status?: string;
   statusName?: string;
@@ -161,7 +156,7 @@ export interface ApplyVO {
   createTime?: string;
   avatar?: string;
   avatarUrl?: string;
-  exchangeStatus?: string;
+  exchanged?: boolean;
   contactPerson?: string;
   contactPhone?: string;
   recruiterContact?: string;
@@ -179,21 +174,17 @@ export interface ApplyVO {
 
 export interface TaskStatistics {
   totalCount: number;
-  pendingConfirm: number;
-  inProgress: number;
-  submitted: number;
-  completed: number;
-  rejected: number;
-  cancelled: number;
+  inProgressCount: number;
+  pendingVerifyCount: number;
+  verifiedCount: number;
+  rejectedCount: number;
+  settledCount: number;
 }
 
 export interface TaskVO {
   taskId?: number;
   jobId?: number;
   jobName?: string;
-  salaryMin?: number;
-  salaryMax?: number;
-  salaryUnit?: string;
   applyId?: number;
   userId?: number;
   workerName?: string;
@@ -201,9 +192,7 @@ export interface TaskVO {
   workerAvatar?: string;
   companyId?: number;
   companyName?: string;
-  arrivalPhotos?: string;
-  midPhotos?: string;
-  finishPhotos?: string;
+  photoPath?: string;
   reportContent?: string;
   workTime?: string;
   address?: string;
@@ -361,7 +350,7 @@ export interface ExchangeStatistics {
 
 export interface ExchangeRequestVO {
   id?: number;
-  applyId?: number;
+  deliveryId?: number;
   recruiterId?: number;
   jobSeekerId?: number;
   exchangeType?: string;
@@ -384,10 +373,8 @@ export interface HotJobVO {
   companyName?: string;
   applyCount?: number;
   browseCount?: number;
-  salaryMin?: number;
-  salaryMax?: number;
-  salaryUnit?: string;
-  workAddress?: string;
+  salary?: string;
+  location?: string;
   createTime?: string;
 }
 
@@ -440,6 +427,7 @@ export interface JobQuery {
   isRecommend?: string;
   isHot?: string;
   workAddress?: string;
+  salary?: string;
   applyCount?: number | string;
   params?: Record<string, any>;
 }
@@ -447,13 +435,16 @@ export interface JobQuery {
 export interface ApplyQuery {
   pageNum?: number;
   pageSize?: number;
+  applyId?: number;
   jobId?: number;
   jobName?: string;
-  userId?: number;
+  userId?: number | string;
   userName?: string;
   status?: string;
   companyName?: string;
   isRead?: string;
+  beginTime?: string;
+  endTime?: string;
   // 企业管理「已反馈/未反馈」弹窗用：companyId 精确过滤企业；feedback=0 未反馈 / 1 已反馈
   companyId?: number;
   feedback?: string;
@@ -595,9 +586,14 @@ export interface PromoterQuery {
 }
 
 export type PromoterForm = PromoterVO;
-export type PromoterStatisticsTimeUnit = 'month' | 'quarter' | 'halfYear' | 'year';
+export type PromoterStatisticsTimeUnit = 'day' | 'month' | 'quarter' | 'halfYear' | 'year';
 
-export interface PromoterStatisticsRow extends PromoterVO {}
+export interface PromoterStatisticsRow extends PromoterVO {
+  authorizedCount?: number;
+  resumeCount?: number;
+  applyCount?: number;
+  totalCount?: number;
+}
 
 export interface PromoterStatisticsGroup {
   key?: string;
@@ -628,6 +624,32 @@ export interface PromoterStatisticsPeriod {
   authorizedCount?: number;
   resumeCount?: number;
   applyCount?: number;
+  enteredCompanyCount?: number;
+  certifiedCompanyCount?: number;
+  publishedCompanyCount?: number;
+  fullTimePublishedCompanyCount?: number;
+  partTimePublishedCompanyCount?: number;
+  communicatedCompanyCount?: number;
+  interviewCompanyCount?: number;
+  hiredCompanyCount?: number;
+  settledCompanyCount?: number;
+}
+
+export interface CompanyOverviewStatisticsPeriod {
+  key?: string;
+  label?: string;
+  enteredCompanyCount?: number;
+  certifiedCompanyCount?: number;
+  publishedCompanyCount?: number;
+  fullTimePublishedCompanyCount?: number;
+  partTimePublishedCompanyCount?: number;
+  promotedCompanyCount?: number;
+  interviewCompanyCount?: number;
+  hiredCompanyCount?: number;
+}
+
+export interface CompanyOverviewStatisticsVO {
+  periodStats?: CompanyOverviewStatisticsPeriod[];
 }
 
 export interface PromoterIdentityPeriod {
@@ -668,6 +690,11 @@ export interface PromoterWorkbenchVO {
   todayAuthorizedCount?: number;
   todayResumeCount?: number;
   todayApplyCount?: number;
+  yesterdayCompanyCount?: number;
+  yesterdayJobSeekerCount?: number;
+  yesterdayAuthorizedCount?: number;
+  yesterdayResumeCount?: number;
+  yesterdayApplyCount?: number;
   totalCompanyCount?: number;
   totalJobSeekerCount?: number;
   totalAuthorizedCount?: number;
@@ -676,12 +703,73 @@ export interface PromoterWorkbenchVO {
   remark?: string;
 }
 
+export interface PromotionAttributionQuery {
+  pageNum?: number;
+  pageSize?: number;
+  promoterId?: string | number;
+  promoterKeyword?: string;
+  identityType?: string;
+  status?: string;
+  keyword?: string;
+  beginTime?: string;
+  endTime?: string;
+}
+
+export interface PromotionAttributionDetailVO {
+  objectType?: 'company' | 'user' | string;
+  objectTypeName?: string;
+  objectId?: string | number;
+  objectName?: string;
+  phone?: string;
+  contactPerson?: string;
+  promoterId?: string | number;
+  promoterName?: string;
+  promoterPhone?: string;
+  identityType?: string;
+  identityTypeName?: string;
+  roleName?: string;
+  status?: string;
+  statusName?: string;
+  completed?: string;
+  jobCount?: number;
+  authorized?: string;
+  resumeCompleted?: string;
+  applied?: string;
+  promotedAt?: string;
+  authorizedTime?: string;
+  resumeCompletedTime?: string;
+  firstApplyTime?: string;
+  createTime?: string;
+}
+
+export interface PromotionAttributionAdjustForm {
+  objectType: 'company' | 'user' | string;
+  objectId: string | number;
+  promoterId?: string | number;
+}
+
 export function listPromoter(query: PromoterQuery) {
   return request.get<any>(`${baseUrl}/promoter/list`, { params: query });
 }
 
 export function getPromoterStatistics(query: PromoterQuery) {
   return request.get<PromoterStatisticsVO>(`${baseUrl}/promoter/statistics`, { params: query });
+}
+
+export function getCompanyOverviewStatistics(query?: PromoterQuery) {
+  return request.get<CompanyOverviewStatisticsVO>(`${baseUrl}/promoter/company-overview/statistics`, { params: query });
+}
+
+export function listPromoterCompanyDetail(query: PromotionAttributionQuery) {
+  return request.get<any>(`${baseUrl}/promoter/company-detail/list`, { params: query });
+}
+
+export function listPromoterUserDetail(query: PromotionAttributionQuery) {
+  return request.get<any>(`${baseUrl}/promoter/user-detail/list`, { params: query });
+}
+
+export function adjustPromoterAttribution(data: PromotionAttributionAdjustForm) {
+  return request.post(`${baseUrl}/promoter/attribution/adjust`, data);
 }
 
 export function getPromoter(promoterId: string | number) {
@@ -713,6 +801,10 @@ export function getPromoterWorkbenchQrCode(target: 'C' | 'B') {
     params: { target },
     responseType: 'blob'
   });
+}
+
+export function listPromoterWorkbenchDetail(query: PromotionAttributionQuery & { metric: string; period: 'today' | 'total' }) {
+  return request.get<any>(`${baseUrl}/promoter/workbench/detail/list`, { params: query });
 }
 
 // ---------- 企业管理 ----------
@@ -779,11 +871,13 @@ export interface UserStatistics {
 }
 
 export interface RecruitmentUserVO {
-  userId: number;
+  userId: number | string;
   userName: string;
   nickName: string;
   userType: string;
-  phone?: string;
+  /** 后端列表接口当前返回 phone；保留 phonenumber 兼容历史页面字段。 */
+  phone: string;
+  phonenumber?: string;
   email: string;
   sex: string;
   sexName: string;
@@ -816,25 +910,26 @@ export function listUsersWithStats(params?: {
   pageSize?: number;
   userName?: string;
   phone?: string;
+  phonenumber?: string;
   isRecruitmentSilenced?: string;
   applyFilter?: string;
 }) {
   return request.get<{ rows: RecruitmentUserVO[]; total: number }>(`${baseUrl}/user/listWithStats`, { params });
 }
 
-export function getRecruitmentUserDetail(userId: number) {
+export function getRecruitmentUserDetail(userId: number | string) {
   return request.get<RecruitmentUserVO>(`${baseUrl}/user/${userId}`);
 }
 
-export function silenceUser(data: { userId: number; reason: string }) {
+export function silenceUser(data: { userId: number | string; reason: string }) {
   return request.post(`${baseUrl}/user/silence`, data);
 }
 
-export function unsilenceUser(data: { userId: number }) {
+export function unsilenceUser(data: { userId: number | string }) {
   return request.post(`${baseUrl}/user/unsilence`, data);
 }
 
-export function listUsers(params?: { pageNum?: number; pageSize?: number; userName?: string; phone?: string; isRecruitmentSilenced?: string }) {
+export function listUsers(params?: { pageNum?: number; pageSize?: number; userName?: string; phonenumber?: string; isRecruitmentSilenced?: string }) {
   return request.get<any>(`${baseUrl}/user/list`, { params });
 }
 
@@ -923,7 +1018,7 @@ export interface ApplyDetailJobSeeker {
   userName?: string;
   nickName?: string;
   realName?: string;
-  phone?: string;
+  phonenumber?: string;
   email?: string;
   sex?: string;
   age?: number;
@@ -949,13 +1044,8 @@ export interface ApplyDetailJob {
   jobId?: number;
   jobName?: string;
   jobType?: string; // 0全职 1兼职 2临时工 3项目制
-  salaryMin?: number;
-  salaryMax?: number;
-  salaryUnit?: string;
-  province?: string;
-  city?: string;
-  district?: string;
-  workAddress?: string;
+  salaryText?: string;
+  location?: string;
   status?: string; // 0审核中 1已上架 2已下架
 }
 
@@ -993,16 +1083,16 @@ export interface ApplyExchangeItem {
 
 export interface ApplyTaskItem {
   taskId?: number;
-  status?: string; // pending_confirm/in_progress/submitted/rejected/completed/cancelled
+  status?: string; // 0进行中 1待核验 2已核验 3已驳回 4已结算
   statusName?: string;
   workTime?: string;
   address?: string;
   remark?: string;
 }
 
-export interface ApplyFulfillmentResult {
-  platformService?: 0 | 1;
-  platformServiceName?: string;
+export interface ApplySelectionResult {
+  selectionType?: string; // 1仅选用自行联系 2确认选用自行结算 3确认选用并签约
+  selectionTypeName?: string;
   selected?: boolean;
   tasks?: ApplyTaskItem[];
 }
@@ -1017,15 +1107,15 @@ export interface ApplyDetailVO {
   statusName?: string;
   isRead?: string;
   message?: string;
-  platformService?: 0 | 1;
-  platformServiceName?: string;
+  selectionType?: string;
+  selectionTypeName?: string;
   jobSeeker?: ApplyDetailJobSeeker;
   company?: ApplyDetailCompany;
   job?: ApplyDetailJob;
   statusFlow?: ApplyStatusFlowItem[];
   interviews?: ApplyInterviewItem[];
   exchangeRecords?: ApplyExchangeItem[];
-  fulfillment?: ApplyFulfillmentResult;
+  selection?: ApplySelectionResult;
 }
 
 // 多条件精确分页查询（投递编号/企业编号/时间区间）→ TableDataInfo<Apply> 原始实体
@@ -1300,8 +1390,8 @@ export interface OperationStatsVO {
   // 业务漏斗计数
   applyCount: number; // 投递数
   interviewInviteCount: number; // 面试邀请数（apply.status=1）
-  partTimeSelectionCount: number; // 履约服务选择数（apply.platform_service = 1）
-  fulfillmentCompletedCount: number; // 履约完成数（task.status=completed）
+  partTimeSelectionCount: number; // 兼职选用数（apply.selection_type 非空）
+  fulfillmentCompletedCount: number; // 履约完成数（task.status in 2,4）
   ledgerGeneratedCount: number; // 台账生成数
   invoiceUploadedCount: number; // 发票上传数（invoice.file_path 非空）
   // 估算指标（非精确，依赖缺失的行为埋点）
