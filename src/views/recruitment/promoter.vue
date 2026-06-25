@@ -73,6 +73,55 @@
           </div>
         </el-tab-pane>
 
+        <el-tab-pane v-if="isAdminUser" label="企业端概览" name="companyOverview">
+          <div v-loading="companyOverviewLoading" class="overview-board">
+            <div class="board-head">
+              <div>
+                <div class="board-title">企业端概览</div>
+                <div class="board-subtitle">使用独立接口查询企业端关键维度数据</div>
+              </div>
+              <div class="board-actions">
+                <el-button icon="Refresh" :loading="companyOverviewLoading" @click="loadCompanyOverviewStatistics">刷新企业端概览</el-button>
+              </div>
+            </div>
+            <div class="overview-table">
+              <div class="panel-head">
+                <span>企业端指标</span>
+                <el-tag size="small" effect="plain">今日/本年/本半年/本季度/本月</el-tag>
+              </div>
+              <el-table :data="companyOverviewRows" border stripe>
+                <el-table-column label="指标" prop="label" min-width="210" />
+                <el-table-column label="说明" prop="description" min-width="280" show-overflow-tooltip />
+                <el-table-column label="今日" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openCompanyOverviewCellDrilldown(row, 'today')">{{ row.today }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="本年" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openCompanyOverviewCellDrilldown(row, 'year')">{{ row.year }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="本半年" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openCompanyOverviewCellDrilldown(row, 'halfYear')">{{ row.halfYear }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="本季度" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openCompanyOverviewCellDrilldown(row, 'quarter')">{{ row.quarter }}</button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="本月" width="110" align="center">
+                  <template #default="{ row }">
+                    <button type="button" class="stat-link" @click="openCompanyOverviewCellDrilldown(row, 'month')">{{ row.month }}</button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </div>
+        </el-tab-pane>
+
         <el-tab-pane v-if="isAdminUser" label="人员渠道统计" name="identity">
           <div v-loading="statisticsLoading" class="overview-board">
             <div class="board-head">
@@ -847,6 +896,7 @@ import {
   addPromoter,
   adjustPromoterAttribution,
   changePromoterStatus,
+  getCompanyOverviewStatistics,
   getPromoter,
   getPromoterStatistics,
   listPromoterCompanyDetail,
@@ -855,6 +905,8 @@ import {
   updatePromoter,
   type PromotionAttributionAdjustForm,
   type PromotionAttributionDetailVO,
+  type CompanyOverviewStatisticsPeriod,
+  type CompanyOverviewStatisticsVO,
   type PromotionAttributionQuery,
   type PromoterForm,
   type PromoterIdentityPeriod,
@@ -873,7 +925,7 @@ import { unwrapList } from './helpers';
 type TagType = 'primary' | 'success' | 'warning' | 'danger' | 'info';
 type StatisticsSide = 'all' | 'company' | 'jobSeeker';
 type DetailObjectType = 'company' | 'user';
-type ActiveTab = 'overview' | 'identity' | 'statistics' | 'statisticsDetail' | 'list';
+type ActiveTab = 'overview' | 'companyOverview' | 'identity' | 'statistics' | 'statisticsDetail' | 'list';
 type CountLike = Pick<PromoterStatisticsGroup, 'companyCount' | 'jobSeekerCount'>;
 type OverviewPeriodMetric = 'companyCount' | 'jobSeekerCount' | 'authorizedCount' | 'resumeCount' | 'applyCount';
 type DrilldownMetric = 'company' | 'jobSeeker' | 'authorized' | 'resume' | 'apply';
@@ -882,6 +934,25 @@ type OverviewRow = {
   label: string;
   description: string;
   metric: OverviewPeriodMetric;
+  today: number;
+  year: number;
+  halfYear: number;
+  quarter: number;
+  month: number;
+};
+type CompanyOverviewMetric =
+  | 'enteredCompanyCount'
+  | 'certifiedCompanyCount'
+  | 'publishedCompanyCount'
+  | 'fullTimePublishedCompanyCount'
+  | 'partTimePublishedCompanyCount'
+  | 'promotedCompanyCount'
+  | 'interviewCompanyCount'
+  | 'hiredCompanyCount';
+type CompanyOverviewRow = {
+  label: string;
+  description: string;
+  metric: CompanyOverviewMetric;
   today: number;
   year: number;
   halfYear: number;
@@ -925,6 +996,7 @@ const isAdminUser = computed(() => userStore.roles.includes('superadmin'));
 const activeTab = ref<ActiveTab>(isAdminUser.value ? 'overview' : 'list');
 
 const statisticsLoading = ref(false);
+const companyOverviewLoading = ref(false);
 const statisticsDateRange = ref<[string, string] | []>([]);
 const listDateRange = ref<[string, string] | []>([]);
 const detailDateRange = ref<[string, string] | []>([]);
@@ -1014,6 +1086,9 @@ const statisticsData = reactive<PromoterStatisticsVO>({
     periodStats: [],
     identityPeriodStats: []
   }
+});
+const companyOverviewData = reactive<CompanyOverviewStatisticsVO>({
+  periodStats: []
 });
 
 const queryParams = reactive<PromoterQuery>({
@@ -1106,6 +1181,17 @@ const overviewRows = computed(() => [
   buildOverviewRow('C端授权数', '授权手机号人数', 'authorizedCount'),
   buildOverviewRow('C端简历数', '填写简历人数', 'resumeCount'),
   buildOverviewRow('C端投递数', '产生投递的人数', 'applyCount')
+]);
+const companyOverviewRows = computed(() => [
+  // 企业端指标来自独立接口 company-overview，不与 /promoter/statistics 融合
+  buildCompanyOverviewRow('已进入', '通过推广人链接已进入，但还未申请或未审核通过的企业', 'enteredCompanyCount'),
+  buildCompanyOverviewRow('已认证企业', '已认证企业数量', 'certifiedCompanyCount'),
+  buildCompanyOverviewRow('已发布岗位企业', '已发布任意岗位的企业数量', 'publishedCompanyCount'),
+  buildCompanyOverviewRow('已发布全职岗位企业', '已发布全职岗位的企业数量', 'fullTimePublishedCompanyCount'),
+  buildCompanyOverviewRow('已发布兼职岗位企业', '已发布兼职岗位的企业数量', 'partTimePublishedCompanyCount'),
+  buildCompanyOverviewRow('推广进入企业', '通过推广进入的企业数量', 'promotedCompanyCount'),
+  buildCompanyOverviewRow('已邀请面试企业', '已邀请面试的企业数量', 'interviewCompanyCount'),
+  buildCompanyOverviewRow('已录用企业', '已录用企业数量', 'hiredCompanyCount')
 ]);
 const identityPeriodRows = computed(() => statisticsData.overview?.identityPeriodStats || []);
 const metricLabel = computed(() => {
@@ -1345,6 +1431,16 @@ const normalizedPromoterPeriodMetricKeys: Array<keyof Omit<PromoterStatisticsPer
   'hiredCompanyCount',
   'settledCompanyCount'
 ];
+const normalizedCompanyOverviewPeriodMetricKeys: Array<keyof Omit<CompanyOverviewStatisticsPeriod, 'key' | 'label'>> = [
+  'enteredCompanyCount',
+  'certifiedCompanyCount',
+  'publishedCompanyCount',
+  'fullTimePublishedCompanyCount',
+  'partTimePublishedCompanyCount',
+  'promotedCompanyCount',
+  'interviewCompanyCount',
+  'hiredCompanyCount'
+];
 
 function normalizeOverviewPeriodStats(periodStats?: PromoterStatisticsPeriod[]): PromoterStatisticsPeriod[] {
   if (!Array.isArray(periodStats) || periodStats.length === 0) return [];
@@ -1357,6 +1453,25 @@ function normalizeOverviewPeriodStats(periodStats?: PromoterStatisticsPeriod[]):
       key
     };
     for (const metricKey of normalizedPromoterPeriodMetricKeys) {
+      merged[metricKey] = toCount((exist as Record<string, number | undefined>)[metricKey] as number) + toCount(item[metricKey] as number);
+    }
+    acc.set(key, merged);
+    return acc;
+  }, new Map());
+  return Array.from(mergedMap.values());
+}
+
+function normalizeCompanyOverviewPeriodStats(periodStats?: CompanyOverviewStatisticsPeriod[]): CompanyOverviewStatisticsPeriod[] {
+  if (!Array.isArray(periodStats) || periodStats.length === 0) return [];
+  const mergedMap = periodStats.reduce<Map<NormalizedPromoterPeriodKey, CompanyOverviewStatisticsPeriod>>((acc, item) => {
+    const key = normalizeOverviewPeriodKey(item.key || item.label);
+    if (!key) return acc;
+    const exist = acc.get(key) || ({ key, label: periodLabelMap[key] } as CompanyOverviewStatisticsPeriod);
+    const merged: CompanyOverviewStatisticsPeriod = {
+      ...exist,
+      key
+    };
+    for (const metricKey of normalizedCompanyOverviewPeriodMetricKeys) {
       merged[metricKey] = toCount((exist as Record<string, number | undefined>)[metricKey] as number) + toCount(item[metricKey] as number);
     }
     acc.set(key, merged);
@@ -1392,6 +1507,31 @@ function buildOverviewRow(label: string, description: string, metric: OverviewPe
     halfYear: overviewPeriodValue('halfYear', metric),
     quarter: overviewPeriodValue('quarter', metric),
     month: overviewPeriodValue('month', metric)
+  };
+}
+
+function companyOverviewPeriodValue(periodKey: string, metric: CompanyOverviewMetric) {
+  const target = normalizeOverviewPeriodKey(periodKey);
+  if (!target) {
+    const direct = (companyOverviewData.periodStats || []).find((item) => item.key === periodKey || item.label === periodKey);
+    return Number(direct?.[metric] || 0);
+  }
+  const period = (companyOverviewData.periodStats || []).find(
+    (item) => isNormalizedPeriodMatch(item.key, target) || isNormalizedPeriodMatch(item.label, target)
+  );
+  return Number(period?.[metric] || 0);
+}
+
+function buildCompanyOverviewRow(label: string, description: string, metric: CompanyOverviewMetric) {
+  return {
+    label,
+    description,
+    metric,
+    today: companyOverviewPeriodValue('today', metric),
+    year: companyOverviewPeriodValue('year', metric),
+    halfYear: companyOverviewPeriodValue('halfYear', metric),
+    quarter: companyOverviewPeriodValue('quarter', metric),
+    month: companyOverviewPeriodValue('month', metric)
   };
 }
 
@@ -1569,6 +1709,18 @@ function openOverviewCellDrilldown(row: OverviewRow, periodKey: string) {
   openAttributionDrilldown({
     title: `${periodLabel(periodKey)}${row.label}明细`,
     metric: row.metric === 'companyCount' ? 'company' : row.metric === 'jobSeekerCount' ? 'jobSeeker' : row.metric === 'authorizedCount' ? 'authorized' : row.metric === 'resumeCount' ? 'resume' : 'apply',
+    periodKey,
+    promoterKeyword: '',
+    identityType: '',
+    useCurrentRange: false
+  });
+}
+
+// 企業端概覽頁按單元格進入歸因明細，與既有總覽分開使用獨立後端口徑
+function openCompanyOverviewCellDrilldown(row: CompanyOverviewRow, periodKey: string) {
+  openAttributionDrilldown({
+    title: `${periodLabel(periodKey)}${row.label}明细`,
+    objectType: 'company',
     periodKey,
     promoterKeyword: '',
     identityType: '',
@@ -1823,12 +1975,15 @@ watch(isAdminUser, (allowed) => {
   activeTab.value = allowed ? 'overview' : 'list';
   if (allowed) {
     loadStatistics();
+    loadCompanyOverviewStatistics();
   }
 });
 
 function handleTabChange(name: string | number) {
   if (name === 'identity') {
     scheduleIdentityCharts();
+  } else if (name === 'companyOverview') {
+    loadCompanyOverviewStatistics();
   } else if (name === 'statistics') {
     scheduleStatisticsCharts();
   } else if (name === 'statisticsDetail') {
@@ -1919,6 +2074,18 @@ async function loadStatistics() {
     scheduleActiveTabCharts();
   } finally {
     statisticsLoading.value = false;
+  }
+}
+
+// 僅刷新企業端概覽的後端接口資料，避免混用 /promoter/statistics 的統計結果
+async function loadCompanyOverviewStatistics() {
+  if (!isAdminUser.value) return;
+  companyOverviewLoading.value = true;
+  try {
+    const res: any = await getCompanyOverviewStatistics(buildStatisticsQuery());
+    companyOverviewData.periodStats = normalizeCompanyOverviewPeriodStats(res?.data?.periodStats);
+  } finally {
+    companyOverviewLoading.value = false;
   }
 }
 
@@ -2581,6 +2748,7 @@ function handleResize() {
 onMounted(() => {
   loadData();
   loadStatistics();
+  loadCompanyOverviewStatistics();
   window.addEventListener('resize', handleResize);
 });
 

@@ -635,6 +635,23 @@ export interface PromoterStatisticsPeriod {
   settledCompanyCount?: number;
 }
 
+export interface CompanyOverviewStatisticsPeriod {
+  key?: string;
+  label?: string;
+  enteredCompanyCount?: number;
+  certifiedCompanyCount?: number;
+  publishedCompanyCount?: number;
+  fullTimePublishedCompanyCount?: number;
+  partTimePublishedCompanyCount?: number;
+  promotedCompanyCount?: number;
+  interviewCompanyCount?: number;
+  hiredCompanyCount?: number;
+}
+
+export interface CompanyOverviewStatisticsVO {
+  periodStats?: CompanyOverviewStatisticsPeriod[];
+}
+
 export interface PromoterIdentityPeriod {
   key?: string;
   label?: string;
@@ -737,6 +754,10 @@ export function listPromoter(query: PromoterQuery) {
 
 export function getPromoterStatistics(query: PromoterQuery) {
   return request.get<PromoterStatisticsVO>(`${baseUrl}/promoter/statistics`, { params: query });
+}
+
+export function getCompanyOverviewStatistics(query?: PromoterQuery) {
+  return request.get<CompanyOverviewStatisticsVO>(`${baseUrl}/promoter/company-overview/statistics`, { params: query });
 }
 
 export function listPromoterCompanyDetail(query: PromotionAttributionQuery) {
