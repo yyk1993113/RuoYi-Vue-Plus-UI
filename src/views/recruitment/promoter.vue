@@ -609,138 +609,213 @@
             <el-tab-pane label="公海客户" name="sea" />
           </el-tabs>
 
-          <el-card shadow="never" class="query-card">
-            <el-form :inline="true" label-width="72px" class="query-form">
-              <el-form-item :label="seaObjectType === 'company' ? '企业/联系' : '昵称/手机'">
-                <el-input
-                  v-model="seaQuery.keyword"
-                  :placeholder="seaObjectType === 'company' ? '企业名称/联系人/手机号' : '昵称/姓名/手机号'"
-                  clearable
-                  style="width: 220px"
-                  @keyup.enter="handleSeaQuery"
-                  @clear="handleSeaQuery"
-                />
-              </el-form-item>
-              <el-form-item v-if="customerScope === 'bound'" label="推广人">
-                <el-input
-                  v-model="seaQuery.promoterKeyword"
-                  placeholder="推广人姓名/手机号"
-                  clearable
-                  style="width: 180px"
-                  @keyup.enter="handleSeaQuery"
-                  @clear="handleSeaQuery"
-                />
-              </el-form-item>
-              <el-form-item label="状态">
-                <el-select v-model="seaQuery.status" placeholder="全部" clearable style="width: 150px">
-                  <el-option v-for="opt in seaStatusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="创建时间">
-                <el-date-picker
-                  v-model="seaDateRange"
-                  type="daterange"
-                  value-format="YYYY-MM-DD"
-                  start-placeholder="开始日期"
-                  end-placeholder="结束日期"
-                  range-separator="-"
-                  style="width: 240px"
-                />
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" icon="Search" @click="handleSeaQuery">搜索</el-button>
-                <el-button icon="Refresh" @click="resetSeaQuery">重置</el-button>
-              </el-form-item>
-            </el-form>
-          </el-card>
-
-          <el-card shadow="never" class="table-card">
-            <template #header>
-              <div class="table-head">
-                <div>
-                  <span class="table-title">{{ customerTableTitle }}</span>
-                  <span class="table-subtitle">{{
-                    customerScope === 'sea' ? '无推广来源的客户，可手动分配给推广人完成归因' : '已绑定推广码的客户，可调整其来源推广人'
-                  }}</span>
+          <!-- 已绑口径：左树(壹聘 根 > 全部推广人 员工，节点带企业/求职者统计) + 右表(按选中员工 promoterId 过滤推广明细)；公海无推广人不展示树 -->
+          <div class="customer-layout" :class="{ 'has-tree': customerScope === 'bound' }">
+            <el-card v-if="customerScope === 'bound'" shadow="never" class="promoter-tree-card">
+              <template #header>
+                <div class="tree-head">
+                  <span>壹聘员工</span>
+                  <el-button link type="primary" icon="Refresh" @click="loadPromoterTree">刷新</el-button>
                 </div>
-                <div class="table-actions">
-                  <el-button plain icon="Refresh" @click="loadCustomerList">刷新</el-button>
-                </div>
-              </div>
-            </template>
+              </template>
+              <el-input
+                v-model="promoterTreeKeyword"
+                placeholder="搜索员工姓名/手机"
+                clearable
+                size="small"
+                prefix-icon="Search"
+                class="tree-search"
+              />
+              <!-- 懒加载异步树：根节点秒出，员工节点展开时并行拉取(花名册+绑定统计)，非阻塞 -->
+              <el-tree
+                ref="promoterTreeRef"
+                :key="promoterTreeKey"
+                lazy
+                :load="loadPromoterTreeNode"
+                node-key="id"
+                highlight-current
+                :current-node-key="selectedPromoterNodeId"
+                :default-expanded-keys="promoterTreeExpandedKeys"
+                :expand-on-click-node="false"
+                :filter-node-method="filterPromoterTreeNode"
+                class="promoter-tree"
+                @node-click="handlePromoterNodeClick"
+                @node-expand="handlePromoterNodeExpand"
+                @node-collapse="handlePromoterNodeCollapse"
+              >
+                <template #default="{ data }">
+                  <span class="promoter-tree-node">
+                    <span class="ptn-label">{{ data.label }}</span>
+                    <span v-if="data.id !== 'ROOT' || rootStatLoaded" class="ptn-stat">
+                      企业 {{ nodeStatText(data).companyCount }} · 求职 {{ nodeStatText(data).jobSeekerCount }}
+                    </span>
+                  </span>
+                </template>
+              </el-tree>
+            </el-card>
 
-            <el-table v-loading="seaLoading" :data="seaRows" border stripe>
-              <el-table-column :label="seaObjectType === 'company' ? '企业' : '面试者'" min-width="190" show-overflow-tooltip>
-                <template #default="{ row }">
-                  <div class="name-cell">
-                    <span class="name-text">{{ row.objectName || '-' }}</span>
-                    <span class="sub-text">{{ row.phone || '-' }}</span>
+            <div class="customer-main">
+              <el-card shadow="never" class="query-card">
+                <el-form :inline="true" label-width="72px" class="query-form">
+                  <el-form-item :label="seaObjectType === 'company' ? '企业/联系' : '昵称/手机'">
+                    <el-input
+                      v-model="seaQuery.keyword"
+                      :placeholder="seaObjectType === 'company' ? '企业名称/联系人/手机号' : '昵称/姓名/手机号'"
+                      clearable
+                      style="width: 220px"
+                      @keyup.enter="handleSeaQuery"
+                      @clear="handleSeaQuery"
+                    />
+                  </el-form-item>
+                  <el-form-item v-if="customerScope === 'bound'" label="推广人">
+                    <el-input
+                      v-model="seaQuery.promoterKeyword"
+                      placeholder="推广人姓名/手机号"
+                      clearable
+                      style="width: 180px"
+                      @keyup.enter="handleSeaQuery"
+                      @clear="handleSeaQuery"
+                    />
+                  </el-form-item>
+                  <el-form-item label="状态">
+                    <el-select v-model="seaQuery.status" placeholder="全部" clearable style="width: 150px">
+                      <el-option v-for="opt in seaStatusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+                    </el-select>
+                  </el-form-item>
+                  <el-form-item label="创建时间">
+                    <el-date-picker
+                      v-model="seaDateRange"
+                      type="daterange"
+                      value-format="YYYY-MM-DD"
+                      start-placeholder="开始日期"
+                      end-placeholder="结束日期"
+                      range-separator="-"
+                      style="width: 240px"
+                    />
+                  </el-form-item>
+                  <el-form-item>
+                    <el-button type="primary" icon="Search" @click="handleSeaQuery">搜索</el-button>
+                    <el-button icon="Refresh" @click="resetSeaQuery">重置</el-button>
+                  </el-form-item>
+                </el-form>
+              </el-card>
+
+              <el-card shadow="never" class="table-card">
+                <template #header>
+                  <div class="table-head">
+                    <div>
+                      <span class="table-title">{{ customerTableTitle }}</span>
+                      <span class="table-subtitle">{{
+                        customerScope === 'sea' ? '无推广来源的客户，可手动分配给推广人完成归因' : '已绑定推广码的客户，可调整其来源推广人'
+                      }}</span>
+                    </div>
+                    <div class="table-actions">
+                      <!-- 仅「已绑推广码」口径：批量移动公海(解除归因)；操作前二次确认 -->
+                      <el-button
+                        v-if="customerScope === 'bound'"
+                        type="warning"
+                        plain
+                        icon="Promotion"
+                        :disabled="seaSelection.length === 0"
+                        @click="handleBatchMoveSea"
+                      >
+                        批量移动公海{{ seaSelection.length ? `(${seaSelection.length})` : '' }}
+                      </el-button>
+                      <!-- 仅「已绑推广码」口径可导出：复用归因明细导出接口，沿用当前筛选条件 -->
+                      <el-button v-if="customerScope === 'bound'" plain icon="Download" @click="handleCustomerExport">导出</el-button>
+                      <el-button plain icon="Refresh" @click="loadCustomerList">刷新</el-button>
+                    </div>
                   </div>
                 </template>
-              </el-table-column>
-              <el-table-column v-if="seaObjectType === 'company'" label="联系人" prop="contactPerson" min-width="110" show-overflow-tooltip>
-                <template #default="{ row }">{{ row.contactPerson || '-' }}</template>
-              </el-table-column>
-              <!-- 已绑客户展示来源推广人；公海客户无来源推广人不显示该列 -->
-              <el-table-column v-if="customerScope === 'bound'" label="来源推广人" min-width="160" show-overflow-tooltip>
-                <template #default="{ row }">
-                  <div class="name-cell">
-                    <span class="name-text">{{ row.promoterName || '-' }}</span>
-                    <span class="sub-text">{{ row.promoterPhone || '-' }}</span>
-                  </div>
-                </template>
-              </el-table-column>
-              <el-table-column v-if="customerScope === 'bound'" label="推广人身份" width="110" align="center">
-                <template #default="{ row }">
-                  <el-tag :type="identityTypeTag(row.identityType)" size="small">{{
-                    row.identityTypeName || identityTypeText(row.identityType)
-                  }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="状态" prop="statusName" width="120" align="center">
-                <template #default="{ row }">
-                  <el-tag :type="detailStatusTag(row, seaObjectType)" size="small">{{ detailStatusText(row, seaObjectType) }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column v-if="seaObjectType === 'company'" label="资料完整" prop="completed" width="100" align="center">
-                <template #default="{ row }">
-                  <el-tag :type="yesNoTag(row.completed)" size="small">{{ row.completed || '-' }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column v-if="seaObjectType === 'company'" label="岗位数" prop="jobCount" width="90" align="center" />
-              <el-table-column v-if="seaObjectType === 'user'" label="授权" prop="authorized" width="80" align="center">
-                <template #default="{ row }">
-                  <el-tag :type="yesNoTag(row.authorized)" size="small">{{ row.authorized || '-' }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column v-if="seaObjectType === 'user'" label="简历" prop="resumeCompleted" width="80" align="center">
-                <template #default="{ row }">
-                  <el-tag :type="yesNoTag(row.resumeCompleted)" size="small">{{ row.resumeCompleted || '-' }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column v-if="seaObjectType === 'user'" label="投递" prop="applied" width="80" align="center">
-                <template #default="{ row }">
-                  <el-tag :type="yesNoTag(row.applied)" size="small">{{ row.applied || '-' }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
-              <el-table-column label="操作" width="130" fixed="right" align="center">
-                <template #default="{ row }">
-                  <el-button link type="primary" :icon="customerScope === 'sea' ? 'Promotion' : 'Edit'" @click="openCustomerAdjust(row)">
-                    {{ customerScope === 'sea' ? '分配推广人' : '调整推广人' }}
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
 
-            <pagination
-              v-show="seaTotal > 0"
-              v-model:page="seaQuery.pageNum"
-              v-model:limit="seaQuery.pageSize"
-              :total="seaTotal"
-              @pagination="loadCustomerList"
-            />
-          </el-card>
+                <el-table
+                  ref="seaTableRef"
+                  v-loading="seaLoading"
+                  :data="seaRows"
+                  border
+                  stripe
+                  :row-key="(row: PromotionAttributionDetailVO) => String(row.objectId)"
+                  @selection-change="handleSeaSelectionChange"
+                >
+                  <!-- 仅已绑口径可多选，用于批量移动公海 -->
+                  <el-table-column v-if="customerScope === 'bound'" type="selection" width="48" reserve-selection />
+                  <el-table-column :label="seaObjectType === 'company' ? '企业' : '面试者'" min-width="190" show-overflow-tooltip>
+                    <template #default="{ row }">
+                      <div class="name-cell">
+                        <!-- B端企业：点击企业名打开只读企业详情弹窗（复用 openCompanyInfo / getCompany） -->
+                        <button v-if="seaObjectType === 'company'" type="button" class="stat-link name-text" @click="openCompanyInfo(row)">
+                          {{ row.objectName || '-' }}
+                        </button>
+                        <span v-else class="name-text">{{ row.objectName || '-' }}</span>
+                        <span class="sub-text">{{ row.phone || '-' }}</span>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column v-if="seaObjectType === 'company'" label="联系人" prop="contactPerson" min-width="110" show-overflow-tooltip>
+                    <template #default="{ row }">{{ row.contactPerson || '-' }}</template>
+                  </el-table-column>
+                  <!-- 已绑客户展示来源推广人；公海客户无来源推广人不显示该列 -->
+                  <el-table-column v-if="customerScope === 'bound'" label="来源推广人" min-width="160" show-overflow-tooltip>
+                    <template #default="{ row }">
+                      <div class="name-cell">
+                        <span class="name-text">{{ row.promoterName || '-' }}</span>
+                        <span class="sub-text">{{ row.promoterPhone || '-' }}</span>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column v-if="customerScope === 'bound'" label="推广人身份" width="110" align="center">
+                    <template #default="{ row }">
+                      <el-tag :type="identityTypeTag(row.identityType)" size="small">{{
+                        row.identityTypeName || identityTypeText(row.identityType)
+                      }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="状态" prop="statusName" width="120" align="center">
+                    <template #default="{ row }">
+                      <el-tag :type="detailStatusTag(row, seaObjectType)" size="small">{{ detailStatusText(row, seaObjectType) }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column v-if="seaObjectType === 'company'" label="资料完整" prop="completed" width="100" align="center">
+                    <template #default="{ row }">
+                      <el-tag :type="yesNoTag(row.completed)" size="small">{{ row.completed || '-' }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column v-if="seaObjectType === 'company'" label="岗位数" prop="jobCount" width="90" align="center" />
+                  <el-table-column v-if="seaObjectType === 'user'" label="授权" prop="authorized" width="80" align="center">
+                    <template #default="{ row }">
+                      <el-tag :type="yesNoTag(row.authorized)" size="small">{{ row.authorized || '-' }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column v-if="seaObjectType === 'user'" label="简历" prop="resumeCompleted" width="80" align="center">
+                    <template #default="{ row }">
+                      <el-tag :type="yesNoTag(row.resumeCompleted)" size="small">{{ row.resumeCompleted || '-' }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column v-if="seaObjectType === 'user'" label="投递" prop="applied" width="80" align="center">
+                    <template #default="{ row }">
+                      <el-tag :type="yesNoTag(row.applied)" size="small">{{ row.applied || '-' }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
+                  <el-table-column label="操作" width="130" fixed="right" align="center">
+                    <template #default="{ row }">
+                      <el-button link type="primary" :icon="customerScope === 'sea' ? 'Promotion' : 'Edit'" @click="openCustomerAdjust(row)">
+                        {{ customerScope === 'sea' ? '分配推广人' : '调整推广人' }}
+                      </el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+
+                <pagination
+                  v-show="seaTotal > 0"
+                  v-model:page="seaQuery.pageNum"
+                  v-model:limit="seaQuery.pageSize"
+                  :total="seaTotal"
+                  @pagination="loadCustomerList"
+                />
+              </el-card>
+            </div>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="推广渠道维护" name="list">
@@ -1331,7 +1406,126 @@ const seaLoading = ref(false);
 const seaRows = ref<PromotionAttributionDetailVO[]>([]);
 const seaTotal = ref(0);
 const seaDateRange = ref<[string, string] | []>([]);
-const seaQuery = reactive<PromotionAttributionQuery>({ pageNum: 1, pageSize: 10, keyword: '', status: '', promoterKeyword: '' });
+const seaQuery = reactive<PromotionAttributionQuery>({
+  pageNum: 1,
+  pageSize: 10,
+  keyword: '',
+  status: '',
+  promoterKeyword: '',
+  promoterId: undefined
+});
+
+// 已绑列表多选 + 批量移动公海
+const seaTableRef = ref();
+const seaSelection = ref<PromotionAttributionDetailVO[]>([]);
+
+// 已绑客户左树（懒加载异步树）：根=部门壹聘(全部)，展开后子=全部推广人(员工)，节点带 企业数/求职者数 统计；点击员工→右表按 promoterId 过滤
+const promoterTreeRef = ref();
+const promoterTreeKeyword = ref('');
+const selectedPromoterNodeId = ref<string>('ROOT'); // 当前选中节点 id，'ROOT'=壹聘=全部
+const promoterTreeKey = ref(0); // 变更即重挂树(用于「刷新」强制重拉懒加载)
+const promoterTreeExpandedKeys = ref<string[]>(['ROOT']); // 默认展开根，员工异步流入
+const rootStat = ref({ companyCount: 0, jobSeekerCount: 0 }); // 全员合计（员工加载后回填）
+const rootStatLoaded = ref(false);
+
+// 员工节点缓存：同一份 Promise 复用，避免切 tab/口径或折叠展开时重复请求统计接口
+let employeesPromise: Promise<any[]> | null = null;
+
+// 拉取员工节点：listPromoter(全员花名册) 与 getPromoterStatistics(真实绑定量) 并行，
+// 真实绑定量取自统计 rows（与右表/活跃统计同源）；listPromoter 自带的 companyCount 是表单手填值故不用。
+function fetchPromoterEmployees(force = false): Promise<any[]> {
+  if (force) employeesPromise = null;
+  if (!employeesPromise) {
+    employeesPromise = (async () => {
+      const [pRes, sRes] = await Promise.all([
+        listPromoter({ pageNum: 1, pageSize: 1000 }),
+        getPromoterStatistics({}).catch(() => null) // 统计异常不阻断树，退化为 0
+      ]);
+      const roster = unwrapList<PromoterVO>(pRes).rows;
+      const statMap = new Map<string, { companyCount: number; jobSeekerCount: number }>();
+      for (const r of (sRes as any)?.data?.rows || []) {
+        statMap.set(String(r.promoterId), { companyCount: r.companyCount ?? 0, jobSeekerCount: r.jobSeekerCount ?? 0 });
+      }
+      const nodes = roster.map((p) => {
+        const s = statMap.get(String(p.promoterId));
+        return {
+          id: String(p.promoterId),
+          label: `${p.name || '-'}（${p.phonenumber || '-'}）`,
+          promoterId: p.promoterId,
+          companyCount: s?.companyCount ?? 0,
+          jobSeekerCount: s?.jobSeekerCount ?? 0,
+          isLeaf: true
+        };
+      });
+      rootStat.value = {
+        companyCount: nodes.reduce((a, n) => a + n.companyCount, 0),
+        jobSeekerCount: nodes.reduce((a, n) => a + n.jobSeekerCount, 0)
+      };
+      rootStatLoaded.value = true;
+      return nodes;
+    })().catch((e) => {
+      employeesPromise = null; // 失败允许下次重试
+      throw e;
+    });
+  }
+  return employeesPromise;
+}
+
+// el-tree 懒加载回调：level 0 返回根节点(秒出)，展开根时异步返回员工(node 自带 loading)
+async function loadPromoterTreeNode(node: any, resolve: (data: any[]) => void) {
+  if (node.level === 0) {
+    resolve([{ id: 'ROOT', label: '部门壹聘', promoterId: '', isLeaf: false }]);
+    return;
+  }
+  if (node.data?.id === 'ROOT') {
+    try {
+      resolve(await fetchPromoterEmployees());
+    } catch {
+      resolve([]);
+    }
+    return;
+  }
+  resolve([]);
+}
+
+// 「刷新」：清缓存 + 重挂树强制重拉懒加载（保留展开状态，根展开则自动重载）
+function loadPromoterTree() {
+  employeesPromise = null;
+  rootStatLoaded.value = false;
+  rootStat.value = { companyCount: 0, jobSeekerCount: 0 };
+  promoterTreeKey.value++;
+}
+
+// 节点统计文案：根用全员合计，员工用各自绑定量
+function nodeStatText(data: any) {
+  if (data.id === 'ROOT') return rootStat.value;
+  return { companyCount: data.companyCount ?? 0, jobSeekerCount: data.jobSeekerCount ?? 0 };
+}
+
+// 记录展开状态，便于刷新重挂后保持
+function handlePromoterNodeExpand(data: any) {
+  if (!promoterTreeExpandedKeys.value.includes(data.id)) promoterTreeExpandedKeys.value.push(data.id);
+}
+function handlePromoterNodeCollapse(data: any) {
+  promoterTreeExpandedKeys.value = promoterTreeExpandedKeys.value.filter((k) => k !== data.id);
+}
+
+// 树本地搜索：按节点 label(姓名/手机) 过滤（懒加载下对已加载节点生效）
+function filterPromoterTreeNode(value: string, data: any) {
+  if (!value) return true;
+  return String(data.label).includes(value);
+}
+watch(promoterTreeKeyword, (val) => {
+  promoterTreeRef.value?.filter(val);
+});
+
+// 点击树节点：根=清除推广人过滤看全部，员工=按其 promoterId 过滤右表
+function handlePromoterNodeClick(data: any) {
+  selectedPromoterNodeId.value = data.id;
+  seaQuery.promoterId = data.id === 'ROOT' ? undefined : data.promoterId;
+  seaQuery.pageNum = 1;
+  loadCustomerList();
+}
 const statisticsTimeUnitOptions: { label: string; value: PromoterStatisticsTimeUnit }[] = [
   { label: '按日', value: 'day' },
   { label: '按年', value: 'year' },
@@ -2362,6 +2556,7 @@ function handleTabChange(name: string | number) {
   } else if (name === 'statisticsDetail') {
     loadAttributionDetails();
   } else if (name === 'sea') {
+    // 进入客户管理：左树为懒加载异步树(展开根才拉员工，且有缓存)，此处只加载右表
     loadCustomerList();
   }
 }
@@ -2408,8 +2603,9 @@ async function loadCustomerList() {
       ...seaQuery,
       keyword: seaQuery.keyword || undefined,
       status: seaQuery.status || undefined,
-      // 推广人关键字仅在「已绑」口径有意义；公海无推广人，置空避免误传
+      // 推广人关键字/树选中员工仅在「已绑」口径有意义；公海无推广人，置空避免误传
       promoterKeyword: isSea ? undefined : seaQuery.promoterKeyword || undefined,
+      promoterId: isSea ? undefined : seaQuery.promoterId || undefined,
       beginTime: beginDate ? `${beginDate} 00:00:00` : undefined,
       endTime: endDate ? `${endDate} 23:59:59` : undefined
     });
@@ -2431,6 +2627,10 @@ function resetSeaQuery() {
   seaQuery.status = '';
   seaQuery.promoterKeyword = '';
   seaDateRange.value = [];
+  // 重置同时把左树选中回到根节点(壹聘=全部)，清除员工过滤
+  seaQuery.promoterId = undefined;
+  selectedPromoterNodeId.value = 'ROOT';
+  promoterTreeRef.value?.setCurrentKey?.('ROOT');
   seaQuery.pageNum = 1;
   loadCustomerList();
 }
@@ -2439,19 +2639,89 @@ function resetSeaQuery() {
 function handleSeaTypeChange() {
   seaQuery.status = '';
   seaQuery.pageNum = 1;
+  seaTableRef.value?.clearSelection?.(); // 切换对象类型，清空已勾选
+  seaSelection.value = [];
   loadCustomerList();
 }
 
-// 切换 已绑/公海 归因状态：公海无推广人筛选，清空后重查
+// 切换 已绑/公海 归因状态：公海无推广人筛选与左树，清空员工过滤后重查；进入已绑时确保树已加载
 function handleScopeChange() {
   seaQuery.promoterKeyword = '';
+  seaQuery.promoterId = undefined;
+  selectedPromoterNodeId.value = 'ROOT';
   seaQuery.pageNum = 1;
+  seaTableRef.value?.clearSelection?.(); // 切换已绑/公海，清空已勾选
+  seaSelection.value = [];
+  // 左树为懒加载+缓存，切回已绑时会自动复用缓存，无需主动重拉
   loadCustomerList();
 }
 
 // 客户管理分配/调整推广人：复用「调整推广来源」弹窗，提交后回刷当前客户列表
 function openCustomerAdjust(row: PromotionAttributionDetailVO) {
   openAdjustAttribution(row, 'customer');
+}
+
+function handleSeaSelectionChange(rows: PromotionAttributionDetailVO[]) {
+  seaSelection.value = rows;
+}
+
+// 批量移动公海：对选中已绑客户逐条调用归因调整(promoterId 置空=解除归因→落入公海)。
+// 无批量后端接口，前端用 Promise.allSettled 并发；操作前二次确认，完成后汇报成功/失败并刷新列表与左树统计。
+async function handleBatchMoveSea() {
+  const rows = seaSelection.value.filter((r) => r.objectId != null);
+  if (rows.length === 0) {
+    ElMessage.warning('请先勾选要移动的客户');
+    return;
+  }
+  const objName = seaObjectType.value === 'company' ? '企业' : '面试者';
+  try {
+    await ElMessageBox.confirm(
+      `确认将选中的 ${rows.length} 个${objName}移动到公海？移动后将解除其推广归因（清除来源推广人与推广码、归因时间），可在「公海客户」中重新分配。`,
+      '批量移动公海',
+      { type: 'warning', confirmButtonText: '确认移动', cancelButtonText: '取消' }
+    );
+  } catch {
+    return; // 用户取消
+  }
+  seaLoading.value = true;
+  try {
+    const objectType = seaObjectType.value; // 'company' | 'user'
+    const results = await Promise.allSettled(
+      rows.map((r) => adjustPromoterAttribution({ objectType, objectId: r.objectId as string | number, promoterId: undefined }))
+    );
+    const ok = results.filter((r) => r.status === 'fulfilled').length;
+    const fail = results.length - ok;
+    if (fail === 0) {
+      ElMessage.success(`已将 ${ok} 个${objName}移动到公海`);
+    } else {
+      ElMessage.warning(`移动完成：成功 ${ok} 个，失败 ${fail} 个`);
+    }
+    seaTableRef.value?.clearSelection?.();
+    seaSelection.value = [];
+    loadCustomerList();
+    loadPromoterTree(); // 归因变化，刷新左树绑定统计
+  } finally {
+    seaLoading.value = false;
+  }
+}
+
+// 已绑推广码客户导出：B端走 company-detail/export、C端走 user-detail/export，沿用当前关键字/推广人/状态/时间筛选
+function handleCustomerExport() {
+  const [beginDate, endDate] = seaDateRange.value;
+  const isCompany = seaObjectType.value === 'company';
+  const url = isCompany ? '/admin/recruitment/promoter/company-detail/export' : '/admin/recruitment/promoter/user-detail/export';
+  const fileName = `${customerTableTitle.value}_${new Date().getTime()}.xlsx`;
+  download(
+    url,
+    {
+      keyword: seaQuery.keyword || undefined,
+      status: seaQuery.status || undefined,
+      promoterKeyword: seaQuery.promoterKeyword || undefined,
+      beginTime: beginDate ? `${beginDate} 00:00:00` : undefined,
+      endTime: endDate ? `${endDate} 23:59:59` : undefined
+    },
+    fileName
+  );
 }
 
 function buildQuery(): PromoterQuery {
@@ -3382,6 +3652,55 @@ onUnmounted(() => {
 .query-card,
 .table-card {
   margin-bottom: 16px;
+}
+
+/* 客户管理-已绑：左树右表布局 */
+.customer-layout.has-tree {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.customer-layout .customer-main {
+  flex: 1;
+  min-width: 0; /* 防止表格撑破 flex 容器 */
+}
+.promoter-tree-card {
+  width: 280px;
+  flex-shrink: 0;
+  margin-bottom: 16px;
+}
+.promoter-tree-card .tree-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+}
+.promoter-tree-card .tree-search {
+  margin-bottom: 8px;
+}
+.promoter-tree {
+  max-height: 560px;
+  overflow: auto;
+}
+/* 树节点：上行姓名、下行企业/求职者统计 */
+.promoter-tree-node {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  padding: 2px 0;
+}
+.promoter-tree-node .ptn-label {
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+}
+.promoter-tree-node .ptn-stat {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+/* 让自定义节点占满整行，统计右对齐时不溢出 */
+.promoter-tree :deep(.el-tree-node__content) {
+  height: auto;
+  align-items: flex-start;
 }
 
 .overview-board,
