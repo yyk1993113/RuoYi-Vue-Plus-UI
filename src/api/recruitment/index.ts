@@ -762,6 +762,28 @@ export function getPromoterStatistics(query: PromoterQuery) {
   return request.get<PromoterStatisticsVO>(`${baseUrl}/promoter/statistics`, { params: query });
 }
 
+// 推广人分组统计：每个推广人在各周期(今日/昨日/本月/本季度/本半年/本年)的业务维度计数
+export interface PromoterGroupStatVO {
+  promoterId?: string | number;
+  name?: string;
+  phonenumber?: string;
+  identityType?: string;
+  roleName?: string;
+  periods?: Array<{
+    key: string;
+    label: string;
+    companyCount: number;
+    jobSeekerCount: number;
+    authorizedCount: number;
+    resumeCount: number;
+    applyCount: number;
+  }>;
+}
+
+export function getPromoterGroupStatistics() {
+  return request.get<PromoterGroupStatVO[]>(`${baseUrl}/promoter/group-statistics`);
+}
+
 // 企业端概览查询已并入 getPromoterStatistics（/promoter/statistics），不再单独提供接口。
 
 export function listPromoterCompanyDetail(query: PromotionAttributionQuery) {

@@ -194,7 +194,7 @@
               <div class="chart-panel">
                 <div class="panel-head">
                   <span>内部/渠道分布</span>
-                  <el-tag size="small" effect="plain">当前筛选数据</el-tag>
+                  <el-tag size="small" effect="plain">本年快照</el-tag>
                 </div>
                 <div ref="identityDistributionChartRef" class="chart-main compact"></div>
               </div>
@@ -287,7 +287,19 @@
 
             <el-form :model="statisticsQuery" :inline="true" label-width="76px" class="statistics-filter">
               <el-form-item label="推广人">
-                <el-input v-model="statisticsQuery.name" placeholder="姓名/昵称" clearable style="width: 180px" @keyup.enter="loadStatistics" />
+                <el-select
+                  v-model="statisticsQuery.name"
+                  filterable
+                  allow-create
+                  default-first-option
+                  clearable
+                  placeholder="选择或输入 姓名/昵称"
+                  style="width: 180px"
+                  @change="loadStatistics"
+                  @clear="loadStatistics"
+                >
+                  <el-option v-for="p in promoterSelectOptions" :key="p.key" :label="p.label" :value="p.value" />
+                </el-select>
               </el-form-item>
               <el-form-item label="身份">
                 <el-select v-model="statisticsQuery.identityType" placeholder="全部" clearable style="width: 150px">
@@ -474,13 +486,19 @@
                 </el-radio-group>
               </el-form-item>
               <el-form-item label="推广人">
-                <el-input
+                <el-select
                   v-model="detailQuery.promoterKeyword"
-                  placeholder="姓名/手机号"
+                  filterable
+                  allow-create
+                  default-first-option
                   clearable
-                  style="width: 180px"
-                  @keyup.enter="handleAttributionQuery"
-                />
+                  placeholder="选择或输入 姓名/手机号"
+                  style="width: 200px"
+                  @change="handleAttributionQuery"
+                  @clear="handleAttributionQuery"
+                >
+                  <el-option v-for="p in promoterSelectOptions" :key="p.key" :label="p.label" :value="p.value" />
+                </el-select>
               </el-form-item>
               <el-form-item label="身份">
                 <el-select v-model="detailQuery.identityType" placeholder="全部" clearable style="width: 150px">
@@ -609,12 +627,12 @@
             <el-tab-pane label="公海客户" name="sea" />
           </el-tabs>
 
-          <!-- 已绑口径：左树(壹聘 根 > 全部推广人 员工，节点带企业/求职者统计) + 右表(按选中员工 promoterId 过滤推广明细)；公海无推广人不展示树 -->
+          <!-- 已绑口径：左树(部门壹聘 > 按推广人身份分组 > 员工) + 右表(按选中身份/员工过滤推广明细)；公海无推广人不展示树 -->
           <div class="customer-layout" :class="{ 'has-tree': customerScope === 'bound' }">
-            <el-card v-if="customerScope === 'bound'" shadow="never" class="promoter-tree-card">
+            <el-card v-if="customerScope === 'bound'" v-loading="promoterTreeLoading" shadow="never" class="promoter-tree-card">
               <template #header>
                 <div class="tree-head">
-                  <span>壹聘员工</span>
+                  <span>推广人员</span>
                   <el-button link type="primary" icon="Refresh" @click="loadPromoterTree">刷新</el-button>
                 </div>
               </template>
@@ -626,29 +644,23 @@
                 prefix-icon="Search"
                 class="tree-search"
               />
-              <!-- 懒加载异步树：根节点秒出，员工节点展开时并行拉取(花名册+绑定统计)，非阻塞 -->
+              <!-- 静态分组树：根 > 身份分组(内部/外部/合伙人，按列表实际身份动态生成) > 员工 -->
               <el-tree
                 ref="promoterTreeRef"
-                :key="promoterTreeKey"
-                lazy
-                :load="loadPromoterTreeNode"
+                :data="promoterTreeData"
                 node-key="id"
                 highlight-current
                 :current-node-key="selectedPromoterNodeId"
-                :default-expanded-keys="promoterTreeExpandedKeys"
                 :expand-on-click-node="false"
+                default-expand-all
                 :filter-node-method="filterPromoterTreeNode"
                 class="promoter-tree"
                 @node-click="handlePromoterNodeClick"
-                @node-expand="handlePromoterNodeExpand"
-                @node-collapse="handlePromoterNodeCollapse"
               >
                 <template #default="{ data }">
                   <span class="promoter-tree-node">
                     <span class="ptn-label">{{ data.label }}</span>
-                    <span v-if="data.id !== 'ROOT' || rootStatLoaded" class="ptn-stat">
-                      企业 {{ nodeStatText(data).companyCount }} · 求职 {{ nodeStatText(data).jobSeekerCount }}
-                    </span>
+                    <span class="ptn-stat">企业 {{ data.companyCount }} · 求职 {{ data.jobSeekerCount }}</span>
                   </span>
                 </template>
               </el-tree>
@@ -668,14 +680,19 @@
                     />
                   </el-form-item>
                   <el-form-item v-if="customerScope === 'bound'" label="推广人">
-                    <el-input
+                    <el-select
                       v-model="seaQuery.promoterKeyword"
-                      placeholder="推广人姓名/手机号"
+                      filterable
+                      allow-create
+                      default-first-option
                       clearable
-                      style="width: 180px"
-                      @keyup.enter="handleSeaQuery"
+                      placeholder="选择或输入 姓名/手机号"
+                      style="width: 200px"
+                      @change="handleSeaQuery"
                       @clear="handleSeaQuery"
-                    />
+                    >
+                      <el-option v-for="p in promoterSelectOptions" :key="p.key" :label="p.label" :value="p.value" />
+                    </el-select>
                   </el-form-item>
                   <el-form-item label="状态">
                     <el-select v-model="seaQuery.status" placeholder="全部" clearable style="width: 150px">
@@ -956,6 +973,65 @@
             />
           </el-card>
         </el-tab-pane>
+
+        <!-- 推广人分组统计：身份 > 内部按岗位/角色 > 推广人；每列=本期值+环比上一期 -->
+        <el-tab-pane v-if="isAdminUser" label="推广人分组统计" name="personnelGroup">
+          <div v-loading="groupStatLoading" class="overview-board">
+            <div class="board-head">
+              <div>
+                <div class="board-title">推广人分组统计</div>
+                <div class="board-subtitle">按身份(内部/外部/合伙人) → 内部按岗位/角色 → 推广人，选维度看各周期数据与环比</div>
+              </div>
+              <div class="board-actions">
+                <el-radio-group v-model="groupStatMetric">
+                  <el-radio-button v-for="m in groupMetricOptions" :key="m.value" :value="m.value">{{ m.label }}</el-radio-button>
+                </el-radio-group>
+                <el-button type="primary" plain icon="DataAnalysis" @click="openCompareDialog">多维度比较</el-button>
+                <el-button icon="Refresh" :loading="groupStatLoading" @click="loadPromoterGroupStat">刷新</el-button>
+              </div>
+            </div>
+            <div class="overview-table">
+              <div class="panel-head">
+                <span>分组贡献 · {{ groupMetricOptions.find((m) => m.value === groupStatMetric)?.label }}</span>
+                <el-tag size="small" effect="plain">本期值 / 环比上一期</el-tag>
+              </div>
+              <el-table
+                :data="personnelGroupRows"
+                row-key="id"
+                border
+                stripe
+                default-expand-all
+                :tree-props="{ children: 'children' }"
+                :row-class-name="groupRowClass"
+                class="group-stat-table"
+              >
+                <el-table-column label="身份 / 岗位 / 推广人" min-width="240" fixed>
+                  <template #default="{ row }">
+                    <span :class="row.nodeType === 'promoter' ? 'sub-text' : 'name-text'">{{ row.name }}</span>
+                    <el-tag v-if="row.nodeType === 'group'" type="primary" size="small" effect="plain" style="margin-left: 6px">身份</el-tag>
+                    <el-tag v-else-if="row.nodeType === 'role'" type="info" size="small" effect="plain" style="margin-left: 6px">岗位</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column v-for="col in GROUP_COMPARE_COLUMNS" :key="col.key" width="116" align="center">
+                  <template #header>
+                    <div class="gc-head">
+                      <span>{{ col.label }}</span>
+                      <span class="gc-head-sub">{{ col.cmp }}</span>
+                    </div>
+                  </template>
+                  <template #default="{ row }">
+                    <div class="group-cell">
+                      <span class="gc-value">{{ row[col.key] }}</span>
+                      <span class="gc-diff" :class="groupDiffClass(row[col.key] - row[col.prev])">{{
+                        formatGroupDiff(row[col.key] - row[col.prev])
+                      }}</span>
+                    </div>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </div>
 
@@ -1115,6 +1191,55 @@
       </el-descriptions>
     </el-dialog>
 
+    <!-- 多维度比较：同一身份分类内(内部vs内部、外部vs外部、合伙人vs合伙人)的推广人在各业务维度上对比 -->
+    <el-dialog v-model="compareDialogVisible" title="多维度比较" width="78%" top="6vh" append-to-body @opened="renderCompareChart">
+      <div class="compare-toolbar">
+        <div class="compare-toolbar-item">
+          <span class="compare-label">身份分类</span>
+          <el-radio-group v-model="compareIdentity">
+            <el-radio-button v-for="t in compareIdentities" :key="t" :value="t">{{ identityTypeText(t) }}</el-radio-button>
+          </el-radio-group>
+        </div>
+        <div class="compare-toolbar-item">
+          <span class="compare-label">周期</span>
+          <el-select v-model="comparePeriod" style="width: 130px">
+            <el-option v-for="p in COMPARE_PERIOD_OPTIONS" :key="p.key" :label="p.label" :value="p.key" />
+          </el-select>
+        </div>
+        <div class="compare-toolbar-item">
+          <span class="compare-label">选择推广人</span>
+          <el-select
+            v-model="compareSelectedIds"
+            multiple
+            filterable
+            clearable
+            collapse-tags
+            collapse-tags-tooltip
+            placeholder="全部（可多选指定人对比）"
+            style="min-width: 260px; max-width: 380px"
+          >
+            <el-option v-for="c in compareCandidates" :key="c.id" :label="`${c.name}（${c.phonenumber || '-'}）`" :value="c.id" />
+          </el-select>
+        </div>
+      </div>
+      <el-empty v-if="!compareMembers.length" description="该分类下暂无推广人数据" />
+      <template v-else>
+        <div ref="compareChartRef" class="compare-chart"></div>
+        <el-table :data="compareMembers" border stripe size="small" max-height="260" class="compare-table">
+          <el-table-column label="推广人" min-width="170" show-overflow-tooltip>
+            <template #default="{ row }">
+              <div class="name-cell">
+                <span class="name-text">{{ row.name }}</span>
+                <span class="sub-text">{{ row.phonenumber || '-' }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column v-for="m in groupMetricOptions" :key="m.value" :label="m.label" :prop="m.value" width="110" align="center" />
+          <el-table-column label="合计" prop="total" width="90" align="center" />
+        </el-table>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="promoterDrilldownVisible" :title="promoterDrilldownTitle" width="920px" append-to-body>
       <div class="dialog-toolbar">
         <el-tag type="primary" effect="plain">推广渠道维护</el-tag>
@@ -1249,6 +1374,7 @@ import {
   getCompany,
   getPromoter,
   getPromoterStatistics,
+  getPromoterGroupStatistics,
   listPromoterCompanyDetail,
   listPromoterUserDetail,
   listSeaCustomerCompany,
@@ -1276,7 +1402,7 @@ import { companyStatusMeta } from './constants';
 type TagType = 'primary' | 'success' | 'warning' | 'danger' | 'info';
 type StatisticsSide = 'all' | 'company' | 'jobSeeker';
 type DetailObjectType = 'company' | 'user';
-type ActiveTab = 'overview' | 'companyOverview' | 'userOverview' | 'identity' | 'statistics' | 'statisticsDetail' | 'sea' | 'list';
+type ActiveTab = 'overview' | 'companyOverview' | 'userOverview' | 'personnelGroup' | 'identity' | 'statistics' | 'statisticsDetail' | 'sea' | 'list';
 type CountLike = Pick<PromoterStatisticsGroup, 'companyCount' | 'jobSeekerCount'>;
 type OverviewPeriodMetric = 'companyCount' | 'jobSeekerCount' | 'authorizedCount' | 'resumeCount' | 'applyCount';
 type DrilldownMetric = 'company' | 'jobSeeker' | 'authorized' | 'resume' | 'apply';
@@ -1412,117 +1538,327 @@ const seaQuery = reactive<PromotionAttributionQuery>({
   keyword: '',
   status: '',
   promoterKeyword: '',
-  promoterId: undefined
+  promoterId: undefined,
+  identityType: undefined
 });
 
 // 已绑列表多选 + 批量移动公海
 const seaTableRef = ref();
 const seaSelection = ref<PromotionAttributionDetailVO[]>([]);
 
-// 已绑客户左树（懒加载异步树）：根=部门壹聘(全部)，展开后子=全部推广人(员工)，节点带 企业数/求职者数 统计；点击员工→右表按 promoterId 过滤
+// 已绑客户左树（推广人员）：根=部门壹聘 > 按推广人身份动态分组(内部人员/外部渠道/合伙人) > 员工。
+// 点击根=全部、点击身份组=按 identityType 过滤、点击员工=按 promoterId 过滤右表。
 const promoterTreeRef = ref();
 const promoterTreeKeyword = ref('');
 const selectedPromoterNodeId = ref<string>('ROOT'); // 当前选中节点 id，'ROOT'=壹聘=全部
-const promoterTreeKey = ref(0); // 变更即重挂树(用于「刷新」强制重拉懒加载)
-const promoterTreeExpandedKeys = ref<string[]>(['ROOT']); // 默认展开根，员工异步流入
-const rootStat = ref({ companyCount: 0, jobSeekerCount: 0 }); // 全员合计（员工加载后回填）
-const rootStatLoaded = ref(false);
+const promoterTreeLoading = ref(false);
+const promoterTreeLoaded = ref(false);
+// 员工原始节点(含身份)，分组由 computed 派生
+const promoterEmployees = ref<
+  Array<{ id: string; label: string; promoterId: any; identityType?: string; companyCount: number; jobSeekerCount: number }>
+>([]);
 
-// 员工节点缓存：同一份 Promise 复用，避免切 tab/口径或折叠展开时重复请求统计接口
-let employeesPromise: Promise<any[]> | null = null;
-
-// 拉取员工节点：listPromoter(全员花名册) 与 getPromoterStatistics(真实绑定量) 并行，
-// 真实绑定量取自统计 rows（与右表/活跃统计同源）；listPromoter 自带的 companyCount 是表单手填值故不用。
-function fetchPromoterEmployees(force = false): Promise<any[]> {
-  if (force) employeesPromise = null;
-  if (!employeesPromise) {
-    employeesPromise = (async () => {
-      const [pRes, sRes] = await Promise.all([
-        listPromoter({ pageNum: 1, pageSize: 1000 }),
-        getPromoterStatistics({}).catch(() => null) // 统计异常不阻断树，退化为 0
-      ]);
-      const roster = unwrapList<PromoterVO>(pRes).rows;
-      const statMap = new Map<string, { companyCount: number; jobSeekerCount: number }>();
-      for (const r of (sRes as any)?.data?.rows || []) {
-        statMap.set(String(r.promoterId), { companyCount: r.companyCount ?? 0, jobSeekerCount: r.jobSeekerCount ?? 0 });
-      }
-      const nodes = roster.map((p) => {
-        const s = statMap.get(String(p.promoterId));
-        return {
-          id: String(p.promoterId),
-          label: `${p.name || '-'}（${p.phonenumber || '-'}）`,
-          promoterId: p.promoterId,
-          companyCount: s?.companyCount ?? 0,
-          jobSeekerCount: s?.jobSeekerCount ?? 0,
-          isLeaf: true
-        };
-      });
-      rootStat.value = {
-        companyCount: nodes.reduce((a, n) => a + n.companyCount, 0),
-        jobSeekerCount: nodes.reduce((a, n) => a + n.jobSeekerCount, 0)
-      };
-      rootStatLoaded.value = true;
-      return nodes;
-    })().catch((e) => {
-      employeesPromise = null; // 失败允许下次重试
-      throw e;
-    });
-  }
-  return employeesPromise;
+// 身份归一：0 内部 / 2 合伙人 / 其它(含1、空)归外部，保证三组口径稳定
+function normalizeTreeIdentity(value?: string) {
+  const s = String(value ?? '');
+  return s === '0' ? '0' : s === '2' ? '2' : '1';
 }
 
-// el-tree 懒加载回调：level 0 返回根节点(秒出)，展开根时异步返回员工(node 自带 loading)
-async function loadPromoterTreeNode(node: any, resolve: (data: any[]) => void) {
-  if (node.level === 0) {
-    resolve([{ id: 'ROOT', label: '部门壹聘', promoterId: '', isLeaf: false }]);
-    return;
-  }
-  if (node.data?.id === 'ROOT') {
-    try {
-      resolve(await fetchPromoterEmployees());
-    } catch {
-      resolve([]);
+// 树数据：部门壹聘(根) > 出现过的身份分组 > 员工；各级带企业/求职者合计
+const promoterTreeData = computed(() => {
+  const emps = promoterEmployees.value;
+  const sum = (list: typeof emps, key: 'companyCount' | 'jobSeekerCount') => list.reduce((a, m) => a + (m[key] || 0), 0);
+  const groups = ['0', '1', '2']
+    .map((t) => ({ t, members: emps.filter((e) => normalizeTreeIdentity(e.identityType) === t) }))
+    .filter((g) => g.members.length > 0) // 动态：只显示列表中实际存在的身份
+    .map((g) => ({
+      id: `GRP-${g.t}`,
+      label: identityTypeText(g.t),
+      nodeType: 'group',
+      identityType: g.t,
+      companyCount: sum(g.members, 'companyCount'),
+      jobSeekerCount: sum(g.members, 'jobSeekerCount'),
+      children: g.members
+    }));
+  return [
+    {
+      id: 'ROOT',
+      label: '部门壹聘',
+      nodeType: 'root',
+      companyCount: sum(emps, 'companyCount'),
+      jobSeekerCount: sum(emps, 'jobSeekerCount'),
+      children: groups
     }
-    return;
+  ];
+});
+
+// 拉取推广人花名册并回填真实绑定量(企业/求职者)：listPromoter 与 getPromoterStatistics 并行；
+// listPromoter 自带的 companyCount 是表单手填值，真实绑定量取自统计 rows(与右表/活跃统计同源)。
+async function loadPromoterTree() {
+  if (promoterTreeLoading.value) return;
+  promoterTreeLoading.value = true;
+  try {
+    const [pRes, sRes] = await Promise.all([listPromoter({ pageNum: 1, pageSize: 1000 }), getPromoterStatistics({}).catch(() => null)]);
+    const roster = unwrapList<PromoterVO>(pRes).rows;
+    const statMap = new Map<string, { companyCount: number; jobSeekerCount: number }>();
+    for (const r of (sRes as any)?.data?.rows || []) {
+      statMap.set(String(r.promoterId), { companyCount: r.companyCount ?? 0, jobSeekerCount: r.jobSeekerCount ?? 0 });
+    }
+    promoterEmployees.value = roster.map((p) => {
+      const s = statMap.get(String(p.promoterId));
+      return {
+        id: String(p.promoterId),
+        label: `${p.name || '-'}（${p.phonenumber || '-'}）`,
+        promoterId: p.promoterId,
+        identityType: p.identityType,
+        companyCount: s?.companyCount ?? 0,
+        jobSeekerCount: s?.jobSeekerCount ?? 0
+      };
+    });
+    promoterTreeLoaded.value = true;
+  } finally {
+    promoterTreeLoading.value = false;
   }
-  resolve([]);
 }
 
-// 「刷新」：清缓存 + 重挂树强制重拉懒加载（保留展开状态，根展开则自动重载）
-function loadPromoterTree() {
-  employeesPromise = null;
-  rootStatLoaded.value = false;
-  rootStat.value = { companyCount: 0, jobSeekerCount: 0 };
-  promoterTreeKey.value++;
+// 已绑口径首次进入/切回时按需加载(已加载则用缓存，不重复请求)
+function ensurePromoterTree() {
+  if (!promoterTreeLoaded.value) loadPromoterTree();
 }
 
-// 节点统计文案：根用全员合计，员工用各自绑定量
-function nodeStatText(data: any) {
-  if (data.id === 'ROOT') return rootStat.value;
-  return { companyCount: data.companyCount ?? 0, jobSeekerCount: data.jobSeekerCount ?? 0 };
+// 各处「选推广人」筛选共用的下拉选项：可下拉选择，也可 allow-create 任意输入做模糊查询
+const promoterSelectOptions = computed(() =>
+  allPromoters.value
+    .map((p) => ({
+      key: String(p.promoterId),
+      value: p.name || p.phonenumber || '',
+      label: `${p.name || '-'}（${p.phonenumber || '-'}）`
+    }))
+    .filter((o) => o.value)
+);
+
+// ===== 推广人分组统计：身份(内部/外部/合伙人) > 内部按岗位/角色 > 推广人；周期作列、选一个维度、带比较 =====
+// 数据源为后端 group-statistics（每人×每周期×5维度，口径按归因时间），前端按身份/岗位分组并逐层汇总。
+const groupStatRows = ref<any[]>([]);
+const groupStatLoading = ref(false);
+const groupStatMetric = ref<'companyCount' | 'jobSeekerCount' | 'authorizedCount' | 'resumeCount' | 'applyCount'>('companyCount');
+const groupMetricOptions = [
+  { value: 'companyCount', label: 'B端企业' },
+  { value: 'jobSeekerCount', label: 'C端求职者' },
+  { value: 'authorizedCount', label: '授权手机号' },
+  { value: 'resumeCount', label: '完成简历' },
+  { value: 'applyCount', label: '产生投递' }
+];
+// 展示列：每列=本期值 + 环比上一期（今日较昨日 / 本月较上月 / 本季度较上季度 / 本半年较上半年 / 本年较去年）
+const GROUP_COMPARE_COLUMNS = [
+  { key: 'today', label: '今日', prev: 'yesterday', cmp: '较昨日' },
+  { key: 'month', label: '本月', prev: 'lastMonth', cmp: '较上月' },
+  { key: 'quarter', label: '本季度', prev: 'lastQuarter', cmp: '较上季度' },
+  { key: 'halfYear', label: '本半年', prev: 'lastHalfYear', cmp: '较上半年' },
+  { key: 'year', label: '本年', prev: 'lastYear', cmp: '较去年' }
+];
+// 需要从后端取数汇总的全部周期键（含各对比基准期）
+const GROUP_ALL_PERIOD_KEYS = ['today', 'yesterday', 'month', 'lastMonth', 'quarter', 'lastQuarter', 'halfYear', 'lastHalfYear', 'year', 'lastYear'];
+
+// 比较值格式与着色
+function formatGroupDiff(d: number) {
+  return d > 0 ? `+${d}` : String(d);
+}
+function groupDiffClass(d: number) {
+  return d > 0 ? 'diff-up' : d < 0 ? 'diff-down' : 'diff-flat';
+}
+// 分组行底色：身份组/岗位组高亮
+function groupRowClass({ row }: { row: any }) {
+  return row.nodeType === 'group' ? 'pg-row-group' : row.nodeType === 'role' ? 'pg-row-role' : '';
 }
 
-// 记录展开状态，便于刷新重挂后保持
-function handlePromoterNodeExpand(data: any) {
-  if (!promoterTreeExpandedKeys.value.includes(data.id)) promoterTreeExpandedKeys.value.push(data.id);
-}
-function handlePromoterNodeCollapse(data: any) {
-  promoterTreeExpandedKeys.value = promoterTreeExpandedKeys.value.filter((k) => k !== data.id);
+// ===== 多维度比较弹窗：同一身份分类内的推广人在 5 个业务维度上对比（内部vs内部、外部vs外部、合伙人vs合伙人）=====
+const compareDialogVisible = ref(false);
+const compareIdentity = ref<string>('0');
+const comparePeriod = ref<string>('year');
+const compareChartRef = ref<HTMLElement | null>(null);
+let compareChart: echarts.ECharts | null = null;
+const COMPARE_PERIOD_OPTIONS = [
+  { key: 'today', label: '今日' },
+  { key: 'month', label: '本月' },
+  { key: 'quarter', label: '本季度' },
+  { key: 'halfYear', label: '本半年' },
+  { key: 'year', label: '本年' }
+];
+
+// 当前数据中存在的身份分类(0内部/1外部/2合伙人)
+const compareIdentities = computed(() => ['0', '1', '2'].filter((t) => groupStatRows.value.some((r) => normalizeTreeIdentity(r.identityType) === t)));
+
+// 选定身份分类下的候选推广人（用于「选人」下拉与表格/雷达），含各维度值
+const compareCandidates = computed(() => {
+  const period = comparePeriod.value;
+  return groupStatRows.value
+    .filter((r) => normalizeTreeIdentity(r.identityType) === compareIdentity.value)
+    .map((r) => {
+      const v: Record<string, any> = { id: String(r.promoterId), promoterId: r.promoterId, name: r.name || '-', phonenumber: r.phonenumber };
+      let total = 0;
+      for (const m of groupMetricOptions) {
+        const val = groupPeriodValue(r.periods, period, m.value);
+        v[m.value] = val;
+        total += val;
+      }
+      v.total = total;
+      return v;
+    });
+});
+// 已选推广人 id；为空表示「全部」
+const compareSelectedIds = ref<string[]>([]);
+// 实际参与比较的推广人：选了就只比选中的，未选默认全部
+const compareMembers = computed(() => {
+  const ids = compareSelectedIds.value;
+  if (!ids.length) return compareCandidates.value;
+  const set = new Set(ids);
+  return compareCandidates.value.filter((c) => set.has(c.id));
+});
+
+function openCompareDialog() {
+  if (!groupStatRows.value.length) loadPromoterGroupStat();
+  // 默认选中存在的第一个分类
+  if (!compareIdentities.value.includes(compareIdentity.value)) {
+    compareIdentity.value = compareIdentities.value[0] || '0';
+  }
+  compareSelectedIds.value = []; // 默认全部
+  compareDialogVisible.value = true;
 }
 
-// 树本地搜索：按节点 label(姓名/手机) 过滤（懒加载下对已加载节点生效）
+// 切换身份分类时清空已选推广人(旧分类的选中在新分类无效)，回到「全部」
+watch(compareIdentity, () => {
+  compareSelectedIds.value = [];
+});
+
+// 雷达图：5 个维度各一轴(按本组最大值归一)，每个推广人一个多边形，便于同类多维对比
+function renderCompareChart() {
+  nextTick(() => {
+    const el = compareChartRef.value;
+    if (!el) return;
+    if (!compareChart) compareChart = echarts.init(el);
+    const members = compareMembers.value;
+    const indicators = groupMetricOptions.map((m) => ({
+      name: m.label,
+      max: Math.max(1, ...members.map((mem) => Number(mem[m.value]) || 0))
+    }));
+    compareChart.setOption(
+      {
+        tooltip: { trigger: 'item' },
+        legend: { type: 'scroll', bottom: 0 },
+        radar: {
+          indicator: indicators,
+          radius: '62%',
+          center: ['50%', '48%'],
+          axisName: { fontSize: 12, color: 'var(--el-text-color-regular)' }
+        },
+        series: [
+          {
+            type: 'radar',
+            areaStyle: { opacity: 0.08 },
+            emphasis: { areaStyle: { opacity: 0.2 } },
+            data: members.map((mem) => ({
+              name: mem.name,
+              value: groupMetricOptions.map((m) => Number(mem[m.value]) || 0)
+            }))
+          }
+        ]
+      },
+      true
+    );
+    compareChart.resize();
+  });
+}
+
+// 切换分类/周期即重绘
+watch([compareIdentity, comparePeriod, compareMembers], () => {
+  if (compareDialogVisible.value) renderCompareChart();
+});
+
+async function loadPromoterGroupStat() {
+  if (!isAdminUser.value) return;
+  groupStatLoading.value = true;
+  try {
+    const res: any = await getPromoterGroupStatistics();
+    groupStatRows.value = res?.data || [];
+  } finally {
+    groupStatLoading.value = false;
+  }
+}
+
+// 取某人某周期下选定维度的值
+function groupPeriodValue(periods: any[], periodKey: string, metric: string) {
+  const p = (periods || []).find((x) => x.key === periodKey);
+  return p ? toCount(p[metric]) : 0;
+}
+// 一组人按各周期(含对比基准期)汇总选定维度
+function buildGroupCells(members: any[], metric: string) {
+  const cell: Record<string, number> = {};
+  for (const k of GROUP_ALL_PERIOD_KEYS) cell[k] = members.reduce((s, m) => s + groupPeriodValue(m.periods, k, metric), 0);
+  return cell;
+}
+
+// 分组树：身份组 + (内部下按岗位/角色再分组) + 推广人叶子；身份与岗位均动态取自列表
+const personnelGroupRows = computed(() => {
+  const rows = groupStatRows.value;
+  const metric = groupStatMetric.value;
+  const leaf = (m: any) => ({
+    id: `pg-p-${m.promoterId}`,
+    name: `${m.name || '-'}（${m.phonenumber || '-'}）`,
+    nodeType: 'promoter',
+    ...buildGroupCells([m], metric)
+  });
+  const result: any[] = [];
+  for (const idt of ['0', '1', '2']) {
+    const members = rows.filter((r) => normalizeTreeIdentity(r.identityType) === idt);
+    if (!members.length) continue;
+    const node: any = { id: `pg-grp-${idt}`, name: identityTypeText(idt), nodeType: 'group', ...buildGroupCells(members, metric) };
+    if (idt === '0') {
+      // 内部：动态按岗位/角色细分(实习生/销售岗/拓展岗…)；无岗位归「未分配岗位」
+      const byRole = new Map<string, any[]>();
+      for (const m of members) {
+        const role = (m.roleName && String(m.roleName).trim()) || '未分配岗位';
+        if (!byRole.has(role)) byRole.set(role, []);
+        byRole.get(role)!.push(m);
+      }
+      node.children = [...byRole.entries()].map(([role, list]) => ({
+        id: `pg-grp-0-${role}`,
+        name: role,
+        nodeType: 'role',
+        ...buildGroupCells(list, metric),
+        children: list.map(leaf)
+      }));
+    } else {
+      node.children = members.map(leaf);
+    }
+    result.push(node);
+  }
+  return result;
+});
+
+// 树本地搜索：按员工节点 label(姓名/手机) 过滤；命中员工时其身份父组会自动保留
 function filterPromoterTreeNode(value: string, data: any) {
   if (!value) return true;
+  if (data.nodeType === 'root' || data.nodeType === 'group') return false; // 让命中逻辑落到员工叶子
   return String(data.label).includes(value);
 }
 watch(promoterTreeKeyword, (val) => {
   promoterTreeRef.value?.filter(val);
 });
 
-// 点击树节点：根=清除推广人过滤看全部，员工=按其 promoterId 过滤右表
+// 点击树节点：根=看全部；身份组=按 identityType 过滤；员工=按 promoterId 过滤右表
 function handlePromoterNodeClick(data: any) {
   selectedPromoterNodeId.value = data.id;
-  seaQuery.promoterId = data.id === 'ROOT' ? undefined : data.promoterId;
+  if (data.nodeType === 'group') {
+    seaQuery.promoterId = undefined;
+    seaQuery.identityType = data.identityType;
+  } else if (data.nodeType === 'root') {
+    seaQuery.promoterId = undefined;
+    seaQuery.identityType = undefined;
+  } else {
+    seaQuery.promoterId = data.promoterId;
+    seaQuery.identityType = undefined;
+  }
   seaQuery.pageNum = 1;
   loadCustomerList();
 }
@@ -2552,11 +2888,17 @@ function handleTabChange(name: string | number) {
   if (name === 'identity') {
     scheduleIdentityCharts();
   } else if (name === 'statistics') {
+    ensurePromotersLoaded(); // 「推广人」筛选下拉选项
     scheduleStatisticsCharts();
+  } else if (name === 'personnelGroup') {
+    loadPromoterGroupStat();
   } else if (name === 'statisticsDetail') {
+    ensurePromotersLoaded();
     loadAttributionDetails();
   } else if (name === 'sea') {
-    // 进入客户管理：左树为懒加载异步树(展开根才拉员工，且有缓存)，此处只加载右表
+    // 进入客户管理：已绑口径按需加载左树(推广人员，含缓存)，并加载右表
+    ensurePromotersLoaded();
+    if (customerScope.value === 'bound') ensurePromoterTree();
     loadCustomerList();
   }
 }
@@ -2606,6 +2948,7 @@ async function loadCustomerList() {
       // 推广人关键字/树选中员工仅在「已绑」口径有意义；公海无推广人，置空避免误传
       promoterKeyword: isSea ? undefined : seaQuery.promoterKeyword || undefined,
       promoterId: isSea ? undefined : seaQuery.promoterId || undefined,
+      identityType: isSea ? undefined : seaQuery.identityType || undefined,
       beginTime: beginDate ? `${beginDate} 00:00:00` : undefined,
       endTime: endDate ? `${endDate} 23:59:59` : undefined
     });
@@ -2627,8 +2970,9 @@ function resetSeaQuery() {
   seaQuery.status = '';
   seaQuery.promoterKeyword = '';
   seaDateRange.value = [];
-  // 重置同时把左树选中回到根节点(壹聘=全部)，清除员工过滤
+  // 重置同时把左树选中回到根节点(壹聘=全部)，清除身份/员工过滤
   seaQuery.promoterId = undefined;
+  seaQuery.identityType = undefined;
   selectedPromoterNodeId.value = 'ROOT';
   promoterTreeRef.value?.setCurrentKey?.('ROOT');
   seaQuery.pageNum = 1;
@@ -2644,15 +2988,16 @@ function handleSeaTypeChange() {
   loadCustomerList();
 }
 
-// 切换 已绑/公海 归因状态：公海无推广人筛选与左树，清空员工过滤后重查；进入已绑时确保树已加载
+// 切换 已绑/公海 归因状态：公海无推广人筛选与左树，清空身份/员工过滤后重查；进入已绑时按需加载树
 function handleScopeChange() {
   seaQuery.promoterKeyword = '';
   seaQuery.promoterId = undefined;
+  seaQuery.identityType = undefined;
   selectedPromoterNodeId.value = 'ROOT';
   seaQuery.pageNum = 1;
   seaTableRef.value?.clearSelection?.(); // 切换已绑/公海，清空已勾选
   seaSelection.value = [];
-  // 左树为懒加载+缓存，切回已绑时会自动复用缓存，无需主动重拉
+  if (customerScope.value === 'bound') ensurePromoterTree();
   loadCustomerList();
 }
 
@@ -2743,9 +3088,23 @@ function buildQuery(): PromoterQuery {
 async function loadData() {
   loading.value = true;
   try {
-    const res = await listPromoter(buildQuery());
-    const list = unwrapList<PromoterVO>(res);
-    tableData.value = list.rows;
+    // listPromoter 的 companyCount/jobSeekerCount 是表单手填字段(常为空)，
+    // 真实「推广码绑定数」取自 getPromoterStatistics.rows，按 promoterId 回填(与左树/活跃统计同源)；
+    // 两接口并行，统计异常不阻断列表。
+    const [pRes, sRes] = await Promise.all([listPromoter(buildQuery()), getPromoterStatistics({}).catch(() => null)]);
+    const list = unwrapList<PromoterVO>(pRes);
+    const statMap = new Map<string, { companyCount: number; jobSeekerCount: number }>();
+    for (const r of (sRes as any)?.data?.rows || []) {
+      statMap.set(String(r.promoterId), { companyCount: r.companyCount ?? 0, jobSeekerCount: r.jobSeekerCount ?? 0 });
+    }
+    tableData.value = list.rows.map((p) => {
+      const s = statMap.get(String(p.promoterId));
+      return {
+        ...p,
+        companyCount: s?.companyCount ?? p.companyCount ?? 0,
+        jobSeekerCount: s?.jobSeekerCount ?? p.jobSeekerCount ?? 0
+      };
+    });
     total.value = list.total;
   } finally {
     loading.value = false;
@@ -3181,6 +3540,8 @@ async function submitForm() {
     dialogVisible.value = false;
     await loadData();
     loadStatistics();
+    // 推广人增删改后，客户管理「壹聘员工」树缓存失效并重载，使新节点动态出现（含其绑定统计）
+    loadPromoterTree();
   } finally {
     submitting.value = false;
   }
@@ -3449,20 +3810,12 @@ function renderIdentityDistributionChart() {
   if (!el) return;
   if (!identityDistributionChart) identityDistributionChart = echarts.init(el);
   const rows = identityPeriodRows.value;
-  const internalTotal = rows.reduce(
-    (sum, item) => sum + identityPeriodInternalMetric(item, statisticsSide.value === 'all' ? undefined : statisticsSide.value),
-    0
-  );
-  const channelTotal = rows.reduce(
-    (sum, item) =>
-      sum +
-      (statisticsSide.value === 'company'
-        ? toCount(item.channelCompanyCount)
-        : statisticsSide.value === 'jobSeeker'
-          ? toCount(item.channelJobSeekerCount)
-          : identityChannelValue(item)),
-    0
-  );
+  const side = statisticsSide.value === 'all' ? undefined : statisticsSide.value;
+  // 修复：分布是「快照占比」，不能把今日/本年/本半年/本季度/本月这些相互包含的周期相加(会重复计数)。
+  // 取单一代表周期「本年」(取不到则用最广的首行)，与趋势/折线口径一致。
+  const distRow = rows.find((item) => normalizeOverviewPeriodKey(item.key || item.label) === 'year') ?? rows[0];
+  const internalTotal = distRow ? identityPeriodInternalMetric(distRow, side) : 0;
+  const channelTotal = distRow ? identityPeriodChannelMetric(distRow, side) : 0;
   const hasData = internalTotal + channelTotal > 0;
   identityDistributionChart.setOption(
     {
@@ -3624,6 +3977,7 @@ onUnmounted(() => {
   promoterChart?.dispose();
   identityChart?.dispose();
   statusChart?.dispose();
+  compareChart?.dispose();
 });
 </script>
 
@@ -3652,6 +4006,76 @@ onUnmounted(() => {
 .query-card,
 .table-card {
   margin-bottom: 16px;
+}
+
+/* 推广人分组统计：环比着色 + 单元格/表头/分组行样式 */
+.diff-up {
+  color: var(--el-color-success);
+  font-weight: 600;
+}
+.diff-down {
+  color: var(--el-color-danger);
+  font-weight: 600;
+}
+.diff-flat {
+  color: var(--el-text-color-placeholder);
+}
+.group-cell {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.group-cell .gc-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.group-cell .gc-diff {
+  font-size: 12px;
+}
+.gc-head {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.gc-head .gc-head-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--el-text-color-secondary);
+}
+.group-stat-table :deep(.pg-row-group) {
+  background: var(--el-color-primary-light-9);
+}
+.group-stat-table :deep(.pg-row-group .gc-value),
+.group-stat-table :deep(.pg-row-group .name-text) {
+  font-weight: 700;
+}
+.group-stat-table :deep(.pg-row-role) {
+  background: var(--el-fill-color-lighter);
+}
+/* 多维度比较弹窗 */
+.compare-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 12px;
+}
+.compare-toolbar .compare-toolbar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.compare-toolbar .compare-label {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+.compare-chart {
+  width: 100%;
+  height: 460px;
+}
+.compare-table {
+  margin-top: 12px;
 }
 
 /* 客户管理-已绑：左树右表布局 */
