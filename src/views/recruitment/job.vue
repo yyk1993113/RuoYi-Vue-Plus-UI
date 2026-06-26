@@ -73,6 +73,7 @@
             <el-option label="待审核" value="0" />
             <el-option label="已上架" value="1" />
             <el-option label="已下架" value="2" />
+            <el-option label="驳回" value="6" />
           </el-select>
         </el-form-item>
         <el-form-item v-show="showMoreQuery" label="工作地点" prop="workAddress">
@@ -195,7 +196,7 @@
                       @click="handleSelectApplyUsers(row)"
                     >候选人</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '0'" icon="CircleCheck" @click="handleAudit(row, '1')">审核通过</el-dropdown-item>
-                    <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '2')">审核拒绝</el-dropdown-item>
+                    <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '6')">审核拒绝</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '1'" icon="Bottom" @click="handleStatusChange(row, '2')">下架</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '2'" icon="Top" @click="handleStatusChange(row, '1')">上架</el-dropdown-item>
                     <el-dropdown-item icon="Delete" @click="handleDelete(row)">删除</el-dropdown-item>
@@ -282,21 +283,21 @@
       </template>
     </el-dialog>
 
-    <!-- 审核对话框：通过即上架（status=1），驳回需填原因（status=2，写入 remark） -->
+    <!-- 审核对话框：通过即上架（status=1），驳回写 status=6（独立驳回态，区别企业自主已下架=2） -->
     <el-dialog v-model="auditVisible" title="岗位审核" width="500px" append-to-body>
       <el-form ref="auditFormRef" :model="auditForm" label-width="80px">
         <el-form-item label="审核结果">
           <el-radio-group v-model="auditForm.status">
             <el-radio label="1">通过（上架）</el-radio>
-            <el-radio label="2">驳回</el-radio>
+            <el-radio label="6">驳回</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item :label="auditForm.status === '2' ? '驳回原因' : '备注'" :required="auditForm.status === '2'">
+        <el-form-item :label="auditForm.status === '6' ? '驳回原因' : '备注'" :required="auditForm.status === '6'">
           <el-input
             v-model="auditForm.remark"
             type="textarea"
             :rows="3"
-            :placeholder="auditForm.status === '2' ? '请填写驳回原因（必填，将告知企业）' : '请输入审核备注（选填）'"
+            :placeholder="auditForm.status === '6' ? '请填写驳回原因（必填，将告知企业）' : '请输入审核备注（选填）'"
           />
         </el-form-item>
       </el-form>
@@ -938,8 +939,8 @@ function displayPhone(row: any): string {
 }
 
 async function submitAudit() {
-  // 驳回（status=2）必须填写原因，写入 Job.remark 一并提交（后端 /job/audit 取 status + remark）
-  if (auditForm.status === '2' && !auditForm.remark.trim()) {
+  // 驳回（status=6）必须填写原因，写入 Job.remark 一并提交（后端 /job/audit 取 status + remark）
+  if (auditForm.status === '6' && !auditForm.remark.trim()) {
     ElMessage.warning('驳回岗位请填写驳回原因');
     return;
   }
