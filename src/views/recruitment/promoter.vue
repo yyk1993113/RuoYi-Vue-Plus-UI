@@ -551,7 +551,7 @@
                 </el-table-column>
                 <el-table-column label="状态" prop="statusName" width="120" align="center">
                   <template #default="{ row }">
-                    <el-tag :type="detailStatusTag(row)" size="small">{{ row.statusName || '-' }}</el-tag>
+                    <el-tag :type="detailStatusTag(row)" size="small">{{ detailStatusText(row) }}</el-tag>
                   </template>
                 </el-table-column>
                 <el-table-column v-if="detailObjectType === 'company'" label="资料完整" prop="completed" width="100" align="center">
@@ -596,6 +596,151 @@
               />
             </div>
           </div>
+        </el-tab-pane>
+
+        <!-- 客户管理：按对象类型(企业B端/面试者C端) × 归因状态(已绑推广码/公海) 两个维度查看客户，并可手动分配/调整推广人 -->
+        <el-tab-pane v-if="isAdminUser" label="客户管理" name="sea">
+          <el-tabs v-model="seaObjectType" class="sea-subtabs" @tab-change="handleSeaTypeChange">
+            <el-tab-pane label="企业B端" name="company" />
+            <el-tab-pane label="面试者C端" name="user" />
+          </el-tabs>
+          <el-tabs v-model="customerScope" class="sea-subtabs sea-scope-tabs" @tab-change="handleScopeChange">
+            <el-tab-pane label="已绑推广码客户" name="bound" />
+            <el-tab-pane label="公海客户" name="sea" />
+          </el-tabs>
+
+          <el-card shadow="never" class="query-card">
+            <el-form :inline="true" label-width="72px" class="query-form">
+              <el-form-item :label="seaObjectType === 'company' ? '企业/联系' : '昵称/手机'">
+                <el-input
+                  v-model="seaQuery.keyword"
+                  :placeholder="seaObjectType === 'company' ? '企业名称/联系人/手机号' : '昵称/姓名/手机号'"
+                  clearable
+                  style="width: 220px"
+                  @keyup.enter="handleSeaQuery"
+                  @clear="handleSeaQuery"
+                />
+              </el-form-item>
+              <el-form-item v-if="customerScope === 'bound'" label="推广人">
+                <el-input
+                  v-model="seaQuery.promoterKeyword"
+                  placeholder="推广人姓名/手机号"
+                  clearable
+                  style="width: 180px"
+                  @keyup.enter="handleSeaQuery"
+                  @clear="handleSeaQuery"
+                />
+              </el-form-item>
+              <el-form-item label="状态">
+                <el-select v-model="seaQuery.status" placeholder="全部" clearable style="width: 150px">
+                  <el-option v-for="opt in seaStatusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="创建时间">
+                <el-date-picker
+                  v-model="seaDateRange"
+                  type="daterange"
+                  value-format="YYYY-MM-DD"
+                  start-placeholder="开始日期"
+                  end-placeholder="结束日期"
+                  range-separator="-"
+                  style="width: 240px"
+                />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" icon="Search" @click="handleSeaQuery">搜索</el-button>
+                <el-button icon="Refresh" @click="resetSeaQuery">重置</el-button>
+              </el-form-item>
+            </el-form>
+          </el-card>
+
+          <el-card shadow="never" class="table-card">
+            <template #header>
+              <div class="table-head">
+                <div>
+                  <span class="table-title">{{ customerTableTitle }}</span>
+                  <span class="table-subtitle">{{
+                    customerScope === 'sea' ? '无推广来源的客户，可手动分配给推广人完成归因' : '已绑定推广码的客户，可调整其来源推广人'
+                  }}</span>
+                </div>
+                <div class="table-actions">
+                  <el-button plain icon="Refresh" @click="loadCustomerList">刷新</el-button>
+                </div>
+              </div>
+            </template>
+
+            <el-table v-loading="seaLoading" :data="seaRows" border stripe>
+              <el-table-column :label="seaObjectType === 'company' ? '企业' : '面试者'" min-width="190" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <div class="name-cell">
+                    <span class="name-text">{{ row.objectName || '-' }}</span>
+                    <span class="sub-text">{{ row.phone || '-' }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="seaObjectType === 'company'" label="联系人" prop="contactPerson" min-width="110" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.contactPerson || '-' }}</template>
+              </el-table-column>
+              <!-- 已绑客户展示来源推广人；公海客户无来源推广人不显示该列 -->
+              <el-table-column v-if="customerScope === 'bound'" label="来源推广人" min-width="160" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <div class="name-cell">
+                    <span class="name-text">{{ row.promoterName || '-' }}</span>
+                    <span class="sub-text">{{ row.promoterPhone || '-' }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="customerScope === 'bound'" label="推广人身份" width="110" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="identityTypeTag(row.identityType)" size="small">{{
+                    row.identityTypeName || identityTypeText(row.identityType)
+                  }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" prop="statusName" width="120" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="detailStatusTag(row, seaObjectType)" size="small">{{ detailStatusText(row, seaObjectType) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="seaObjectType === 'company'" label="资料完整" prop="completed" width="100" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="yesNoTag(row.completed)" size="small">{{ row.completed || '-' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="seaObjectType === 'company'" label="岗位数" prop="jobCount" width="90" align="center" />
+              <el-table-column v-if="seaObjectType === 'user'" label="授权" prop="authorized" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="yesNoTag(row.authorized)" size="small">{{ row.authorized || '-' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="seaObjectType === 'user'" label="简历" prop="resumeCompleted" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="yesNoTag(row.resumeCompleted)" size="small">{{ row.resumeCompleted || '-' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="seaObjectType === 'user'" label="投递" prop="applied" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="yesNoTag(row.applied)" size="small">{{ row.applied || '-' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
+              <el-table-column label="操作" width="130" fixed="right" align="center">
+                <template #default="{ row }">
+                  <el-button link type="primary" :icon="customerScope === 'sea' ? 'Promotion' : 'Edit'" @click="openCustomerAdjust(row)">
+                    {{ customerScope === 'sea' ? '分配推广人' : '调整推广人' }}
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <pagination
+              v-show="seaTotal > 0"
+              v-model:page="seaQuery.pageNum"
+              v-model:limit="seaQuery.pageSize"
+              :total="seaTotal"
+              @pagination="loadCustomerList"
+            />
+          </el-card>
         </el-tab-pane>
 
         <el-tab-pane label="推广渠道维护" name="list">
@@ -841,7 +986,7 @@
         </el-table-column>
         <el-table-column label="状态" prop="statusName" width="120" align="center">
           <template #default="{ row }">
-            <el-tag :type="detailStatusTag(row, drilldownObjectType)" size="small">{{ row.statusName || '-' }}</el-tag>
+            <el-tag :type="detailStatusTag(row, drilldownObjectType)" size="small">{{ detailStatusText(row, drilldownObjectType) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column v-if="drilldownObjectType === 'company'" label="资料完整" prop="completed" width="100" align="center">
@@ -941,13 +1086,42 @@
       />
     </el-dialog>
 
-    <el-dialog v-model="adjustDialogVisible" title="调整推广来源" width="460px" append-to-body>
-      <el-form :model="adjustForm" label-width="110px">
-        <el-form-item label="调整对象">
+    <el-dialog v-model="adjustDialogVisible" :title="adjustRequirePromoter ? '分配推广人' : '调整推广人'" width="520px" append-to-body>
+      <el-form :model="adjustForm" label-width="92px">
+        <el-form-item label="客户对象">
           <el-input :model-value="adjustForm.objectName" disabled />
         </el-form-item>
-        <el-form-item label="推广人ID">
-          <el-input v-model="adjustForm.promoterId" placeholder="填写推广人ID，留空则清空为自然流量" clearable />
+        <el-form-item label="推广人身份">
+          <el-radio-group v-model="adjustPromoterIdentity">
+            <el-radio-button value="">全部</el-radio-button>
+            <el-radio-button value="0">内部</el-radio-button>
+            <el-radio-button value="channel">外部</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="选择推广人">
+          <el-select
+            v-model="adjustForm.promoterId"
+            :loading="promotersLoading"
+            filterable
+            clearable
+            placeholder="输入姓名/手机号搜索后选择"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="p in adjustPromoterCandidates"
+              :key="p.promoterId"
+              :label="`${p.name || '-'}（${p.phonenumber || '-'}）`"
+              :value="p.promoterId!"
+            >
+              <span style="float: left">{{ p.name || '-' }}（{{ p.phonenumber || '-' }}）</span>
+              <el-tag :type="identityTypeTag(p.identityType)" size="small" style="float: right; margin-top: 4px">
+                {{ identityTypeText(p.identityType) }}
+              </el-tag>
+            </el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="!adjustRequirePromoter">
+          <span class="table-subtitle">不选择推广人直接确定，将清空该客户的推广归因（转为自然流量）</span>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -1002,6 +1176,8 @@ import {
   getPromoterStatistics,
   listPromoterCompanyDetail,
   listPromoterUserDetail,
+  listSeaCustomerCompany,
+  listSeaCustomerUser,
   listPromoter,
   updatePromoter,
   type PromotionAttributionAdjustForm,
@@ -1020,11 +1196,12 @@ import {
 import { download, globalHeaders } from '@/utils/request';
 import { useUserStore } from '@/store/modules/user';
 import { unwrapList } from './helpers';
+import { companyStatusMeta } from './constants';
 
 type TagType = 'primary' | 'success' | 'warning' | 'danger' | 'info';
 type StatisticsSide = 'all' | 'company' | 'jobSeeker';
 type DetailObjectType = 'company' | 'user';
-type ActiveTab = 'overview' | 'companyOverview' | 'userOverview' | 'identity' | 'statistics' | 'statisticsDetail' | 'list';
+type ActiveTab = 'overview' | 'companyOverview' | 'userOverview' | 'identity' | 'statistics' | 'statisticsDetail' | 'sea' | 'list';
 type CountLike = Pick<PromoterStatisticsGroup, 'companyCount' | 'jobSeekerCount'>;
 type OverviewPeriodMetric = 'companyCount' | 'jobSeekerCount' | 'authorizedCount' | 'resumeCount' | 'applyCount';
 type DrilldownMetric = 'company' | 'jobSeeker' | 'authorized' | 'resume' | 'apply';
@@ -1140,6 +1317,21 @@ const promoterDrilldownRows = ref<PromoterVO[]>([]);
 const promoterDrilldownTotal = ref(0);
 const adjustDialogVisible = ref(false);
 const adjustSubmitting = ref(false);
+// 分配来源的触发上下文：来自归因明细弹窗('detail') 还是客户管理列表('customer')，决定提交后刷新哪个列表
+const adjustContext = ref<'detail' | 'customer'>('detail');
+// 调整/分配弹窗：推广人候选列表（一次性拉取启用中的推广人，弹窗内按身份本地过滤 + 名称搜索）
+const allPromoters = ref<PromoterVO[]>([]);
+const promotersLoading = ref(false);
+const adjustPromoterIdentity = ref<string>(''); // '' 全部 / '0' 内部 / 'channel' 外部(渠道+合伙人)
+
+// 客户管理：对象类型(企业B端/面试者C端) × 归因状态(已绑推广码 bound / 公海 sea) 两个维度，共用一套查询/数据，切换时重新拉取。
+const seaObjectType = ref<DetailObjectType>('company');
+const customerScope = ref<'bound' | 'sea'>('bound');
+const seaLoading = ref(false);
+const seaRows = ref<PromotionAttributionDetailVO[]>([]);
+const seaTotal = ref(0);
+const seaDateRange = ref<[string, string] | []>([]);
+const seaQuery = reactive<PromotionAttributionQuery>({ pageNum: 1, pageSize: 10, keyword: '', status: '', promoterKeyword: '' });
 const statisticsTimeUnitOptions: { label: string; value: PromoterStatisticsTimeUnit }[] = [
   { label: '按日', value: 'day' },
   { label: '按年', value: 'year' },
@@ -1422,7 +1614,7 @@ function statusTag(value?: string): TagType {
 function detailStatusTag(row: PromotionAttributionDetailVO, objectType: DetailObjectType = detailObjectType.value): TagType {
   if (objectType === 'company') {
     if (row.status === '1' || row.status === 'completed' || row.status === 'published') return 'success';
-    if (row.status === '0' || row.status === 'incomplete') return 'warning';
+    if (row.status === '0' || row.status === 'incomplete' || row.status === '4') return 'warning';
     if (row.status === '2') return 'danger';
     return 'info';
   }
@@ -1430,6 +1622,12 @@ function detailStatusTag(row: PromotionAttributionDetailVO, objectType: DetailOb
   if (row.status === 'resume') return 'primary';
   if (row.status === 'authorized') return 'warning';
   return 'info';
+}
+
+// 状态文本：企业端后端 statusName 对未覆盖状态(如草稿4)会回退成原始数字，统一用企业状态字典兜底；C端 statusName 已是中文枚举直接用。
+function detailStatusText(row: PromotionAttributionDetailVO, objectType: DetailObjectType = detailObjectType.value): string {
+  if (objectType === 'company') return companyStatusMeta(row.status).label;
+  return row.statusName || '-';
 }
 
 function yesNoTag(value?: string): TagType {
@@ -2163,11 +2361,97 @@ function handleTabChange(name: string | number) {
     scheduleStatisticsCharts();
   } else if (name === 'statisticsDetail') {
     loadAttributionDetails();
+  } else if (name === 'sea') {
+    loadCustomerList();
   }
 }
 
 function handleDetailTypeChange() {
   loadAttributionDetails();
+}
+
+// 客户管理状态筛选项：B端按企业生命周期，C端按求职漏斗，与后端归因明细/公海接口的 status 口径一致
+const seaStatusOptions = computed<{ label: string; value: string }[]>(() =>
+  seaObjectType.value === 'company'
+    ? [
+        { label: '待审核', value: '0' },
+        { label: '已认证', value: '1' },
+        { label: '已禁用', value: '2' },
+        { label: '资料完整', value: 'completed' },
+        { label: '资料不全', value: 'incomplete' },
+        { label: '已发岗', value: 'published' }
+      ]
+    : [
+        { label: '已授权手机号', value: 'authorized' },
+        { label: '已完善简历', value: 'resume' },
+        { label: '已投递', value: 'apply' },
+        { label: '未填简历', value: 'unresume' },
+        { label: '未投递', value: 'unapply' }
+      ]
+);
+
+// 客户管理表格标题：随对象类型 + 归因状态变化
+const customerTableTitle = computed(() => {
+  const obj = seaObjectType.value === 'company' ? '企业（B端）' : '面试者（C端）';
+  return `${customerScope.value === 'sea' ? '公海' : '已绑推广码'}${obj}`;
+});
+
+// 客户管理列表加载：已绑(bound)走归因明细接口(含推广人)，公海(sea)走未归因接口
+async function loadCustomerList() {
+  seaLoading.value = true;
+  try {
+    const [beginDate, endDate] = seaDateRange.value;
+    const isCompany = seaObjectType.value === 'company';
+    const isSea = customerScope.value === 'sea';
+    const api = isSea ? (isCompany ? listSeaCustomerCompany : listSeaCustomerUser) : isCompany ? listPromoterCompanyDetail : listPromoterUserDetail;
+    const res = await api({
+      ...seaQuery,
+      keyword: seaQuery.keyword || undefined,
+      status: seaQuery.status || undefined,
+      // 推广人关键字仅在「已绑」口径有意义；公海无推广人，置空避免误传
+      promoterKeyword: isSea ? undefined : seaQuery.promoterKeyword || undefined,
+      beginTime: beginDate ? `${beginDate} 00:00:00` : undefined,
+      endTime: endDate ? `${endDate} 23:59:59` : undefined
+    });
+    const list = unwrapList<PromotionAttributionDetailVO>(res);
+    seaRows.value = list.rows;
+    seaTotal.value = list.total;
+  } finally {
+    seaLoading.value = false;
+  }
+}
+
+function handleSeaQuery() {
+  seaQuery.pageNum = 1;
+  loadCustomerList();
+}
+
+function resetSeaQuery() {
+  seaQuery.keyword = '';
+  seaQuery.status = '';
+  seaQuery.promoterKeyword = '';
+  seaDateRange.value = [];
+  seaQuery.pageNum = 1;
+  loadCustomerList();
+}
+
+// 切换 B/C 对象类型：状态口径不同需清空状态筛选并回到首页重新查询
+function handleSeaTypeChange() {
+  seaQuery.status = '';
+  seaQuery.pageNum = 1;
+  loadCustomerList();
+}
+
+// 切换 已绑/公海 归因状态：公海无推广人筛选，清空后重查
+function handleScopeChange() {
+  seaQuery.promoterKeyword = '';
+  seaQuery.pageNum = 1;
+  loadCustomerList();
+}
+
+// 客户管理分配/调整推广人：复用「调整推广来源」弹窗，提交后回刷当前客户列表
+function openCustomerAdjust(row: PromotionAttributionDetailVO) {
+  openAdjustAttribution(row, 'customer');
 }
 
 function buildQuery(): PromoterQuery {
@@ -2360,7 +2644,7 @@ async function openCompanyInfo(row: PromotionAttributionDetailVO) {
       { label: '企业编号', value: c.companyNo || '-' },
       { label: '联系人', value: c.contactPerson || row.contactPerson || '-' },
       { label: '联系电话', value: c.contactPhone || c.adminPhone || row.phone || '-' },
-      { label: '状态', value: row.statusName || '-' },
+      { label: '状态', value: companyStatusMeta(row.status).label },
       { label: '岗位数', value: String(row.jobCount ?? '-') },
       { label: '来源推广人', value: `${row.promoterName || '-'}（${row.promoterPhone || '-'}）` },
       { label: '首次进入', value: row.promotedAt || row.createTime || '-' }
@@ -2405,22 +2689,66 @@ function handlePeriodStatisticsExport() {
   download('/admin/recruitment/promoter/period-statistics/export', buildStatisticsQuery(), `推广周期统计_${new Date().getTime()}.xlsx`);
 }
 
-function openAdjustAttribution(row: PromotionAttributionDetailVO) {
+// 弹窗内按身份本地过滤推广人候选：'' 全部 / '0' 内部 / 'channel' 外部(渠道1+合伙人2)
+const adjustPromoterCandidates = computed<PromoterVO[]>(() => {
+  const identity = adjustPromoterIdentity.value;
+  if (!identity) return allPromoters.value;
+  if (identity === 'channel') return allPromoters.value.filter((p) => p.identityType === '1' || p.identityType === '2');
+  return allPromoters.value.filter((p) => p.identityType === identity);
+});
+
+// 一次性拉取启用中的推广人作为候选（量不大，弹窗内本地过滤/搜索，避免每次远程请求）
+async function ensurePromotersLoaded(force = false) {
+  if (!force && allPromoters.value.length > 0) return;
+  promotersLoading.value = true;
+  try {
+    const res = await listPromoter({ pageNum: 1, pageSize: 1000, status: '1' });
+    allPromoters.value = unwrapList<PromoterVO>(res).rows;
+  } finally {
+    promotersLoading.value = false;
+  }
+}
+
+function openAdjustAttribution(row: PromotionAttributionDetailVO, context: 'detail' | 'customer' = 'detail') {
   if (!row.objectId || !row.objectType) {
     ElMessage.warning('当前记录缺少对象编号，无法调整来源');
     return;
   }
+  adjustContext.value = context;
   adjustForm.objectType = row.objectType;
   adjustForm.objectId = row.objectId;
   adjustForm.objectName = `${row.objectTypeName || detailObjectTypeName.value}：${row.objectName || row.objectId}`;
   adjustForm.promoterId = row.promoterId || undefined;
+  adjustPromoterIdentity.value = '';
   adjustDialogVisible.value = true;
+  ensurePromotersLoaded();
 }
+
+// 客户管理-公海口径下分配推广人语义是「指派」而非「清空」，必须选择推广人
+const adjustRequirePromoter = computed(() => adjustContext.value === 'customer' && customerScope.value === 'sea');
 
 async function submitAdjustAttribution() {
   if (!adjustForm.objectId || !adjustForm.objectType) {
     ElMessage.warning('调整对象不能为空');
     return;
+  }
+  if (adjustRequirePromoter.value && !adjustForm.promoterId) {
+    ElMessage.warning('请选择要分配的推广人');
+    return;
+  }
+  // 二次确认：是否绑定到所选推广人（未选则为清空归因）
+  const picked = allPromoters.value.find((p) => String(p.promoterId) === String(adjustForm.promoterId));
+  const confirmText = adjustForm.promoterId
+    ? `确认将「${adjustForm.objectName}」绑定到推广人「${picked?.name || adjustForm.promoterId}（${picked?.phonenumber || '-'}）」？`
+    : `确认清空「${adjustForm.objectName}」的推广归因，转为自然流量？`;
+  try {
+    await ElMessageBox.confirm(confirmText, adjustForm.promoterId ? '绑定推广人' : '清空归因', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消'
+    });
+  } catch {
+    return; // 用户取消
   }
   adjustSubmitting.value = true;
   try {
@@ -2429,9 +2757,14 @@ async function submitAdjustAttribution() {
       objectId: adjustForm.objectId,
       promoterId: adjustForm.promoterId || undefined
     });
-    ElMessage.success('推广来源已调整');
+    ElMessage.success(adjustForm.promoterId ? '已绑定推广人' : '已清空推广归因');
     adjustDialogVisible.value = false;
-    await loadAttributionDetails();
+    if (adjustContext.value === 'customer') {
+      // 分配/调整后归因状态可能变化（公海←→已绑），回刷当前客户列表
+      await loadCustomerList();
+    } else {
+      await loadAttributionDetails();
+    }
     loadStatistics();
   } finally {
     adjustSubmitting.value = false;

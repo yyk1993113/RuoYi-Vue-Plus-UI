@@ -776,6 +776,16 @@ export function adjustPromoterAttribution(data: PromotionAttributionAdjustForm) 
   return request.post(`${baseUrl}/promoter/attribution/adjust`, data);
 }
 
+// 公海客户：未插入任何推广来源（无推广人、无推广码）的企业 / 面试者，供运营手动分配推广人。
+// 复用 PromotionAttributionDetailVO，其中推广人相关字段恒为空。
+export function listSeaCustomerCompany(query: PromotionAttributionQuery) {
+  return request.get<any>(`${baseUrl}/promoter/sea-customer/company/list`, { params: query });
+}
+
+export function listSeaCustomerUser(query: PromotionAttributionQuery) {
+  return request.get<any>(`${baseUrl}/promoter/sea-customer/user/list`, { params: query });
+}
+
 export function getPromoter(promoterId: string | number) {
   return request.get<PromoterVO>(`${baseUrl}/promoter/${promoterId}`);
 }
