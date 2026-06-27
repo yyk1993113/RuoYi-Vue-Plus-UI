@@ -13,6 +13,39 @@
                 <div class="board-subtitle">按年、半年、季度、月统计 B/C 端整体转化</div>
               </div>
               <div class="board-actions">
+                <!-- 总览维度筛选：身份 + 推广人多选 + 协作人口径开关；筛选后卡片与统计表实时重算，条件本地记忆 -->
+                <div class="overview-filter">
+                  <el-select v-model="overviewFilterIdentity" size="small" style="width: 100px" @change="onOverviewIdentityChange">
+                    <el-option label="全部身份" value="all" />
+                    <el-option label="内部" value="0" />
+                    <el-option label="外部" value="channel" />
+                  </el-select>
+                  <el-select
+                    v-model="overviewFilterPromoterIds"
+                    multiple
+                    filterable
+                    collapse-tags
+                    collapse-tags-tooltip
+                    size="small"
+                    placeholder="按推广人筛选(可多选)"
+                    style="width: 230px"
+                    @change="onOverviewFilterChange"
+                  >
+                    <el-option
+                      v-for="p in overviewPromoterCandidates"
+                      :key="p.promoterId"
+                      :label="`${p.name || '-'}（${p.phonenumber || '-'}）`"
+                      :value="p.promoterId!"
+                    />
+                  </el-select>
+                  <el-tooltip content="开启后仅统计所选人员作为「协作人」关联的客户；关闭则按「主推广人」归因" placement="top">
+                    <span class="overview-collab-switch">
+                      协作人口径
+                      <el-switch v-model="overviewFilterCollaborator" size="small" @change="onOverviewFilterChange" />
+                    </span>
+                  </el-tooltip>
+                  <el-button v-if="overviewFilterActive" link type="primary" size="small" @click="resetOverviewFilter">清除筛选</el-button>
+                </div>
                 <el-button icon="Download" @click="handlePeriodStatisticsExport">导出周期统计</el-button>
                 <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新总览</el-button>
               </div>
@@ -23,15 +56,57 @@
                 v-for="card in overviewCards"
                 :key="card.key"
                 class="overview-card is-clickable"
-                :class="card.tone"
+                :class="[card.tone, { 'is-empty': card.value === 0 }]"
                 role="button"
                 tabindex="0"
                 @click="openOverviewCardDrilldown(card)"
                 @keyup.enter="openOverviewCardDrilldown(card)"
               >
+                <!-- 右上角问号：指标释义（同表格说明口径） -->
+                <el-tooltip placement="top" :content="card.hint">
+                  <el-icon class="card-help" @click.stop><i-ep-question-filled /></el-icon>
+                </el-tooltip>
                 <span class="metric-label">{{ card.label }}</span>
-                <strong>{{ card.value }}</strong>
-                <span class="metric-sub">{{ card.sub }}</span>
+                <strong :class="{ 'is-zero': card.value === 0 }">{{ card.value }}</strong>
+                <!-- 转化拆解：B端/C端 可点下钻到对应人群明细；为 0 时弱化灰色 -->
+                <div class="metric-breakdown">
+                  <span
+                    class="bd-item"
+                    :class="{ 'is-zero': card.company === 0 }"
+                    title="点击查看 B 端企业明细"
+                    @click.stop="openOverviewCardDrilldown(card, 'company')"
+                    >B端 {{ card.company }}</span
+                  >
+                  <span class="bd-sep">/</span>
+                  <span
+                    class="bd-item"
+                    :class="{ 'is-zero': card.jobSeeker === 0 }"
+                    title="点击查看 C 端求职者明细"
+                    @click.stop="openOverviewCardDrilldown(card, 'jobSeeker')"
+                    >C端 {{ card.jobSeeker }}</span
+                  >
+                </div>
+                <!-- 同比=对去年同期、环比=对上期同期；方向用箭头+颜色，环比下滑超30%标红预警 -->
+                <div class="metric-compare">
+                  <el-tooltip placement="top" content="同比 = 当前周期 ÷ 去年同期 − 1（去年同一时段至今的对比）">
+                    <span class="compare-item" :class="`is-${card.yoy.trend}`" @click.stop>
+                      <span class="cmp-label">同比</span> {{ trendArrow(card.yoy.trend) }}{{ card.yoy.text }}
+                    </span>
+                  </el-tooltip>
+                  <el-tooltip
+                    placement="top"
+                    :content="
+                      card.chain.alert
+                        ? '环比 = 当前周期 ÷ 上一周期 − 1；本期环比下滑超30%，请跟进渠道问题'
+                        : '环比 = 当前周期 ÷ 上一周期 − 1（本月→上月 / 本季度→上季度）'
+                    "
+                  >
+                    <span class="compare-item" :class="[`is-${card.chain.trend}`, { 'is-alert': card.chain.alert }]" @click.stop>
+                      <span class="cmp-label">环比</span> {{ trendArrow(card.chain.trend) }}{{ card.chain.text }}
+                      <el-icon v-if="card.chain.alert" class="compare-alert-icon"><i-ep-warning-filled /></el-icon>
+                    </span>
+                  </el-tooltip>
+                </div>
               </div>
             </div>
 
@@ -281,6 +356,7 @@
               </div>
               <div class="board-actions">
                 <el-button icon="Download" @click="handleStatisticsExport">导出汇总统计</el-button>
+                <el-button type="primary" plain icon="Setting" @click="openStatisticsCustomExport">自定义导出</el-button>
                 <el-button icon="Refresh" :loading="statisticsLoading" @click="loadStatistics">刷新统计</el-button>
               </div>
             </div>
@@ -454,6 +530,13 @@
                     <button type="button" class="stat-link" @click="openStatisticsRowDrilldown(row, 'apply')">{{ row.applyCount || 0 }}</button>
                   </template>
                 </el-table-column>
+                <!-- 协同维护：该推广人作为协作人参与的对象数（不替代主推广人归因，故仅展示不下钻） -->
+                <el-table-column label="协同维护企业" prop="collaborativeCompanyCount" width="120" align="center">
+                  <template #default="{ row }">{{ row.collaborativeCompanyCount || 0 }}</template>
+                </el-table-column>
+                <el-table-column label="协同维护用户" prop="collaborativeJobSeekerCount" width="120" align="center">
+                  <template #default="{ row }">{{ row.collaborativeJobSeekerCount || 0 }}</template>
+                </el-table-column>
                 <el-table-column label="合计" width="100" align="center">
                   <template #default="{ row }">
                     <button type="button" class="stat-link" @click="openStatisticsRowTotalDrilldown(row)">{{ rowMetric(row) }}</button>
@@ -474,6 +557,9 @@
               </div>
               <div class="board-actions">
                 <el-button icon="Download" @click="handleAttributionExport">导出</el-button>
+                <el-button type="primary" plain icon="Setting" :loading="exportPreparing" @click="openAttributionDetailCustomExport"
+                  >自定义导出</el-button
+                >
                 <el-button icon="Refresh" :loading="detailLoading" @click="loadAttributionDetails">刷新明细</el-button>
               </div>
             </div>
@@ -570,6 +656,15 @@
                 <el-table-column label="状态" prop="statusName" width="120" align="center">
                   <template #default="{ row }">
                     <el-tag :type="detailStatusTag(row)" size="small">{{ detailStatusText(row) }}</el-tag>
+                  </template>
+                </el-table-column>
+                <!-- 协作人：协同跟进推广人，不替代主推广人归因 -->
+                <el-table-column label="协作人" min-width="160">
+                  <template #default="{ row }">
+                    <template v-if="row.collaborators && row.collaborators.length">
+                      <el-tag v-for="c in row.collaborators" :key="c.promoterId" size="small" class="collaborator-tag">{{ c.name || '-' }}</el-tag>
+                    </template>
+                    <span v-else class="sub-text">-</span>
                   </template>
                 </el-table-column>
                 <el-table-column v-if="detailObjectType === 'company'" label="资料完整" prop="completed" width="100" align="center">
@@ -740,6 +835,10 @@
                       </el-button>
                       <!-- 仅「已绑推广码」口径可导出：复用归因明细导出接口，沿用当前筛选条件 -->
                       <el-button v-if="customerScope === 'bound'" plain icon="Download" @click="handleCustomerExport">导出</el-button>
+                      <!-- 自定义导出：已绑/公海均可，按当前筛选拉全量后自定义列/拆分 Sheet -->
+                      <el-button type="primary" plain icon="Setting" :loading="exportPreparing" @click="openCustomerCustomExport"
+                        >自定义导出</el-button
+                      >
                       <el-button plain icon="Refresh" @click="loadCustomerList">刷新</el-button>
                     </div>
                   </div>
@@ -790,6 +889,15 @@
                   <el-table-column label="状态" prop="statusName" width="120" align="center">
                     <template #default="{ row }">
                       <el-tag :type="detailStatusTag(row, seaObjectType)" size="small">{{ detailStatusText(row, seaObjectType) }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <!-- 协作人：仅「已绑推广码」口径有意义（公海客户无主推广人/协作人） -->
+                  <el-table-column v-if="customerScope === 'bound'" label="协作人" min-width="150">
+                    <template #default="{ row }">
+                      <template v-if="row.collaborators && row.collaborators.length">
+                        <el-tag v-for="c in row.collaborators" :key="c.promoterId" size="small" class="collaborator-tag">{{ c.name || '-' }}</el-tag>
+                      </template>
+                      <span v-else class="sub-text">-</span>
                     </template>
                   </el-table-column>
                   <el-table-column v-if="seaObjectType === 'company'" label="资料完整" prop="completed" width="100" align="center">
@@ -987,6 +1095,7 @@
                   <el-radio-button v-for="m in groupMetricOptions" :key="m.value" :value="m.value">{{ m.label }}</el-radio-button>
                 </el-radio-group>
                 <el-button type="primary" plain icon="DataAnalysis" @click="openCompareDialog">多维度比较</el-button>
+                <el-button type="primary" plain icon="Setting" @click="openGroupStatCustomExport">自定义导出</el-button>
                 <el-button icon="Refresh" :loading="groupStatLoading" @click="loadPromoterGroupStat">刷新</el-button>
               </div>
             </div>
@@ -1021,7 +1130,11 @@
                   </template>
                   <template #default="{ row }">
                     <div class="group-cell">
-                      <span class="gc-value">{{ row[col.key] }}</span>
+                      <!-- 推广人/身份分组的本期值可点击下钻到对应归因明细；岗位聚合行(role)无法精确过滤，保持纯文本 -->
+                      <button v-if="row.nodeType !== 'role'" type="button" class="stat-link gc-value" @click="openGroupStatDrilldown(row, col)">
+                        {{ row[col.key] }}
+                      </button>
+                      <span v-else class="gc-value">{{ row[col.key] }}</span>
                       <span class="gc-diff" :class="groupDiffClass(row[col.key] - row[col.prev])">{{
                         formatGroupDiff(row[col.key] - row[col.prev])
                       }}</span>
@@ -1161,6 +1274,15 @@
             <el-tag :type="yesNoTag(row.applied)" size="small">{{ row.applied || '-' }}</el-tag>
           </template>
         </el-table-column>
+        <!-- 协作人：协同跟进推广人，不替代主推广人归因 -->
+        <el-table-column label="协作人" min-width="150">
+          <template #default="{ row }">
+            <template v-if="row.collaborators && row.collaborators.length">
+              <el-tag v-for="c in row.collaborators" :key="c.promoterId" size="small" class="collaborator-tag">{{ c.name || '-' }}</el-tag>
+            </template>
+            <span v-else class="sub-text">-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="首次进入" prop="promotedAt" width="170" align="center">
           <template #default="{ row }">{{ row.promotedAt || row.createTime || '-' }}</template>
         </el-table-column>
@@ -1186,7 +1308,8 @@
     <el-dialog v-model="detailInfoVisible" :title="detailInfoTitle" width="560px" append-to-body>
       <el-descriptions v-loading="detailInfoLoading" :column="1" border>
         <el-descriptions-item v-for="item in detailInfoRows" :key="item.label" :label="item.label">
-          {{ item.value }}
+          <el-button v-if="item.link" type="primary" link @click="item.link">{{ item.value }}</el-button>
+          <template v-else>{{ item.value }}</template>
         </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
@@ -1320,14 +1443,67 @@
             </el-option>
           </el-select>
         </el-form-item>
+        <!-- 协作人：在主推广人之外记录协同跟进人员，可多选(内部/外部均可)，仅记录协同参与，不替代主归因 -->
+        <el-form-item label="选择协作人">
+          <el-select
+            v-model="adjustForm.collaboratorIds"
+            :loading="promotersLoading"
+            filterable
+            multiple
+            clearable
+            collapse-tags
+            collapse-tags-tooltip
+            placeholder="可多选；不选表示无协同跟进人员"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="p in collaboratorCandidates"
+              :key="p.promoterId"
+              :label="`${p.name || '-'}（${p.phonenumber || '-'}）`"
+              :value="p.promoterId!"
+            >
+              <span style="float: left">{{ p.name || '-' }}（{{ p.phonenumber || '-' }}）</span>
+              <el-tag :type="identityTypeTag(p.identityType)" size="small" style="float: right; margin-top: 4px">
+                {{ identityTypeText(p.identityType) }}
+              </el-tag>
+            </el-option>
+          </el-select>
+        </el-form-item>
+        <!-- 离职交接：把某协作人「转正」为主推广人(原主推广人自动降为协作人，全程留交接记录) -->
+        <el-form-item v-if="adjustForm.collaboratorIds && adjustForm.collaboratorIds.length" label="协作人转正">
+          <div class="collaborator-promote-list">
+            <div v-for="cid in adjustForm.collaboratorIds" :key="cid" class="collaborator-promote-item">
+              <span class="collaborator-promote-name">{{ promoterLabel(cid) }}</span>
+              <el-button type="primary" link size="small" @click="promoteToPrimary(cid)">设为主推广人</el-button>
+            </div>
+          </div>
+        </el-form-item>
         <el-form-item v-if="!adjustRequirePromoter">
-          <span class="table-subtitle">不选择推广人直接确定，将清空该客户的推广归因（转为自然流量）</span>
+          <span class="table-subtitle">不选择推广人直接确定，将清空该客户的推广归因（转为自然流量）；协作人仅记录协同参与，不影响主归因。</span>
         </el-form-item>
       </el-form>
       <template #footer>
+        <el-button style="float: left" @click="openHandoverHistory">交接历史</el-button>
         <el-button @click="adjustDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="adjustSubmitting" @click="submitAdjustAttribution">确定</el-button>
       </template>
+    </el-dialog>
+
+    <!-- 交接历史：某对象的归因/协作变更流水(改主/清空/加减协作人/转正)，按时间倒序 -->
+    <el-dialog v-model="handoverDialogVisible" title="归因/协作交接历史" width="720px" append-to-body>
+      <el-table v-loading="handoverLoading" :data="handoverList" size="small" border max-height="420">
+        <el-table-column label="时间" prop="createTime" width="160" />
+        <el-table-column label="动作" prop="actionName" width="110" />
+        <el-table-column label="原推广人" min-width="120">
+          <template #default="{ row }">{{ row.fromPromoterName || (row.fromPromoterId ? row.fromPromoterId : '-') }}</template>
+        </el-table-column>
+        <el-table-column label="新推广人/协作人" min-width="120">
+          <template #default="{ row }">{{ row.toPromoterName || (row.toPromoterId ? row.toPromoterId : '-') }}</template>
+        </el-table-column>
+        <el-table-column label="操作人" prop="operatorName" width="110" />
+        <el-table-column label="备注" prop="remark" min-width="120" show-overflow-tooltip />
+        <template #empty>暂无交接记录</template>
+      </el-table>
     </el-dialog>
 
     <el-dialog v-model="upload.open" :title="upload.title" width="420px" append-to-body>
@@ -1360,16 +1536,35 @@
         <el-button type="primary" :loading="upload.isUploading" @click="submitFileForm">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 自定义 Excel 导出弹窗：各 tab 复用同一实例，数据/列定义/公共模板由打开函数动态注入 -->
+    <CustomExportDialog
+      v-model="customExportVisible"
+      :title="customExportTitle"
+      :columns="customExportColumns"
+      :rows="customExportRows"
+      :split-options="customExportSplitOptions"
+      :groups="customExportGroups"
+      :hints="customExportHints"
+      :sensitive-keys="customExportSensitiveKeys"
+      :server-templates="customExportServerTemplates"
+      :storage-key="customExportStorageKey"
+      :file-name="customExportFileName"
+      @save-public="handleSavePublicTemplate"
+      @delete-public="handleDeletePublicTemplate"
+    />
   </div>
 </template>
 
 <script setup name="RecruitmentPromoter" lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import * as echarts from 'echarts';
 import { ElMessage, ElMessageBox, type FormRules, type UploadFile, type UploadInstance } from 'element-plus';
 import {
   addPromoter,
   adjustPromoterAttribution,
+  getAttributionHandover,
   changePromoterStatus,
   getCompany,
   getPromoter,
@@ -1380,9 +1575,13 @@ import {
   listSeaCustomerCompany,
   listSeaCustomerUser,
   listPromoter,
+  listExportTemplates,
+  saveExportTemplate,
+  delExportTemplate,
   updatePromoter,
   type PromotionAttributionAdjustForm,
   type PromotionAttributionDetailVO,
+  type PromotionHandoverVO,
   type PromotionAttributionQuery,
   type PromoterForm,
   type PromoterIdentityPeriod,
@@ -1398,6 +1597,9 @@ import { download, globalHeaders } from '@/utils/request';
 import { useUserStore } from '@/store/modules/user';
 import { unwrapList } from './helpers';
 import { companyStatusMeta } from './constants';
+import CustomExportDialog from './components/CustomExportDialog.vue';
+
+const router = useRouter();
 
 type TagType = 'primary' | 'success' | 'warning' | 'danger' | 'info';
 type StatisticsSide = 'all' | 'company' | 'jobSeeker';
@@ -1410,7 +1612,8 @@ type IdentityDrilldownType = 'internal' | 'channel';
 type OverviewRow = {
   label: string;
   description: string;
-  metric: OverviewPeriodMetric;
+  // 统计口径表既有 C/B 新增等基础口径，也含「已认证企业/已发布岗位企业」企业漏斗口径，故 metric 为两类联合
+  metric: OverviewPeriodMetric | CompanyOverviewMetric;
   today: number;
   year: number;
   halfYear: number;
@@ -1425,7 +1628,10 @@ type CompanyOverviewMetric =
   | 'partTimePublishedCompanyCount'
   | 'promotedCompanyCount'
   | 'interviewCompanyCount'
-  | 'hiredCompanyCount';
+  | 'hiredCompanyCount'
+  // 已录用拆分：全职/兼职录用企业数（后端 PeriodItem 需补同名字段，未返回时前端显示 0）
+  | 'fullTimeHiredCompanyCount'
+  | 'partTimeHiredCompanyCount';
 type CompanyOverviewRow = {
   label: string;
   description: string;
@@ -1641,9 +1847,13 @@ const promoterSelectOptions = computed(() =>
 // 数据源为后端 group-statistics（每人×每周期×5维度，口径按归因时间），前端按身份/岗位分组并逐层汇总。
 const groupStatRows = ref<any[]>([]);
 const groupStatLoading = ref(false);
-const groupStatMetric = ref<'companyCount' | 'jobSeekerCount' | 'authorizedCount' | 'resumeCount' | 'applyCount'>('companyCount');
+const groupStatMetric = ref<string>('companyCount');
 const groupMetricOptions = [
   { value: 'companyCount', label: 'B端企业' },
+  { value: 'certifiedCompanyCount', label: '已认证企业' },
+  { value: 'draftCompanyCount', label: '草稿企业' },
+  { value: 'rejectedCompanyCount', label: '审核拒绝' },
+  { value: 'publishedCompanyCount', label: '已发布岗位' },
   { value: 'jobSeekerCount', label: 'C端求职者' },
   { value: 'authorizedCount', label: '授权手机号' },
   { value: 'resumeCount', label: '完成简历' },
@@ -1798,6 +2008,439 @@ function buildGroupCells(members: any[], metric: string) {
   return cell;
 }
 
+// 分组统计各维度 → 钻取明细的对象类型与状态过滤（与后端 company-detail/user-detail 的 status 分支对齐）。
+// 企业状态码见后端 Company.status：2驳回 / 3通过 / 4草稿；published 走「名下有岗位」分支；C 端 authorized/resume/apply 同概览口径。
+const groupMetricDrilldownMap: Record<string, { objectType: DetailObjectType; status: string }> = {
+  companyCount: { objectType: 'company', status: '' },
+  certifiedCompanyCount: { objectType: 'company', status: '3' },
+  draftCompanyCount: { objectType: 'company', status: '4' },
+  rejectedCompanyCount: { objectType: 'company', status: '2' },
+  publishedCompanyCount: { objectType: 'company', status: 'published' },
+  jobSeekerCount: { objectType: 'user', status: '' },
+  authorizedCount: { objectType: 'user', status: 'authorized' },
+  resumeCount: { objectType: 'user', status: 'resume' },
+  applyCount: { objectType: 'user', status: 'apply' }
+};
+
+// 分组统计单元格下钻：按所点周期列(今日/本月/本季度/本半年/本年) + 当前选中维度，
+// 过滤到该推广人(叶子,按 promoterId)或该身份分组(group,按 identityType)的归因明细列表。
+// 岗位/角色聚合行(nodeType==='role')因归因明细接口无岗位过滤维度，无法精确还原，故不可点。
+function openGroupStatDrilldown(row: any, col: { key: string; label: string }) {
+  if (row.nodeType === 'role') return;
+  const metricOpt = groupMetricOptions.find((m) => m.value === groupStatMetric.value);
+  const filter = groupMetricDrilldownMap[groupStatMetric.value] || { objectType: 'company' as DetailObjectType, status: '' };
+  const scopeName = row.nodeType === 'promoter' ? row.name : `${row.name}组`;
+  openAttributionDrilldown({
+    title: `${scopeName} · ${col.label}${metricOpt?.label || ''}明细`,
+    objectType: filter.objectType,
+    status: filter.status,
+    promoterId: row.nodeType === 'promoter' ? row.promoterId : undefined,
+    identityType: row.nodeType === 'group' ? row.identityType : undefined,
+    promoterKeyword: '',
+    periodKey: col.key,
+    useCurrentRange: false
+  });
+}
+
+// ===== 自定义 Excel 导出：活跃统计 / 分组统计两个 tab 复用同一弹窗组件 =====
+// 弹窗只接收「扁平行 + 列定义 + 拆分维度」，各 tab 负责把自家数据拉平成扁平结构后传入。
+const customExportVisible = ref(false);
+const customExportColumns = ref<{ key: string; label: string; numeric?: boolean }[]>([]);
+const customExportRows = ref<Record<string, any>[]>([]);
+const customExportSplitOptions = ref<{ value: string; label: string; getGroup: (row: Record<string, any>) => string }[]>([]);
+const customExportStorageKey = ref('');
+const customExportFileName = ref('');
+const customExportTitle = ref('自定义导出');
+// 列分组(业务分组折叠)、字段说明(hover/指标说明)、敏感字段(脱敏) —— 随各 tab 一并注入
+const customExportGroups = ref<{ key: string; label: string; columnKeys: string[] }[]>([]);
+const customExportHints = ref<Record<string, string>>({});
+const customExportSensitiveKeys = ref<string[]>([]);
+// 公共模板（后端 export-template 接口）：{name, config(已解析对象), templateId}
+const customExportServerTemplates = ref<{ name: string; config: any; templateId?: number | string }[]>([]);
+
+// 按场景拉取公共模板（fire-and-forget，失败/未就绪静默忽略，不阻塞弹窗打开）
+async function loadServerTemplates(scene: string) {
+  customExportServerTemplates.value = [];
+  try {
+    const res: any = await listExportTemplates(scene);
+    const list: any[] = res?.data || res?.rows || [];
+    customExportServerTemplates.value = list
+      .map((t) => {
+        try {
+          return { name: t.name, config: JSON.parse(t.config), templateId: t.templateId };
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean) as { name: string; config: any; templateId?: number | string }[];
+  } catch {
+    /* 后端未就绪/无权限：保持空，仅本地模板可用 */
+  }
+}
+
+// 存为公共模板：config 序列化为 JSON 字符串落库，成功后重新拉取列表
+async function handleSavePublicTemplate(payload: { name: string; config: any }) {
+  try {
+    await saveExportTemplate({ scene: customExportStorageKey.value, name: payload.name, config: JSON.stringify(payload.config) });
+    ElMessage.success('已保存为公共模板');
+    await loadServerTemplates(customExportStorageKey.value);
+  } catch {
+    ElMessage.error('保存公共模板失败');
+  }
+}
+
+// 删除公共模板：从已加载列表按名称解析 templateId 后调用删除
+async function handleDeletePublicTemplate(name: string) {
+  const t = customExportServerTemplates.value.find((x) => x.name === name);
+  if (!t?.templateId) {
+    ElMessage.warning('未找到该公共模板');
+    return;
+  }
+  try {
+    await delExportTemplate(t.templateId);
+    ElMessage.success('公共模板已删除');
+    await loadServerTemplates(customExportStorageKey.value);
+  } catch {
+    ElMessage.error('删除公共模板失败');
+  }
+}
+
+// 业务维度说明（指标释义，供 hover 气泡与「指标说明」弹窗）。各 tab 取所需子集。
+const PROMOTER_METRIC_HINTS: Record<string, string> = {
+  name: '推广人展示名（姓名/昵称）',
+  phonenumber: '推广人账号手机号',
+  identityTypeName: '推广人身份：内部人员 / 外部渠道 / 合伙人',
+  statusName: '推广账号启用 / 禁用状态',
+  roleName: '内部人员的岗位 / 角色（如销售岗、拓展岗）',
+  periodLabel: '统计周期：今日 / 本月 / 本季度 / 本半年 / 本年',
+  createTime: '记录创建时间',
+  companyCount: 'B端企业：归因到该推广人的注册企业总数',
+  certifiedCompanyCount: '已认证企业：通过平台资质审核的企业数',
+  draftCompanyCount: '草稿企业：仅保存未提交审核的企业数量',
+  rejectedCompanyCount: '审核拒绝：资质审核被驳回的企业数',
+  publishedCompanyCount: '已发布岗位：名下已发布岗位的企业数',
+  jobSeekerCount: 'C端求职者：归因到该推广人的求职者总数',
+  authorizedCount: '授权手机号：完成手机号授权的求职者数',
+  resumeCount: '完成简历：填写完整简历的求职者数',
+  applyCount: '产生投递：发生过岗位投递的求职者数',
+  total: 'B/C 合计：B端企业数 + C端求职者数',
+  // 归因明细(统计明细 / 客户管理)字段
+  objectName: '客户名称（企业名 / 求职者昵称）',
+  phone: '客户联系手机号',
+  contactPerson: '企业联系人',
+  promoterName: '来源推广人姓名',
+  promoterPhone: '来源推广人手机号',
+  completed: '企业资料是否完整',
+  jobCount: '企业名下岗位数量',
+  authorized: '求职者是否已授权手机号',
+  resumeCompleted: '求职者是否已完成简历',
+  applied: '求职者是否已产生投递',
+  promotedAt: '首次通过推广进入的时间',
+  authorizedTime: '手机号授权时间',
+  resumeCompletedTime: '简历完成时间',
+  firstApplyTime: '首次投递时间'
+};
+
+// 活跃统计：每个推广人一行（含 B/C 端、授权、简历、投递、合计、身份、状态、创建时间）。
+function openStatisticsCustomExport() {
+  customExportTitle.value = '自定义导出 · 活跃统计';
+  customExportStorageKey.value = 'statistics';
+  loadServerTemplates('statistics');
+  customExportFileName.value = '推广人活跃统计';
+  customExportColumns.value = [
+    { key: 'name', label: '推广人' },
+    { key: 'phonenumber', label: '手机号' },
+    { key: 'identityTypeName', label: '身份' },
+    { key: 'statusName', label: '状态' },
+    { key: 'companyCount', label: 'B端企业', numeric: true },
+    { key: 'jobSeekerCount', label: 'C端求职者', numeric: true },
+    { key: 'authorizedCount', label: '授权手机号', numeric: true },
+    { key: 'resumeCount', label: '完成简历', numeric: true },
+    { key: 'applyCount', label: '产生投递', numeric: true },
+    { key: 'total', label: 'B/C合计', numeric: true },
+    { key: 'createTime', label: '创建时间' }
+  ];
+  customExportRows.value = statisticsRows.value.map((r) => ({
+    name: r.name || '-',
+    phonenumber: r.phonenumber || '-',
+    identityTypeName: identityTypeText(r.identityType),
+    statusName: statusText(r.status),
+    companyCount: toCount(r.companyCount),
+    jobSeekerCount: toCount(r.jobSeekerCount),
+    authorizedCount: toCount(r.authorizedCount),
+    resumeCount: toCount(r.resumeCount),
+    applyCount: toCount(r.applyCount),
+    total: toCount(r.companyCount) + toCount(r.jobSeekerCount),
+    createTime: r.createTime || ''
+  }));
+  customExportSplitOptions.value = [
+    { value: 'identity', label: '按身份', getGroup: (r) => r.identityTypeName || '未知' },
+    { value: 'status', label: '按状态', getGroup: (r) => r.statusName || '未知' },
+    { value: 'year', label: '按创建年', getGroup: (r) => String(r.createTime || '').slice(0, 4) || '未知' },
+    { value: 'month', label: '按创建月', getGroup: (r) => String(r.createTime || '').slice(0, 7) || '未知' },
+    { value: 'day', label: '按创建日', getGroup: (r) => String(r.createTime || '').slice(0, 10) || '未知' }
+  ];
+  customExportGroups.value = [
+    { key: 'base', label: '基础维度', columnKeys: ['name', 'phonenumber', 'identityTypeName', 'statusName', 'createTime'] },
+    { key: 'company', label: 'B端企业指标', columnKeys: ['companyCount'] },
+    { key: 'user', label: 'C端求职者指标', columnKeys: ['jobSeekerCount', 'authorizedCount', 'resumeCount', 'applyCount'] },
+    { key: 'sum', label: '汇总', columnKeys: ['total'] }
+  ];
+  customExportHints.value = PROMOTER_METRIC_HINTS;
+  customExportSensitiveKeys.value = ['phonenumber'];
+  customExportVisible.value = true;
+}
+
+// 分组统计：把「每人 × periods[周期]」拉平成一行一周期；后端 group-statistics 就绪后即有数据。
+async function openGroupStatCustomExport() {
+  if (!groupStatRows.value.length) await loadPromoterGroupStat();
+  customExportTitle.value = '自定义导出 · 推广人分组统计';
+  customExportStorageKey.value = 'groupStat';
+  loadServerTemplates('groupStat');
+  customExportFileName.value = '推广人分组统计';
+  customExportColumns.value = [
+    { key: 'name', label: '推广人' },
+    { key: 'phonenumber', label: '手机号' },
+    { key: 'identityTypeName', label: '身份' },
+    { key: 'roleName', label: '岗位/角色' },
+    { key: 'periodLabel', label: '统计周期' },
+    { key: 'companyCount', label: 'B端企业', numeric: true },
+    { key: 'certifiedCompanyCount', label: '已认证企业', numeric: true },
+    { key: 'draftCompanyCount', label: '草稿企业', numeric: true },
+    { key: 'rejectedCompanyCount', label: '审核拒绝', numeric: true },
+    { key: 'publishedCompanyCount', label: '已发布岗位', numeric: true },
+    { key: 'jobSeekerCount', label: 'C端求职者', numeric: true },
+    { key: 'authorizedCount', label: '授权手机号', numeric: true },
+    { key: 'resumeCount', label: '完成简历', numeric: true },
+    { key: 'applyCount', label: '产生投递', numeric: true }
+  ];
+  customExportRows.value = groupStatRows.value.flatMap((r: any) =>
+    (r.periods || []).map((p: any) => ({
+      name: r.name || '-',
+      phonenumber: r.phonenumber || '-',
+      identityTypeName: identityTypeText(normalizeTreeIdentity(r.identityType)),
+      roleName: (r.roleName && String(r.roleName).trim()) || '未分配岗位',
+      periodLabel: p.label || p.key || '-',
+      companyCount: toCount(p.companyCount),
+      certifiedCompanyCount: toCount(p.certifiedCompanyCount),
+      draftCompanyCount: toCount(p.draftCompanyCount),
+      rejectedCompanyCount: toCount(p.rejectedCompanyCount),
+      publishedCompanyCount: toCount(p.publishedCompanyCount),
+      jobSeekerCount: toCount(p.jobSeekerCount),
+      authorizedCount: toCount(p.authorizedCount),
+      resumeCount: toCount(p.resumeCount),
+      applyCount: toCount(p.applyCount)
+    }))
+  );
+  customExportSplitOptions.value = [
+    // 按推广人：每个推广人单独一个 Sheet，组内为该人各周期行；用 姓名（手机号）做分组键避免重名碰撞
+    { value: 'promoter', label: '按推广人', getGroup: (r) => `${r.name || '-'}（${r.phonenumber || '-'}）` },
+    { value: 'period', label: '按周期', getGroup: (r) => r.periodLabel || '未知' },
+    { value: 'identity', label: '按身份类型', getGroup: (r) => r.identityTypeName || '未知' },
+    { value: 'role', label: '按岗位/角色', getGroup: (r) => r.roleName || '未分配岗位' }
+  ];
+  // 业务分组折叠：基础维度 / B端企业指标 / C端求职者指标（对应需求描述的三组）
+  customExportGroups.value = [
+    { key: 'base', label: '基础维度', columnKeys: ['name', 'phonenumber', 'identityTypeName', 'roleName', 'periodLabel'] },
+    {
+      key: 'company',
+      label: 'B端企业指标',
+      columnKeys: ['companyCount', 'certifiedCompanyCount', 'draftCompanyCount', 'rejectedCompanyCount', 'publishedCompanyCount']
+    },
+    { key: 'user', label: 'C端求职者指标', columnKeys: ['jobSeekerCount', 'authorizedCount', 'resumeCount', 'applyCount'] }
+  ];
+  customExportHints.value = PROMOTER_METRIC_HINTS;
+  customExportSensitiveKeys.value = ['phonenumber'];
+  if (!customExportRows.value.length) ElMessage.warning('暂无分组统计数据（后端 group-statistics 接口就绪后可导出）');
+  customExportVisible.value = true;
+}
+
+// ===== 分页明细页（统计明细 / 客户管理）的自定义导出：先按当前筛选拉全量，再交给弹窗自定义 =====
+// 这两个页面都是服务端分页的归因明细(PromotionAttributionDetailVO)，导出语义应为「全量」而非当前页，
+// 故循环翻页拉取（每页 500），上限 EXPORT_ROW_CAP 行防极端数据卡死，超出则截断并提示。
+const EXPORT_ROW_CAP = 20000;
+const exportPreparing = ref(false);
+
+async function fetchAllAttribution(api: (q: PromotionAttributionQuery) => Promise<any>, baseQuery: PromotionAttributionQuery) {
+  const PAGE = 500;
+  const all: PromotionAttributionDetailVO[] = [];
+  let pageNum = 1;
+  let total = 0;
+  for (;;) {
+    const res = await api({ ...baseQuery, pageNum, pageSize: PAGE });
+    const list = unwrapList<PromotionAttributionDetailVO>(res);
+    all.push(...list.rows);
+    total = list.total || all.length;
+    if (list.rows.length < PAGE || all.length >= total || all.length >= EXPORT_ROW_CAP) break;
+    pageNum++;
+  }
+  return { rows: all.slice(0, EXPORT_ROW_CAP), truncated: total > EXPORT_ROW_CAP };
+}
+
+// 归因明细 VO → 扁平行（统计明细与客户管理共用；状态文本按对象类型取企业/用户口径）
+function flattenAttributionRows(rows: PromotionAttributionDetailVO[], objectType: DetailObjectType) {
+  return rows.map((r) => ({
+    objectName: r.objectName || '-',
+    phone: r.phone || '-',
+    contactPerson: r.contactPerson || '-',
+    promoterName: r.promoterName || '-',
+    promoterPhone: r.promoterPhone || '-',
+    identityTypeName: r.identityTypeName || identityTypeText(r.identityType),
+    statusName: detailStatusText(r, objectType),
+    completed: r.completed || '-',
+    jobCount: toCount(r.jobCount),
+    authorized: r.authorized || '-',
+    resumeCompleted: r.resumeCompleted || '-',
+    applied: r.applied || '-',
+    promotedAt: r.promotedAt || r.createTime || '',
+    authorizedTime: r.authorizedTime || '',
+    resumeCompletedTime: r.resumeCompletedTime || '',
+    firstApplyTime: r.firstApplyTime || '',
+    createTime: r.createTime || ''
+  }));
+}
+
+// 列定义：按对象类型(企业/求职者)给出差异列；includePromoter=false 时(公海客户无来源)省略推广人列
+function buildAttributionExportColumns(objectType: DetailObjectType, includePromoter: boolean) {
+  const cols: { key: string; label: string; numeric?: boolean }[] = [
+    { key: 'objectName', label: objectType === 'company' ? '企业' : '求职者' },
+    { key: 'phone', label: '手机号' }
+  ];
+  if (objectType === 'company') cols.push({ key: 'contactPerson', label: '联系人' });
+  if (includePromoter) {
+    cols.push(
+      { key: 'promoterName', label: '来源推广人' },
+      { key: 'promoterPhone', label: '推广人手机' },
+      { key: 'identityTypeName', label: '推广人身份' }
+    );
+  }
+  cols.push({ key: 'statusName', label: '状态' });
+  if (objectType === 'company') {
+    cols.push({ key: 'completed', label: '资料完整' }, { key: 'jobCount', label: '岗位数', numeric: true });
+  } else {
+    cols.push({ key: 'authorized', label: '授权' }, { key: 'resumeCompleted', label: '简历' }, { key: 'applied', label: '投递' });
+  }
+  cols.push({ key: 'promotedAt', label: '首次进入' });
+  if (objectType === 'user') {
+    cols.push(
+      { key: 'authorizedTime', label: '授权时间' },
+      { key: 'resumeCompletedTime', label: '简历时间' },
+      { key: 'firstApplyTime', label: '投递时间' }
+    );
+  }
+  cols.push({ key: 'createTime', label: '创建时间' });
+  return cols;
+}
+
+// 拆分维度：状态 + 首次进入年/月/日；有推广人列时再加 按身份 / 按推广人
+function buildAttributionSplitOptions(includePromoter: boolean) {
+  const opts: { value: string; label: string; getGroup: (row: Record<string, any>) => string }[] = [
+    { value: 'status', label: '按状态', getGroup: (r) => r.statusName || '未知' },
+    { value: 'year', label: '按首次进入年', getGroup: (r) => String(r.promotedAt || '').slice(0, 4) || '未知' },
+    { value: 'month', label: '按首次进入月', getGroup: (r) => String(r.promotedAt || '').slice(0, 7) || '未知' },
+    { value: 'day', label: '按首次进入日', getGroup: (r) => String(r.promotedAt || '').slice(0, 10) || '未知' }
+  ];
+  if (includePromoter) {
+    opts.unshift(
+      { value: 'identity', label: '按推广人身份', getGroup: (r) => r.identityTypeName || '未知' },
+      { value: 'promoter', label: '按推广人', getGroup: (r) => r.promoterName || '未知' }
+    );
+  }
+  return opts;
+}
+
+// 归因明细列分组折叠：客户信息 / 推广来源 / 状态转化 / 时间。只放当前存在的列(随对象类型/口径而变)
+function buildAttributionExportGroups(objectType: DetailObjectType, includePromoter: boolean) {
+  const base = ['objectName', 'phone'];
+  if (objectType === 'company') base.push('contactPerson');
+  const source = includePromoter ? ['promoterName', 'promoterPhone', 'identityTypeName'] : [];
+  const stage = objectType === 'company' ? ['statusName', 'completed', 'jobCount'] : ['statusName', 'authorized', 'resumeCompleted', 'applied'];
+  const time =
+    objectType === 'company' ? ['promotedAt', 'createTime'] : ['promotedAt', 'authorizedTime', 'resumeCompletedTime', 'firstApplyTime', 'createTime'];
+  const groups = [
+    { key: 'base', label: '客户信息', columnKeys: base },
+    { key: 'stage', label: '状态 / 转化', columnKeys: stage },
+    { key: 'time', label: '时间节点', columnKeys: time }
+  ];
+  if (source.length) groups.splice(1, 0, { key: 'source', label: '推广来源', columnKeys: source });
+  return groups;
+}
+
+// 统计明细 tab：按当前 detailQuery 筛选拉全量 B端/C端归因明细后导出
+async function openAttributionDetailCustomExport() {
+  const objectType = detailObjectType.value;
+  const api = objectType === 'company' ? listPromoterCompanyDetail : listPromoterUserDetail;
+  exportPreparing.value = true;
+  try {
+    const { rows, truncated } = await fetchAllAttribution(api, buildAttributionDetailQuery());
+    if (!rows.length) {
+      ElMessage.warning('当前筛选无数据可导出');
+      return;
+    }
+    if (truncated) ElMessage.warning(`数据较多，仅导出前 ${EXPORT_ROW_CAP} 行`);
+    customExportTitle.value = `自定义导出 · ${detailObjectTypeName.value}推广明细`;
+    customExportStorageKey.value = `statisticsDetail-${objectType}`;
+    loadServerTemplates(customExportStorageKey.value);
+    customExportFileName.value = `${detailObjectTypeName.value}推广来源明细`;
+    customExportColumns.value = buildAttributionExportColumns(objectType, true);
+    customExportRows.value = flattenAttributionRows(rows, objectType);
+    customExportSplitOptions.value = buildAttributionSplitOptions(true);
+    customExportGroups.value = buildAttributionExportGroups(objectType, true);
+    customExportHints.value = PROMOTER_METRIC_HINTS;
+    customExportSensitiveKeys.value = ['phone', 'promoterPhone'];
+    customExportVisible.value = true;
+  } finally {
+    exportPreparing.value = false;
+  }
+}
+
+// 客户管理 tab：按当前 seaQuery + 口径(已绑/公海) 拉全量后导出；公海无来源推广人列
+async function openCustomerCustomExport() {
+  const objectType = seaObjectType.value;
+  const isSea = customerScope.value === 'sea';
+  const includePromoter = !isSea;
+  const [beginDate, endDate] = seaDateRange.value;
+  const api = isSea
+    ? objectType === 'company'
+      ? listSeaCustomerCompany
+      : listSeaCustomerUser
+    : objectType === 'company'
+      ? listPromoterCompanyDetail
+      : listPromoterUserDetail;
+  // 复用 loadCustomerList 的查询口径：公海口径不传推广人相关过滤
+  const baseQuery: PromotionAttributionQuery = {
+    keyword: seaQuery.keyword || undefined,
+    status: seaQuery.status || undefined,
+    promoterKeyword: isSea ? undefined : seaQuery.promoterKeyword || undefined,
+    promoterId: isSea ? undefined : seaQuery.promoterId || undefined,
+    identityType: isSea ? undefined : seaQuery.identityType || undefined,
+    beginTime: beginDate ? `${beginDate} 00:00:00` : undefined,
+    endTime: endDate ? `${endDate} 23:59:59` : undefined
+  };
+  exportPreparing.value = true;
+  try {
+    const { rows, truncated } = await fetchAllAttribution(api, baseQuery);
+    if (!rows.length) {
+      ElMessage.warning('当前筛选无数据可导出');
+      return;
+    }
+    if (truncated) ElMessage.warning(`数据较多，仅导出前 ${EXPORT_ROW_CAP} 行`);
+    customExportTitle.value = `自定义导出 · ${customerTableTitle.value}`;
+    customExportStorageKey.value = `customer-${customerScope.value}-${objectType}`;
+    loadServerTemplates(customExportStorageKey.value);
+    customExportFileName.value = customerTableTitle.value;
+    customExportColumns.value = buildAttributionExportColumns(objectType, includePromoter);
+    customExportRows.value = flattenAttributionRows(rows, objectType);
+    customExportSplitOptions.value = buildAttributionSplitOptions(includePromoter);
+    customExportGroups.value = buildAttributionExportGroups(objectType, includePromoter);
+    customExportHints.value = PROMOTER_METRIC_HINTS;
+    customExportSensitiveKeys.value = ['phone', 'promoterPhone'];
+    customExportVisible.value = true;
+  } finally {
+    exportPreparing.value = false;
+  }
+}
+
 // 分组树：身份组 + (内部下按岗位/角色再分组) + 推广人叶子；身份与岗位均动态取自列表
 const personnelGroupRows = computed(() => {
   const rows = groupStatRows.value;
@@ -1806,13 +2449,17 @@ const personnelGroupRows = computed(() => {
     id: `pg-p-${m.promoterId}`,
     name: `${m.name || '-'}（${m.phonenumber || '-'}）`,
     nodeType: 'promoter',
+    // 下钻所需：定位到该推广人本人的归因明细
+    promoterId: m.promoterId,
+    identityType: m.identityType,
     ...buildGroupCells([m], metric)
   });
   const result: any[] = [];
   for (const idt of ['0', '1', '2']) {
     const members = rows.filter((r) => normalizeTreeIdentity(r.identityType) === idt);
     if (!members.length) continue;
-    const node: any = { id: `pg-grp-${idt}`, name: identityTypeText(idt), nodeType: 'group', ...buildGroupCells(members, metric) };
+    // 身份分组：下钻按 identityType(0内部/1外部/2合伙人) 过滤该身份全部推广人的归因明细
+    const node: any = { id: `pg-grp-${idt}`, name: identityTypeText(idt), nodeType: 'group', identityType: idt, ...buildGroupCells(members, metric) };
     if (idt === '0') {
       // 内部：动态按岗位/角色细分(实习生/销售岗/拓展岗…)；无岗位归「未分配岗位」
       const byRole = new Map<string, any[]>();
@@ -1965,7 +2612,9 @@ const adjustForm = reactive<PromotionAttributionAdjustForm & { objectName?: stri
   objectType: 'company',
   objectId: '',
   objectName: '',
-  promoterId: undefined
+  promoterId: undefined,
+  // 协作人推广人ID集合：仅记录协同参与，不替代主推广人归因
+  collaboratorIds: []
 });
 
 // 渠道推广人员的数量字段由运营手工维护，后端按 company_count/job_seeker_count 原样落库。
@@ -1992,31 +2641,57 @@ const rules: FormRules = {
 
 const dialogTitle = computed(() => (isEdit.value ? '编辑推广人员' : '新增推广人员'));
 const roleOptions = computed(() => roleOptionsMap[form.identityType || '0'] || []);
-const overviewCards = computed(() => {
-  const yearCompany = overviewPeriodValue('year', 'companyCount');
-  const yearJobSeeker = overviewPeriodValue('year', 'jobSeekerCount');
-  const halfCompany = overviewPeriodValue('halfYear', 'companyCount');
-  const halfJobSeeker = overviewPeriodValue('halfYear', 'jobSeekerCount');
-  const quarterCompany = overviewPeriodValue('quarter', 'companyCount');
-  const quarterJobSeeker = overviewPeriodValue('quarter', 'jobSeekerCount');
-  const monthCompany = overviewPeriodValue('month', 'companyCount');
-  const monthJobSeeker = overviewPeriodValue('month', 'jobSeekerCount');
-  return [
-    { key: 'year', label: '本年新增', value: yearCompany + yearJobSeeker, sub: `B端 ${yearCompany} / C端 ${yearJobSeeker}`, tone: 'success' },
-    { key: 'halfYear', label: '本半年新增', value: halfCompany + halfJobSeeker, sub: `B端 ${halfCompany} / C端 ${halfJobSeeker}`, tone: 'primary' },
-    {
-      key: 'quarter',
-      label: '本季度新增',
-      value: quarterCompany + quarterJobSeeker,
-      sub: `B端 ${quarterCompany} / C端 ${quarterJobSeeker}`,
-      tone: 'warning'
-    },
-    { key: 'month', label: '本月新增', value: monthCompany + monthJobSeeker, sub: `B端 ${monthCompany} / C端 ${monthJobSeeker}`, tone: 'info' }
-  ];
-});
-const overviewRows = computed(() => [
+// 卡片同比/环比涨跌：current 为本期「新增(B+C)合计」，base 为后端按「同期至今」口径返回的对比基数。
+// base<=0 视为无可比基数（如去年同期尚无数据/从 0 起步），统一显示「—」，避免出现 +∞%。
+// trend: up 增长(绿) / down 下降(红) / flat 持平(灰) / new 从0新增(蓝，无可比基数但本期有量)
+// alert: 环比下滑超 30% 触发预警标红，提醒运营跟进渠道问题
+type GrowthInfo = { text: string; trend: 'up' | 'down' | 'flat' | 'new'; pct: number | null; alert: boolean };
+function growthInfo(current: number, base: number): GrowthInfo {
+  if (!Number.isFinite(base) || base <= 0) {
+    // 无可比基数：本期有量记为「新增」(从0起步)，本期也为0才是真正的「—」
+    return current > 0 ? { text: '新增', trend: 'new', pct: null, alert: false } : { text: '—', trend: 'flat', pct: null, alert: false };
+  }
+  const pct = ((current - base) / base) * 100;
+  const trend = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+  // 方向由箭头+颜色表达，百分比取绝对值不带正负号（如 ↑12.5% / ↓5.2%）
+  return { text: `${Math.abs(pct).toFixed(1)}%`, trend, pct, alert: pct <= -30 };
+}
+// 涨跌箭头：增长↑ / 下降↓ / 持平·新增无箭头
+function trendArrow(trend: 'up' | 'down' | 'flat' | 'new'): string {
+  return trend === 'up' ? '↑' : trend === 'down' ? '↓' : '';
+}
+
+// 单张总览卡片：合计本期新增 = B 端企业 + C 端求职者；环比对上期同期、同比对去年同期（基数均来自后端 periodStats）。
+function buildOverviewCard(periodKey: 'year' | 'halfYear' | 'quarter' | 'month', label: string, tone: string) {
+  const company = overviewPeriodValue(periodKey, 'companyCount');
+  const jobSeeker = overviewPeriodValue(periodKey, 'jobSeekerCount');
+  const value = company + jobSeeker;
+  return {
+    key: periodKey,
+    label,
+    value,
+    company,
+    jobSeeker,
+    sub: `B端 ${company} / C端 ${jobSeeker}`,
+    tone,
+    // 指标释义（同表格说明口径），卡片右上角问号 hover 展示
+    hint: `${label}：该周期内通过推广新进入的 B 端企业（${company}）与 C 端求职者（${jobSeeker}）合计；点击卡片下钻全部明细，点 B端/C端 数字按对应人群下钻。`,
+    chain: growthInfo(value, overviewPeriodValue(periodKey, 'chainNewCount')),
+    yoy: growthInfo(value, overviewPeriodValue(periodKey, 'yoyNewCount'))
+  };
+}
+const overviewCards = computed(() => [
+  buildOverviewCard('year', '本年新增', 'success'),
+  buildOverviewCard('halfYear', '本半年新增', 'primary'),
+  buildOverviewCard('quarter', '本季度新增', 'warning'),
+  buildOverviewCard('month', '本月新增', 'info')
+]);
+const overviewRows = computed<OverviewRow[]>(() => [
   buildOverviewRow('新增B端企业', '通过推广进入的企业数量', 'companyCount'),
   buildOverviewRow('新增C端用户', '通过推广进入的求职者数量', 'jobSeekerCount'),
+  // 企业转化口径：已认证 / 已发布岗位企业（复用 overview.periodStats 中企业漏斗字段，与企业端概览同源）
+  buildCompanyOverviewRow('已认证企业', '审核通过的企业数量', 'certifiedCompanyCount'),
+  buildCompanyOverviewRow('已发布岗位企业', '已发布任意岗位的企业数量', 'publishedCompanyCount'),
   buildOverviewRow('C端授权数', '授权手机号人数', 'authorizedCount'),
   buildOverviewRow('C端简历数', '填写简历人数', 'resumeCount'),
   buildOverviewRow('C端投递数', '产生投递的人数', 'applyCount')
@@ -2028,9 +2703,11 @@ const companyOverviewRows = computed(() => [
   buildCompanyOverviewRow('已发布岗位企业', '已发布任意岗位的企业数量', 'publishedCompanyCount'),
   buildCompanyOverviewRow('已发布全职岗位企业', '已发布全职岗位的企业数量', 'fullTimePublishedCompanyCount'),
   buildCompanyOverviewRow('已发布兼职岗位企业', '已发布兼职岗位的企业数量', 'partTimePublishedCompanyCount'),
-  buildCompanyOverviewRow('推广进入企业', '通过推广进入且审核通过的企业数量', 'promotedCompanyCount'),
   buildCompanyOverviewRow('已邀请面试企业', '已邀请面试的企业数量', 'interviewCompanyCount'),
-  buildCompanyOverviewRow('已录用企业', '已录用企业数量', 'hiredCompanyCount')
+  buildCompanyOverviewRow('已录用企业', '已录用企业数量', 'hiredCompanyCount'),
+  // 已录用按岗位类型拆分：全职/兼职录用企业数
+  buildCompanyOverviewRow('已录用全职', '已录用全职岗位的企业数量', 'fullTimeHiredCompanyCount'),
+  buildCompanyOverviewRow('已录用兼职', '已录用兼职岗位的企业数量', 'partTimeHiredCompanyCount')
 ]);
 const userOverviewRows = computed<UserOverviewRow[]>(() => [
   // 用户端漏斗：进入授权 → 完善简历 → 投递（合计/全职/兼职）→ 参与面试 → 被录用。
@@ -2290,7 +2967,12 @@ const normalizedPromoterPeriodMetricKeys: Array<keyof Omit<PromoterStatisticsPer
   'communicatedCompanyCount',
   'interviewCompanyCount',
   'hiredCompanyCount',
-  'settledCompanyCount'
+  'fullTimeHiredCompanyCount',
+  'partTimeHiredCompanyCount',
+  'settledCompanyCount',
+  // 同比/环比基数：必须列在此处，normalizeOverviewPeriodStats 才会把它们随周期项搬运下来（否则被丢弃）
+  'chainNewCount',
+  'yoyNewCount'
 ];
 function normalizeOverviewPeriodStats(periodStats?: PromoterStatisticsPeriod[]): PromoterStatisticsPeriod[] {
   if (!Array.isArray(periodStats) || periodStats.length === 0) return [];
@@ -2316,7 +2998,7 @@ function isNormalizedPeriodMatch(itemKey: string | undefined, target: Normalized
   return Boolean(normalized && normalized === target);
 }
 
-function overviewPeriodValue(periodKey: string, metric: OverviewPeriodMetric) {
+function overviewPeriodValue(periodKey: string, metric: OverviewPeriodMetric | 'chainNewCount' | 'yoyNewCount') {
   const target = normalizeOverviewPeriodKey(periodKey);
   if (!target) {
     const direct = (statisticsData.overview?.periodStats || []).find((item) => item.key === periodKey || item.label === periodKey);
@@ -2550,10 +3232,12 @@ function handleDrilldownTypeChange() {
   loadDrilldownDetails();
 }
 
-function openOverviewCardDrilldown(card: { key: string; label: string }) {
+// 卡片下钻：整卡点击=企业+可切换；点 B端=仅企业、C端=仅求职者，下方钻取明细按对应人群过滤
+function openOverviewCardDrilldown(card: { key: string; label: string }, objectType: 'company' | 'jobSeeker' = 'company') {
+  const typeName = objectType === 'jobSeeker' ? 'C端求职者' : 'B端企业';
   openAttributionDrilldown({
-    title: `${card.label}推广明细`,
-    objectType: 'company',
+    title: objectType === 'company' ? `${card.label}推广明细` : `${card.label}·${typeName}明细`,
+    objectType: objectType === 'jobSeeker' ? 'user' : 'company',
     periodKey: card.key,
     promoterKeyword: '',
     identityType: '',
@@ -2563,6 +3247,20 @@ function openOverviewCardDrilldown(card: { key: string; label: string }) {
 }
 
 function openOverviewCellDrilldown(row: OverviewRow, periodKey: string) {
+  // 企业漏斗口径（已认证/已发布岗位企业）下钻到企业归因明细并按状态过滤，口径与「企业端概览」一致；
+  // 其余 C/B 基础口径仍按 metric 维度下钻。
+  if (row.metric === 'certifiedCompanyCount' || row.metric === 'publishedCompanyCount') {
+    openAttributionDrilldown({
+      title: `${periodLabel(periodKey)}${row.label}明细`,
+      objectType: 'company',
+      status: row.metric === 'certifiedCompanyCount' ? 'certified' : 'published',
+      periodKey,
+      promoterKeyword: '',
+      identityType: '',
+      useCurrentRange: false
+    });
+    return;
+  }
   openAttributionDrilldown({
     title: `${periodLabel(periodKey)}${row.label}明细`,
     metric:
@@ -2591,7 +3289,10 @@ const companyOverviewMetricStatusMap: Record<CompanyOverviewMetric, string> = {
   fullTimePublishedCompanyCount: 'fulltime', // 名下有全职岗位
   partTimePublishedCompanyCount: 'parttime', // 名下有兼职/临时/项目制岗位
   interviewCompanyCount: 'interview', // 名下有面试邀请/录用投递
-  hiredCompanyCount: 'hired' // 名下有已录用投递
+  hiredCompanyCount: 'hired', // 名下有已录用投递
+  // 全职/兼职录用暂无独立明细状态，统一下钻到「已录用」企业列表，表头计数仍为各自精确口径
+  fullTimeHiredCompanyCount: 'hired',
+  partTimeHiredCompanyCount: 'hired'
 };
 
 // 企业端概览按单元格进入归因明细：按所点指标下发 status 过滤，列表只展示该指标对应的企业
@@ -3111,8 +3812,70 @@ async function loadData() {
   }
 }
 
+// ===== 总览：按推广人/协作人维度筛选（适配绩效分摊对账/个人自查）=====
+// 仅作用于总览 4 张卡片 + 统计口径表（后端 buildOverviewStats 按 promoterIds/collaboratorMode 重算）。
+const OVERVIEW_FILTER_KEY = 'promoter-overview-filter';
+const overviewFilterIdentity = ref<'all' | '0' | 'channel'>('all');
+const overviewFilterPromoterIds = ref<Array<string | number>>([]);
+const overviewFilterCollaborator = ref(false);
+
+// 候选推广人：按身份过滤(全部 / 内部0 / 外部=渠道1+合伙人2)
+const overviewPromoterCandidates = computed<PromoterVO[]>(() => {
+  if (overviewFilterIdentity.value === 'all') return allPromoters.value;
+  if (overviewFilterIdentity.value === 'channel') return allPromoters.value.filter((p) => p.identityType === '1' || p.identityType === '2');
+  return allPromoters.value.filter((p) => p.identityType === overviewFilterIdentity.value);
+});
+const overviewFilterActive = computed(
+  () => overviewFilterIdentity.value !== 'all' || overviewFilterPromoterIds.value.length > 0 || overviewFilterCollaborator.value
+);
+// 实际下发的推广人ID：显式多选优先；仅选身份则取该身份全部；都没有=全局口径
+function effectiveOverviewPromoterIds(): Array<string | number> {
+  if (overviewFilterPromoterIds.value.length) return overviewFilterPromoterIds.value;
+  if (overviewFilterIdentity.value !== 'all') return overviewPromoterCandidates.value.map((p) => p.promoterId!).filter((id) => id != null);
+  return [];
+}
+function persistOverviewFilter() {
+  try {
+    localStorage.setItem(
+      OVERVIEW_FILTER_KEY,
+      JSON.stringify({ identity: overviewFilterIdentity.value, ids: overviewFilterPromoterIds.value, collaborator: overviewFilterCollaborator.value })
+    );
+  } catch {
+    /* localStorage 不可用时静默忽略 */
+  }
+}
+function restoreOverviewFilter() {
+  try {
+    const raw = localStorage.getItem(OVERVIEW_FILTER_KEY);
+    if (!raw) return;
+    const o = JSON.parse(raw);
+    overviewFilterIdentity.value = o.identity === '0' || o.identity === 'channel' ? o.identity : 'all';
+    overviewFilterPromoterIds.value = Array.isArray(o.ids) ? o.ids : [];
+    overviewFilterCollaborator.value = !!o.collaborator;
+  } catch {
+    /* ignore */
+  }
+}
+// 身份切换：剔除不在新候选集合内的已选推广人，再重算
+function onOverviewIdentityChange() {
+  const allow = new Set(overviewPromoterCandidates.value.map((p) => String(p.promoterId)));
+  overviewFilterPromoterIds.value = overviewFilterPromoterIds.value.filter((id) => allow.has(String(id)));
+  onOverviewFilterChange();
+}
+function onOverviewFilterChange() {
+  persistOverviewFilter();
+  loadStatistics();
+}
+function resetOverviewFilter() {
+  overviewFilterIdentity.value = 'all';
+  overviewFilterPromoterIds.value = [];
+  overviewFilterCollaborator.value = false;
+  onOverviewFilterChange();
+}
+
 function buildStatisticsQuery(): PromoterQuery {
   const [beginDate, endDate] = statisticsDateRange.value;
+  const overviewIds = effectiveOverviewPromoterIds();
   return {
     ...statisticsQuery,
     name: statisticsQuery.name || undefined,
@@ -3121,7 +3884,10 @@ function buildStatisticsQuery(): PromoterQuery {
     params: {
       beginTime: beginDate ? `${beginDate} 00:00:00` : undefined,
       endTime: endDate ? `${endDate} 23:59:59` : undefined,
-      timeUnit: statisticsTimeUnit.value
+      timeUnit: statisticsTimeUnit.value,
+      // 总览按推广人/协作人筛选：promoterIds(csv) + collaboratorMode；空则后端走全局口径
+      promoterIds: overviewIds.length ? overviewIds.join(',') : undefined,
+      collaboratorMode: overviewFilterCollaborator.value ? 'true' : undefined
     }
   };
 }
@@ -3143,19 +3909,8 @@ async function loadStatistics() {
       identityStats: [],
       timeStats: [],
       statusStats: [],
-      overview: {
-        todayCompanyCount: 0,
-        todayJobSeekerCount: 0,
-        todayAuthorizedCount: 0,
-        todayResumeCount: 0,
-        todayApplyCount: 0,
-        totalCompanyCount: 0,
-        totalJobSeekerCount: 0,
-        remark: '',
-        periodStats: [],
-        identityPeriodStats: []
-      },
       ...(res?.data || {}),
+      // overview 始终用归一化后的版本（periodStats 已补默认），覆盖 res.data.overview
       overview: normalizedOverview
     });
     await nextTick();
@@ -3254,10 +4009,18 @@ function handleDrilldownExport() {
 }
 
 // 钻取明细——查看企业 / 推广人详情（只读弹窗）。行数据已含主要信息，再按需用接口补全。
+// link 存在时该行渲染为可点击链接（如「岗位数」跳转到岗位查询页并按企业名预筛）。
 const detailInfoVisible = ref(false);
 const detailInfoLoading = ref(false);
 const detailInfoTitle = ref('');
-const detailInfoRows = ref<Array<{ label: string; value: string }>>([]);
+const detailInfoRows = ref<Array<{ label: string; value: string; link?: () => void }>>([]);
+
+// 跳转到岗位查询页：按企业名称预筛（job 列表支持 companyName 模糊筛选）。
+// 关闭当前详情弹窗后再跳转，避免遮罩残留。
+function goCompanyJobs(companyName?: string) {
+  detailInfoVisible.value = false;
+  router.push({ path: '/recruitment/job', query: { companyName: companyName || '' } });
+}
 
 async function openCompanyInfo(row: PromotionAttributionDetailVO) {
   if (!row.objectId) return;
@@ -3266,15 +4029,18 @@ async function openCompanyInfo(row: PromotionAttributionDetailVO) {
   detailInfoVisible.value = true;
   detailInfoLoading.value = true;
   try {
-    const res: any = await getCompany(Number(row.objectId));
+    // objectId 为19位雪花ID，原值(字符串)透传，禁止 Number() 转换（丢精度→后端「企业不存在」）
+    const res: any = await getCompany(row.objectId);
     const c = res?.data || {};
+    const companyName = c.companyName || row.objectName || '-';
     detailInfoRows.value = [
-      { label: '企业名称', value: c.companyName || row.objectName || '-' },
+      { label: '企业名称', value: companyName },
       { label: '企业编号', value: c.companyNo || '-' },
       { label: '联系人', value: c.contactPerson || row.contactPerson || '-' },
       { label: '联系电话', value: c.contactPhone || c.adminPhone || row.phone || '-' },
       { label: '状态', value: companyStatusMeta(row.status).label },
-      { label: '岗位数', value: String(row.jobCount ?? '-') },
+      // 岗位数：点击进入岗位查询页，按该企业名称预筛
+      { label: '岗位数', value: String(row.jobCount ?? '-'), link: () => goCompanyJobs(companyName) },
       { label: '来源推广人', value: `${row.promoterName || '-'}（${row.promoterPhone || '-'}）` },
       { label: '首次进入', value: row.promotedAt || row.createTime || '-' }
     ];
@@ -3348,6 +4114,8 @@ function openAdjustAttribution(row: PromotionAttributionDetailVO, context: 'deta
   adjustForm.objectId = row.objectId;
   adjustForm.objectName = `${row.objectTypeName || detailObjectTypeName.value}：${row.objectName || row.objectId}`;
   adjustForm.promoterId = row.promoterId || undefined;
+  // 回填已有协作人（后端明细已带出 collaborators）
+  adjustForm.collaboratorIds = (row.collaborators || []).map((c) => c.promoterId!).filter((id) => id != null);
   adjustPromoterIdentity.value = '';
   adjustDialogVisible.value = true;
   ensurePromotersLoaded();
@@ -3384,7 +4152,9 @@ async function submitAdjustAttribution() {
     await adjustPromoterAttribution({
       objectType: adjustForm.objectType,
       objectId: adjustForm.objectId,
-      promoterId: adjustForm.promoterId || undefined
+      promoterId: adjustForm.promoterId || undefined,
+      // 协作人全量覆盖（排除主推广人本身，避免主推广人又被记为协作人）
+      collaboratorIds: (adjustForm.collaboratorIds || []).filter((id) => String(id) !== String(adjustForm.promoterId))
     });
     ElMessage.success(adjustForm.promoterId ? '已绑定推广人' : '已清空推广归因');
     adjustDialogVisible.value = false;
@@ -3397,6 +4167,68 @@ async function submitAdjustAttribution() {
     loadStatistics();
   } finally {
     adjustSubmitting.value = false;
+  }
+}
+
+// 协作人候选：复用按身份过滤的推广人候选，但排除已选为主推广人者（主推广人不同时充当协作人）
+const collaboratorCandidates = computed<PromoterVO[]>(() =>
+  adjustPromoterCandidates.value.filter((p) => String(p.promoterId) !== String(adjustForm.promoterId))
+);
+
+// 由推广人ID取展示label（姓名（手机号）），用于协作人转正列表
+function promoterLabel(promoterId: string | number) {
+  const p = allPromoters.value.find((x) => String(x.promoterId) === String(promoterId));
+  return p ? `${p.name || '-'}（${p.phonenumber || '-'}）` : String(promoterId);
+}
+
+// 协作人转正为主推广人（离职交接）：二次确认后调用归因接口的转正语义，成功后回刷
+async function promoteToPrimary(collaboratorId: string | number) {
+  try {
+    await ElMessageBox.confirm(
+      `确认将协作人「${promoterLabel(collaboratorId)}」设为「${adjustForm.objectName}」的主推广人？原主推广人将自动降为协作人，并记录交接。`,
+      '协作人转正',
+      { type: 'warning', confirmButtonText: '确定转正', cancelButtonText: '取消' }
+    );
+  } catch {
+    return;
+  }
+  adjustSubmitting.value = true;
+  try {
+    await adjustPromoterAttribution({
+      objectType: adjustForm.objectType,
+      objectId: adjustForm.objectId,
+      promoteCollaboratorId: collaboratorId
+    });
+    ElMessage.success('已转正为主推广人');
+    adjustDialogVisible.value = false;
+    if (adjustContext.value === 'customer') {
+      await loadCustomerList();
+    } else {
+      await loadAttributionDetails();
+    }
+    loadStatistics();
+  } finally {
+    adjustSubmitting.value = false;
+  }
+}
+
+// 交接历史弹窗：展示当前对象的归因/协作变更流水
+const handoverDialogVisible = ref(false);
+const handoverLoading = ref(false);
+const handoverList = ref<PromotionHandoverVO[]>([]);
+async function openHandoverHistory() {
+  if (!adjustForm.objectId || !adjustForm.objectType) {
+    ElMessage.warning('当前记录缺少对象编号');
+    return;
+  }
+  handoverDialogVisible.value = true;
+  handoverLoading.value = true;
+  handoverList.value = [];
+  try {
+    const res = await getAttributionHandover(adjustForm.objectType, adjustForm.objectId);
+    handoverList.value = res.data || [];
+  } finally {
+    handoverLoading.value = false;
   }
 }
 
@@ -3962,6 +4794,9 @@ function handleResize() {
 
 onMounted(() => {
   loadData();
+  // 总览维度筛选：先恢复上次记忆的筛选条件，再加载（保证首屏即按记忆口径展示）
+  restoreOverviewFilter();
+  ensurePromotersLoaded(); // 总览推广人筛选下拉候选
   // loadStatistics 同时承载总览统计与企业端概览（同源数据），无需为企业端概览单独加载
   loadStatistics();
   window.addEventListener('resize', handleResize);
@@ -4029,6 +4864,18 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 600;
   color: var(--el-text-color-primary);
+}
+/* 可点击下钻的本期值用主色提示（覆盖 .gc-value 的文本色），并撑满列宽与差值左对齐 */
+.group-cell button.gc-value {
+  align-self: stretch;
+  padding: 0;
+  color: var(--el-color-primary);
+}
+.group-cell button.gc-value:hover,
+.group-cell button.gc-value:focus-visible {
+  color: var(--el-color-primary-dark-2);
+  text-decoration: underline;
+  outline: none;
 }
 .group-cell .gc-diff {
   font-size: 12px;
@@ -4160,6 +5007,75 @@ onUnmounted(() => {
   color: var(--el-text-color-secondary);
 }
 
+/* 协作人转正列表：每个协作人一行 + 「设为主推广人」按钮 */
+.collaborator-promote-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+.collaborator-promote-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.collaborator-promote-name {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+/* 协作人标签：列表里多个协作人换行展示 */
+.collaborator-tag {
+  margin: 2px 4px 2px 0;
+}
+
+/* 总览卡片同比/环比涨跌：up=增长(绿) / down=下降(红) / flat=持平或无可比基数(灰) */
+.metric-compare {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 8px;
+}
+
+.compare-item {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+}
+
+.compare-item.is-up {
+  color: var(--el-color-success);
+}
+
+.compare-item.is-down {
+  color: var(--el-color-danger);
+}
+
+.compare-item.is-flat {
+  color: var(--el-text-color-secondary);
+}
+
+/* 从0新增：无去年/上期基数但本期有量，蓝色区分于「—」 */
+.compare-item.is-new {
+  color: var(--el-color-primary);
+}
+
+/* 环比下滑超30%预警：红底高亮 + 警示图标，提醒运营跟进 */
+.compare-item.is-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--el-color-danger);
+  background: var(--el-color-danger-light-9);
+  border: 1px solid var(--el-color-danger-light-5);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+.compare-alert-icon {
+  font-size: 12px;
+}
+
 .table-title {
   margin-right: 10px;
 }
@@ -4170,6 +5086,22 @@ onUnmounted(() => {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+/* 总览维度筛选栏：位于导出/刷新按钮左侧 */
+.overview-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-right: 6px;
+}
+.overview-collab-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+  white-space: nowrap;
 }
 
 .statistics-filter,
@@ -4192,12 +5124,63 @@ onUnmounted(() => {
 }
 
 .overview-card {
+  position: relative;
   min-height: 92px;
   padding: 14px 16px;
   border: 1px solid var(--el-border-color-lighter);
   border-top: 4px solid var(--el-color-primary);
   border-radius: 8px;
   background: var(--el-fill-color-blank);
+}
+
+/* 右上角问号：指标释义入口 */
+.card-help {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 14px;
+  color: var(--el-text-color-placeholder);
+  cursor: help;
+}
+.card-help:hover {
+  color: var(--el-color-primary);
+}
+
+/* 转化拆解：B端/C端 可点下钻 */
+.metric-breakdown {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+  margin-bottom: 6px;
+}
+.metric-breakdown .bd-item {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0 2px;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.metric-breakdown .bd-item:hover {
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  text-decoration: underline;
+}
+.metric-breakdown .bd-sep {
+  color: var(--el-text-color-placeholder);
+}
+/* 空数据兜底：0 弱化灰色，不留空白横线 */
+.metric-breakdown .bd-item.is-zero {
+  color: var(--el-text-color-placeholder);
+}
+.overview-card strong.is-zero {
+  color: var(--el-text-color-placeholder);
+}
+.compare-item .cmp-label {
+  color: var(--el-text-color-secondary);
+  font-weight: 400;
 }
 
 .metric-card {

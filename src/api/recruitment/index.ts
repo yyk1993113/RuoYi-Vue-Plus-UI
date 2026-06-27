@@ -593,6 +593,9 @@ export interface PromoterStatisticsRow extends PromoterVO {
   resumeCount?: number;
   applyCount?: number;
   totalCount?: number;
+  // 协同维护数：作为协作人参与的企业/求职者数（不替代主推广人归因）
+  collaborativeCompanyCount?: number;
+  collaborativeJobSeekerCount?: number;
 }
 
 export interface PromoterStatisticsGroup {
@@ -638,7 +641,14 @@ export interface PromoterStatisticsPeriod {
   communicatedCompanyCount?: number;
   interviewCompanyCount?: number;
   hiredCompanyCount?: number;
+  // 已录用按岗位类型拆分：全职/兼职录用企业数（待后端 PeriodItem 补同名字段）
+  fullTimeHiredCompanyCount?: number;
+  partTimeHiredCompanyCount?: number;
   settledCompanyCount?: number;
+  // 周期同比/环比基数（后端 PeriodItem 同名字段）：新增(B+C 合计) 的「上期同期至今」(环比基数) 与「去年同期至今」(同比基数)。
+  // 仅 year/halfYear/quarter/month 周期有值，today 恒为 0；前端据此算卡片环比/同比涨跌。
+  chainNewCount?: number;
+  yoyNewCount?: number;
 }
 
 export interface CompanyOverviewStatisticsPeriod {
@@ -746,12 +756,44 @@ export interface PromotionAttributionDetailVO {
   resumeCompletedTime?: string;
   firstApplyTime?: string;
   createTime?: string;
+  // 协作人(协同跟进推广人)：不替代主推广人归因，后端 enrichCollaborators 装配
+  collaborators?: PromotionCollaboratorBrief[];
+  collaboratorNames?: string;
 }
 
 export interface PromotionAttributionAdjustForm {
   objectType: 'company' | 'user' | string;
   objectId: string | number;
   promoterId?: string | number;
+  // 协作人推广人ID集合（全量覆盖：本次提交即为该对象最终协作人；空表示清空协作人）。协作人仅记录协同参与，不替代主推广人归因。
+  collaboratorIds?: Array<string | number>;
+  // 转正：把某协作人提升为主推广人（离职交接）。非空时以转正语义为准，promoterId/collaboratorIds 可不传。
+  promoteCollaboratorId?: string | number;
+}
+
+// 归因明细中的协作人精简信息（后端 enrichCollaborators 装配）
+export interface PromotionCollaboratorBrief {
+  promoterId?: string | number;
+  name?: string;
+  phone?: string;
+  identityType?: string;
+}
+
+// 交接流水记录（GET /promoter/attribution/handover 返回）
+export interface PromotionHandoverVO {
+  id?: string | number;
+  objectType?: string;
+  objectId?: string | number;
+  action?: string;
+  actionName?: string;
+  fromPromoterId?: string | number;
+  fromPromoterName?: string;
+  toPromoterId?: string | number;
+  toPromoterName?: string;
+  operatorId?: string | number;
+  operatorName?: string;
+  remark?: string;
+  createTime?: string;
 }
 
 export function listPromoter(query: PromoterQuery) {
@@ -773,6 +815,10 @@ export interface PromoterGroupStatVO {
     key: string;
     label: string;
     companyCount: number;
+    certifiedCompanyCount: number;
+    draftCompanyCount: number;
+    rejectedCompanyCount: number;
+    publishedCompanyCount: number;
     jobSeekerCount: number;
     authorizedCount: number;
     resumeCount: number;
@@ -782,6 +828,33 @@ export interface PromoterGroupStatVO {
 
 export function getPromoterGroupStatistics() {
   return request.get<PromoterGroupStatVO[]>(`${baseUrl}/promoter/group-statistics`);
+}
+
+// ---------- 自定义导出·公共模板 ----------
+// 对应后端 AdminExportTemplateController（/admin/recruitment/export-template）。
+// config 为列配置快照 JSON 字符串（结构见前端 CustomExportDialog 的 snapshot）；scene 对应前端 storageKey。
+export interface ExportTemplateVO {
+  templateId?: number | string;
+  scene?: string;
+  name?: string;
+  config?: string;
+  isPublic?: string;
+  remark?: string;
+}
+
+// 按场景拉取公共模板列表。silent:true → 后端未部署时 404 不弹全局提示，调用方静默降级。
+export function listExportTemplates(scene: string) {
+  return request.get<ExportTemplateVO[]>(`${baseUrl}/export-template/list`, { params: { scene }, silent: true } as any);
+}
+
+// 新增/更新公共模板（管理员）。silent → 由调用方统一提示成功/失败，避免与全局提示重复。
+export function saveExportTemplate(data: ExportTemplateVO) {
+  return request.post(`${baseUrl}/export-template`, data, { silent: true } as any);
+}
+
+// 删除公共模板
+export function delExportTemplate(templateId: number | string) {
+  return request.delete(`${baseUrl}/export-template/${templateId}`, { silent: true } as any);
 }
 
 // 企业端概览查询已并入 getPromoterStatistics（/promoter/statistics），不再单独提供接口。
@@ -796,6 +869,13 @@ export function listPromoterUserDetail(query: PromotionAttributionQuery) {
 
 export function adjustPromoterAttribution(data: PromotionAttributionAdjustForm) {
   return request.post(`${baseUrl}/promoter/attribution/adjust`, data);
+}
+
+// 某对象(企业/求职者)的归因/协作交接历史，按时间倒序
+export function getAttributionHandover(objectType: string, objectId: string | number) {
+  return request.get<PromotionHandoverVO[]>(`${baseUrl}/promoter/attribution/handover`, {
+    params: { objectType, objectId }
+  });
 }
 
 // 公海客户：未插入任何推广来源（无推广人、无推广码）的企业 / 面试者，供运营手动分配推广人。
@@ -849,7 +929,8 @@ export function listCompany(query: CompanyQuery) {
   return request.get<any>(`${baseUrl}/company/list`, { params: query });
 }
 
-export function getCompany(companyId: number) {
+// companyId 为19位雪花ID：必须按原值(字符串)透传到 URL，禁止 Number() 转换（超出安全整数会丢精度，后端按错误ID查不到→「企业不存在」）
+export function getCompany(companyId: number | string) {
   return request.get<any>(`${baseUrl}/company/${companyId}`);
 }
 

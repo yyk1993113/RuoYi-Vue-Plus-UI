@@ -171,7 +171,10 @@ service.interceptors.response.use(
       ElMessage({ message: msg, type: 'warning' });
       return Promise.reject(new Error(msg));
     } else if (code !== HttpStatus.SUCCESS) {
-      ElNotification.error({ title: msg });
+      // silent:true 的请求（如「可缺失」的可选接口）不弹全局提示，由调用方自行处理
+      if (!(res.config as any)?.silent) {
+        ElNotification.error({ title: msg });
+      }
       return Promise.reject('error');
     } else {
       return Promise.resolve(res.data);
@@ -191,7 +194,10 @@ service.interceptors.response.use(
     } else if (message.includes('Request failed with status code')) {
       message = '系统接口' + message.substr(message.length - 3) + '异常';
     }
-    ElMessage({ message: message, type: 'error', duration: 5 * 1000 });
+    // silent:true 的请求不弹全局错误提示（如未部署的可选接口 404），交调用方处理
+    if (!(error?.config as any)?.silent) {
+      ElMessage({ message: message, type: 'error', duration: 5 * 1000 });
+    }
     return Promise.reject(error);
   }
 );
