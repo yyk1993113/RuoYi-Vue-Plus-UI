@@ -479,7 +479,8 @@
       </template>
     </el-dialog>
 
-    <!-- 审核对话框：通过走 /company/audit（后端固定置为已认证并生成企业编号）；驳回走 /company/changeStatus（status=2，原因写入 remark） -->
+    <!-- 审核对话框：通过走 /company/audit（置已认证并生成企业编号、回写资质=已通过）；
+         驳回走 /company/rejectCert（资质=已驳回+原因，账号仍可登录，企业可整改重交） -->
     <el-dialog v-model="auditVisible" title="企业审核" width="500px" append-to-body>
       <el-form ref="auditFormRef" :model="auditForm" :rules="auditRules" label-width="80px">
         <el-form-item label="企业名称">
@@ -641,6 +642,7 @@ import {
   getCompanyAuditHistory,
   auditCompany,
   changeCompanyStatus,
+  rejectCompanyCert,
   silenceCompany,
   unsilenceCompany,
   listJob,
@@ -998,8 +1000,9 @@ async function submitAudit() {
   auditSubmitting.value = true;
   try {
     if (auditForm.status === '2') {
-      // 驳回：/company/audit 后端固定置为已认证，不能用于驳回；改走 changeStatus 置为已禁用(2)，原因写入 remark。
-      await changeCompanyStatus({ companyId: auditForm.companyId, status: '2', remark: auditForm.remark });
+      // 驳回(方案A：账号/资质分离)：改走 /company/rejectCert——只把资质态置为已驳回+原因，账号仍保持「已认证」可登录，
+      // 让企业能登录看到驳回原因并整改重交。不再走 changeStatus 置 DISABLED(那会挡登录、企业进不来看原因)。
+      await rejectCompanyCert({ companyId: auditForm.companyId, remark: auditForm.remark });
       ElMessage.success('已驳回该企业认证');
     } else {
       // 通过：/company/audit 后端置为已认证并生成企业编号

@@ -869,6 +869,12 @@ export function changeCompanyStatus(data: { companyId: number; status: string; r
   return request.post(`${baseUrl}/company/changeStatus`, data);
 }
 
+// 驳回企业资质认证(方案A：账号/资质分离)。后端置 cert=已驳回+原因，但账号保持「已认证」可登录——
+// 让企业能登录看到驳回原因并整改重交；与 changeStatus(禁用账号，会挡登录)区分。remark=驳回原因(必填)。
+export function rejectCompanyCert(data: { companyId: number; remark: string }) {
+  return request.post(`${baseUrl}/company/rejectCert`, data);
+}
+
 export function silenceCompany(data: { companyId: number; silenceReason: string }) {
   return request.post(`${baseUrl}/company/silence`, data);
 }
