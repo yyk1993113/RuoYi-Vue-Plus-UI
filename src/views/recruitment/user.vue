@@ -533,9 +533,11 @@ async function loadData() {
       isRecruitmentSilenced: queryParams.isSilenced || undefined,
       applyFilter: queryParams.applyFilter || undefined,
     });
-    // 列表拆包统一走 unwrapList（顶层 rows/total 优先，兼容历史 data.rows 形状）
+    // 列表拆包：本接口 /user/listWithStats 后端用 R<TableDataInfo> 包了一层（与 listJob/listApply 等
+    // 「直接返回 TableDataInfo、顶层 rows/total」的项目约定不一致），数据在 res.data.{rows,total}。
+    // 这里兼容两种形态：R 包则取 res.data，直返则取 res，避免列表恒空。
     // 安全：不要打印整包响应，避免把求职者手机号/邮箱/登录IP 等 PII 暴露到浏览器控制台
-    const list = unwrapList<RecruitmentUserVO>(res);
+    const list = unwrapList<RecruitmentUserVO>((res as any)?.data ?? res);
     // 后端新老接口在手机号字段上存在 phone / phonenumber 两种返回，这里统一归一化避免页面空列。
     tableData.value = list.rows.map((item) => ({
       ...item,

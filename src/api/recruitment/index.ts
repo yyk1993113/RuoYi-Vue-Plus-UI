@@ -1092,6 +1092,17 @@ export function updateJob(data: any) {
   return request.put(`${baseUrl}/job`, data);
 }
 
+// 运营代发岗位：POST /admin/recruitment/job/add，body 为 CreateJobRequest（含 companyId 指定归属企业）。
+// status 由调用方决定：'0' 待审核 / '1' 直接上架 / '3' 存草稿（运营有发布权限）。
+export function addJob(data: any) {
+  return request.post(`${baseUrl}/job/add`, data);
+}
+
+// 存草稿语法糖：固定 status='3'，岗位不进入审核、不对外展示。
+export function saveJobDraft(data: any) {
+  return request.post(`${baseUrl}/job/add`, { ...data, status: '3' });
+}
+
 export function refreshJobRecommendCache() {
   return request.delete(`${baseUrl}/job/refreshCache`);
 }

@@ -124,6 +124,14 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         meta: { title: '岗位管理', icon: 'job' }
       },
       {
+        // 代发岗位整页：不在侧栏展示，从「岗位管理」的新增/复制发布入口进入；复制发布走 query.copyFrom=jobId
+        path: 'job-publish',
+        component: () => import('@/views/recruitment/job-publish.vue'),
+        name: 'RecruitmentJobPublish',
+        meta: { title: '代发岗位', icon: 'job', activeMenu: '/recruitment/job' },
+        hidden: true
+      },
+      {
         path: 'user',
         component: () => import('@/views/recruitment/user.vue'),
         name: 'RecruitmentUser',

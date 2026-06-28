@@ -73,6 +73,7 @@
             <el-option label="待审核" value="0" />
             <el-option label="已上架" value="1" />
             <el-option label="已下架" value="2" />
+            <el-option label="草稿" value="3" />
             <el-option label="驳回" value="6" />
           </el-select>
         </el-form-item>
@@ -105,6 +106,10 @@
     <el-card shadow="hover">
       <template #header>
         <el-row :gutter="10" align="middle">
+          <el-col :span="1.5">
+            <!-- 运营代发岗位：跳转独立发布整页（需指定所属企业） -->
+            <el-button type="primary" icon="Plus" @click="handleCreate">新增岗位</el-button>
+          </el-col>
           <el-col :span="1.5">
             <el-button type="primary" plain icon="Refresh" @click="handleRefresh" :loading="refreshing">刷新</el-button>
           </el-col>
@@ -199,7 +204,9 @@
                     <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '6')">审核拒绝</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '1'" icon="Bottom" @click="handleStatusChange(row, '2')">下架</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '2'" icon="Top" @click="handleStatusChange(row, '1')">上架</el-dropdown-item>
-                    <el-dropdown-item icon="Delete" @click="handleDelete(row)">删除</el-dropdown-item>
+                    <!-- 复制发布：进入代发整页并按 jobId 回填原岗位信息，少量修改即可重发 -->
+                  <el-dropdown-item icon="CopyDocument" @click="handleCopyPublish(row)">复制发布</el-dropdown-item>
+                  <el-dropdown-item icon="Delete" @click="handleDelete(row)">删除</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -309,72 +316,193 @@
 
     <!-- 岗位编辑对话框：运营修正岗位核心信息。
          数据来源 getJobFullDetail 全量回显；提交走 PUT /admin/recruitment/job，只发送结构化薪资字段。 -->
-    <el-dialog v-model="editVisible" title="编辑岗位" width="640px" append-to-body>
-      <!-- 字段集与排序对齐 B 端发布岗位表单：名称/性质/类目/地点/薪资/经验/学历/人数/描述 -->
-      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="100px" v-loading="editLoading" scroll-to-error>
-        <el-form-item label="岗位名称" prop="jobName">
-          <el-input v-model="editForm.jobName" placeholder="请输入岗位名称" maxlength="50" show-word-limit />
-        </el-form-item>
+    <el-dialog v-model="editVisible" title="编辑岗位" width="880px" append-to-body>
+      <!-- 字段集与排序对齐 B 端发布岗位表单：名称/性质/类目/地点/薪资/经验/学历/人数/描述。
+           表单按「基础信息 / 招聘要求 / 岗位详情」三段分组(el-divider 标题)，短字段双栏(el-col :span=12)以压缩弹窗高度。 -->
+      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="100px" v-loading="editLoading" scroll-to-error class="job-edit-form">
+        <!-- 模块1：基础岗位信息 -->
+        <el-divider content-position="left">
+          <span class="section-title"><el-icon><Document /></el-icon>基础岗位信息</span>
+        </el-divider>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="岗位名称" prop="jobName">
+              <el-input v-model="editForm.jobName" placeholder="请输入岗位名称" maxlength="50" show-word-limit />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="职位类目" prop="category">
+              <el-select v-model="editForm.category" placeholder="请选择职位类目" clearable filterable style="width: 100%">
+                <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <!-- 用工性质：整行通栏，4 张块状卡片单行展示不折行（半栏宽容不下 4 张）。点击后手动触发校验(rule trigger=change 对程序赋值不生效) -->
         <el-form-item label="用工性质" prop="jobType">
-          <el-radio-group v-model="editForm.jobType">
-            <el-radio label="0">全职</el-radio>
-            <el-radio label="1">兼职</el-radio>
-            <el-radio label="2">临时工</el-radio>
-            <el-radio label="3">项目制</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="职位类目" prop="category">
-          <el-select v-model="editForm.category" placeholder="请选择职位类目" clearable filterable style="width: 100%">
-            <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="省市区" prop="regionPath">
-          <el-cascader
-            v-model="editForm.regionPath"
-            :options="regionOptions"
-            filterable
-            clearable
-            placeholder="请选择省 / 市 / 区县"
-            style="width: 100%"
-            @change="syncEditRegionFromPath"
-          />
-        </el-form-item>
-        <el-form-item label="工作地点" prop="workAddress">
-          <el-input v-model="editForm.workAddress" placeholder="请输入详细地址" maxlength="200" />
-        </el-form-item>
-        <el-form-item label="薪资区间" prop="salaryMin">
-          <div style="display: flex; align-items: center; gap: 8px; width: 100%">
-            <el-input-number v-model="editForm.salaryMin" :min="0" :max="9999999" controls-position="right" placeholder="最低" style="width: 150px" />
-            <span>至</span>
-            <el-input-number v-model="editForm.salaryMax" :min="0" :max="9999999" controls-position="right" placeholder="最高" style="width: 150px" />
-            <el-select v-model="editForm.salaryUnit" style="width: 100px">
-              <el-option label="元/月" value="1" />
-              <el-option label="元/天" value="0" />
-              <el-option label="元/小时" value="3" />
-              <el-option label="元/次" value="2" />
-            </el-select>
+          <div class="job-type-cards">
+            <div
+              v-for="opt in jobTypeOptions"
+              :key="opt.value"
+              class="job-type-card"
+              :class="{ active: editForm.jobType === opt.value }"
+              role="radio"
+              tabindex="0"
+              :aria-checked="editForm.jobType === opt.value"
+              @click="selectJobType(opt.value)"
+              @keyup.enter="selectJobType(opt.value)"
+              @keyup.space="selectJobType(opt.value)"
+            >
+              {{ opt.label }}
+            </div>
           </div>
         </el-form-item>
-        <el-form-item label="经验要求" prop="experience">
-          <el-select v-model="editForm.experience" placeholder="请选择经验要求" clearable style="width: 100%">
-            <el-option v-for="opt in experienceOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-          </el-select>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="省市区" prop="regionPath">
+              <!-- checkStrictly: 允许部分路径(只到省/市)回显与选择——B 端按「全省/全市」发的岗位只存省或省+市，
+                   3 级级联默认只认完整叶子路径会导致这类岗位省市区带不出来 -->
+              <el-cascader
+                v-model="editForm.regionPath"
+                :options="regionOptions"
+                :props="{ checkStrictly: true }"
+                filterable
+                clearable
+                placeholder="请选择省 / 市 / 区县"
+                style="width: 100%"
+                @change="syncEditRegionFromPath"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="工作地点" prop="workAddress">
+              <el-input v-model="editForm.workAddress" placeholder="请输入详细地址（如：张江路 88 号 3 号楼）" maxlength="200">
+                <template #prefix><el-icon><LocationInformation /></el-icon></template>
+              </el-input>
+              <div class="field-hint">选好省市区后会自动预填地址前缀，补充街道门牌即可，例：合肥市高新区创新产业园 A 栋</div>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <!-- 模块2：招聘要求 -->
+        <el-divider content-position="left">
+          <span class="section-title"><el-icon><Filter /></el-icon>招聘要求</span>
+        </el-divider>
+        <el-form-item label="薪资区间" prop="salaryMin">
+          <div class="salary-field">
+            <!-- 快捷薪资标签：一键填充常用区间(均按元/月口径)，减少手动输入误填 -->
+            <div class="salary-quick">
+              <el-tag
+                v-for="q in salaryQuickOptions"
+                :key="q.label"
+                class="salary-quick-tag"
+                :type="isSalaryQuickActive(q) ? 'primary' : 'info'"
+                :effect="isSalaryQuickActive(q) ? 'dark' : 'plain'"
+                @click="applySalaryQuick(q)"
+              >{{ q.label }}</el-tag>
+            </div>
+            <div class="salary-inputs">
+              <el-input-number v-model="editForm.salaryMin" :min="0" :max="9999999" :precision="0" controls-position="right" placeholder="最低" style="width: 150px" @change="revalidateSalary" />
+              <span>至</span>
+              <el-input-number v-model="editForm.salaryMax" :min="0" :max="9999999" :precision="0" controls-position="right" placeholder="最高" style="width: 150px" @change="revalidateSalary" />
+              <el-select v-model="editForm.salaryUnit" style="width: 100px" @change="revalidateSalary">
+                <el-option label="元/月" value="1" />
+                <el-option label="元/天" value="0" />
+                <el-option label="元/小时" value="3" />
+                <el-option label="元/次" value="2" />
+              </el-select>
+            </div>
+            <!-- 极低薪友好提示：不阻断提交，仅提醒会降低投递量 -->
+            <div v-if="salaryTooLow" class="salary-tip">
+              <el-icon><WarningFilled /></el-icon>
+              薪资偏低会大幅降低简历投递量，建议调整到合理范围
+            </div>
+          </div>
         </el-form-item>
-        <el-form-item label="学历要求" prop="education">
-          <el-select v-model="editForm.education" placeholder="请选择学历要求" clearable style="width: 100%">
-            <el-option v-for="opt in educationOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-          </el-select>
-        </el-form-item>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="经验要求" prop="experience">
+              <el-select v-model="editForm.experience" placeholder="请选择经验要求" clearable filterable style="width: 100%">
+                <el-option v-for="opt in experienceOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="学历要求" prop="education">
+              <el-select v-model="editForm.education" placeholder="请选择学历要求" clearable filterable style="width: 100%">
+                <el-option v-for="opt in educationOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-form-item label="招聘人数" prop="recruitNumber">
-          <el-input-number v-model="editForm.recruitNumber" :min="1" :max="9999" controls-position="right" style="width: 150px" />
-          <span style="margin-left: 8px; color: #606266">人</span>
+          <div class="recruit-field">
+            <div class="recruit-quick">
+              <!-- 招聘人数为单值，快捷标签填具体人数（不用 2-5 人区间，避免歧义） -->
+              <el-tag
+                v-for="n in recruitQuickOptions"
+                :key="n"
+                class="recruit-quick-tag"
+                :type="editForm.recruitNumber === n ? 'primary' : 'info'"
+                :effect="editForm.recruitNumber === n ? 'dark' : 'plain'"
+                @click="applyRecruitQuick(n)"
+              >{{ n }} 人</el-tag>
+            </div>
+            <div class="recruit-input">
+              <!-- 去上下箭头(:controls=false)防误触，:precision=0 限正整数 -->
+              <el-input-number v-model="editForm.recruitNumber" :min="1" :max="9999" :precision="0" :controls="false" style="width: 150px" @change="revalidateRecruit" />
+              <span style="margin-left: 8px; color: #606266">人</span>
+            </div>
+          </div>
         </el-form-item>
+
+        <!-- 工作时间（仅非全职展示）：兼职/临时工/项目制需采集工作时间类型与具体时间，全职不展示也不校验 -->
+        <el-row v-if="isEditPartTime" :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="工作时间类型" prop="workTimeType" :required="isEditPartTime">
+              <el-select v-model="editForm.workTimeType" placeholder="请选择工作时间类型" clearable style="width: 100%">
+                <el-option v-for="opt in workTimeTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="工作时间" prop="workTime" :required="isEditPartTime">
+              <el-input v-model="editForm.workTime" placeholder="如：周一至周五 09:00-18:00，或 每周六日全天" maxlength="200" show-word-limit />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <!-- 模块3：岗位详情 -->
+        <el-divider content-position="left">
+          <span class="section-title"><el-icon><Tickets /></el-icon>岗位详情</span>
+        </el-divider>
         <el-form-item label="岗位描述" prop="description">
-          <el-input v-model="editForm.description" type="textarea" :rows="5" placeholder="岗位职责、工作内容、任职要求等" maxlength="2000" show-word-limit />
+          <div class="desc-field">
+            <!-- 模板快捷填充：生成「岗位职责/任职要求/福利待遇」三段式纯文本（非富文本，保持落库为纯文本）。
+                 已有内容时二次确认，避免误覆盖。 -->
+            <div class="desc-templates">
+              <span class="desc-templates-label">模板：</span>
+              <el-button v-for="t in descTemplates" :key="t.key" size="small" plain @click="applyDescTemplate(t)">{{ t.label }}</el-button>
+            </div>
+            <el-input
+              v-model="editForm.description"
+              type="textarea"
+              :rows="6"
+              :placeholder="descriptionPlaceholder"
+              maxlength="2000"
+              show-word-limit
+            />
+          </div>
         </el-form-item>
         <!-- 岗位福利：小程序端为 JSON 数组串、B 端 PC 为纯文本，此处原样回显/原样保存不做转换，避免破坏来源格式 -->
         <el-form-item label="岗位福利">
-          <el-input v-model="editForm.benefits" type="textarea" :rows="3" placeholder="选填：如五险一金、餐补、年终奖、弹性工作等" maxlength="500" show-word-limit />
+          <div class="benefit-field">
+            <!-- 快捷福利标签：点击把标签文字以「、」追加进纯文本框，不改变 benefits 的纯文本存储口径 -->
+            <div class="benefit-quick">
+              <el-tag v-for="b in benefitQuickOptions" :key="b" class="benefit-quick-tag" type="success" effect="plain" @click="appendBenefit(b)">+ {{ b }}</el-tag>
+            </div>
+            <el-input v-model="editForm.benefits" type="textarea" :rows="3" placeholder="选填：如五险一金、餐补、年终奖、弹性工作等" maxlength="500" show-word-limit />
+          </div>
         </el-form-item>
         <el-form-item label="团队介绍">
           <el-input v-model="editForm.teamIntro" type="textarea" :rows="3" placeholder="选填：介绍团队规模、氛围、技术栈等" maxlength="500" show-word-limit />
@@ -385,10 +513,37 @@
         <el-form-item label="备注">
           <el-input v-model="editForm.remark" type="textarea" :rows="2" placeholder="运营备注（选填）" maxlength="200" show-word-limit />
         </el-form-item>
+
+        <!-- 内联审核：仅待审核(0)岗位展示。通过=上架(status 1)，驳回=独立驳回态(status 6，原因必填，将告知企业) -->
+        <template v-if="editJobStatus === '0'">
+          <el-divider content-position="left">
+            <span class="section-title"><el-icon><CircleCheck /></el-icon>岗位审核</span>
+          </el-divider>
+          <el-form-item label="审核结果">
+            <el-radio-group v-model="editAuditForm.status">
+              <el-radio label="1">通过（上架）</el-radio>
+              <el-radio label="6">驳回</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item :label="editAuditForm.status === '6' ? '驳回原因' : '审核备注'" :required="editAuditForm.status === '6'">
+            <el-input
+              v-model="editAuditForm.remark"
+              type="textarea"
+              :rows="2"
+              :placeholder="editAuditForm.status === '6' ? '请填写驳回原因（必填，将告知企业）' : '审核备注（选填）'"
+              maxlength="200"
+            />
+          </el-form-item>
+        </template>
       </el-form>
       <template #footer>
         <el-button @click="editVisible = false">取消</el-button>
-        <el-button type="primary" :loading="editSubmitting" @click="submitEdit">保存</el-button>
+        <!-- 待审核岗位：保存与审核分开两按钮；其余状态仅保存 -->
+        <template v-if="editJobStatus === '0'">
+          <el-button :loading="editSubmitting" @click="submitEdit">仅保存</el-button>
+          <el-button type="primary" :loading="editSubmitting" @click="submitEditAndAudit">保存并审核</el-button>
+        </template>
+        <el-button v-else type="primary" :loading="editSubmitting" @click="submitEdit">保存</el-button>
       </template>
     </el-dialog>
 
@@ -456,9 +611,9 @@
 </template>
 
 <script setup name="JobManagement" lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { computed } from 'vue';
 import {
   listJob,
   getJobStatistics,
@@ -476,6 +631,7 @@ import { REGIONS } from '@/utils/region-data';
 import { unwrapList, splitToArray, formatSalary } from './helpers';
 import { jobStatusMeta, jobTypeMeta } from './constants';
 
+const router = useRouter();
 const loading = ref(false);
 const refreshing = ref(false);
 const total = ref(0);
@@ -595,12 +751,32 @@ const editForm = reactive({
   experience: '',
   education: '',
   recruitNumber: undefined as number | undefined,
+  workTime: '', // 工作时间（仅非全职）
+  workTimeType: '', // 工作时间类型（仅非全职）
   description: '',
   benefits: '',
   teamIntro: '',
   additionalConditions: '',
   remark: ''
 });
+
+// 非全职：jobType 不为 '0' 时需采集工作时间相关字段（与 B 端发布表单口径一致）
+const isEditPartTime = computed(() => editForm.jobType !== '0');
+
+// 编辑弹窗内联审核：仅当被编辑岗位为「待审核(0)」时展示审核区与「保存并审核」按钮。
+const editJobStatus = ref('');
+const editAuditForm = reactive({
+  status: '1', // 审核结果：'1' 通过(上架) / '6' 驳回
+  remark: '' // 驳回原因（驳回必填）/ 审核备注
+});
+
+// 工作时间类型（仅非全职展示）
+const workTimeTypeOptions = [
+  { value: '0', label: '固定班次' },
+  { value: '1', label: '排班/轮班' },
+  { value: '2', label: '弹性时间' },
+  { value: '3', label: '按需/临时' }
+];
 
 // 职位类目：与 B 端发布表单同一套本地常量（value 为字典值、label 为展示名），保证两端落库口径一致
 const categoryOptions = [
@@ -641,6 +817,157 @@ const educationOptions = [
   { value: '7', label: '博士' }
 ];
 
+// 用工性质：块状单选卡片选项，value 口径与 jobType(0全职/1兼职/2临时工/3项目制)一致
+const jobTypeOptions = [
+  { value: '0', label: '全职' },
+  { value: '1', label: '兼职' },
+  { value: '2', label: '临时工' },
+  { value: '3', label: '项目制' }
+];
+
+// 选中用工性质卡片：程序赋值不会触发 rule 的 change 校验，手动 validateField 清除红框
+function selectJobType(v: string) {
+  editForm.jobType = v;
+  editFormRef.value?.validateField?.('jobType');
+}
+
+// 快捷薪资标签：固定按「元/月」(salaryUnit=1)填充常用区间，点击即覆盖最低/最高并切回月薪
+const salaryQuickOptions = [
+  { label: '3k-5k', min: 3000, max: 5000 },
+  { label: '5k-8k', min: 5000, max: 8000 },
+  { label: '8k-12k', min: 8000, max: 12000 },
+  { label: '12k-20k', min: 12000, max: 20000 }
+];
+
+function applySalaryQuick(q: { min: number; max: number }) {
+  editForm.salaryMin = q.min;
+  editForm.salaryMax = q.max;
+  editForm.salaryUnit = '1';
+  revalidateSalary();
+}
+
+// 高亮当前与已填值匹配的快捷标签（仅月薪口径下比较）
+function isSalaryQuickActive(q: { min: number; max: number }): boolean {
+  return editForm.salaryUnit === '1' && editForm.salaryMin === q.min && editForm.salaryMax === q.max;
+}
+
+// 薪资任一输入或单位变化时，重新校验 salaryMin 规则，使「最低>最高」实时标红
+function revalidateSalary() {
+  editFormRef.value?.validateField?.('salaryMin');
+}
+
+// 极低薪提示阈值：按单位区分合理下限，低于阈值给出友好提醒（不阻断提交）
+const salaryLowThreshold: Record<string, number> = {
+  '1': 1000, // 元/月
+  '0': 50, // 元/天
+  '3': 10, // 元/小时
+  '2': 10 // 元/次
+};
+
+const salaryTooLow = computed<boolean>(() => {
+  const min = editForm.salaryMin;
+  if (min == null || min <= 0) return false;
+  const threshold = salaryLowThreshold[editForm.salaryUnit] ?? 1000;
+  return min < threshold;
+});
+
+// 岗位描述分段引导：用换行占位提示 HR 按「职责/要求/福利」三段填写
+const descriptionPlaceholder = ['【岗位职责】', '1. ', '', '【任职要求】', '1. ', '', '【福利待遇】', '1. '].join('\n');
+
+// 招聘人数快捷标签：单值填充（不用区间避免歧义），点击后重校验清红框
+const recruitQuickOptions = [1, 2, 5, 10];
+function applyRecruitQuick(n: number) {
+  editForm.recruitNumber = n;
+  revalidateRecruit();
+}
+function revalidateRecruit() {
+  editFormRef.value?.validateField?.('recruitNumber');
+}
+
+// 岗位描述模板：三段式纯文本（非富文本，保持 description 落库为纯文本）。已有内容时二次确认再覆盖。
+const descTemplates = [
+  {
+    key: 'tech',
+    label: '技术岗模板',
+    text: [
+      '一、岗位职责',
+      '1. 负责核心模块的设计、开发与维护；',
+      '2. 参与技术方案评审，保障代码质量与系统稳定性；',
+      '3. 配合团队完成需求迭代与线上问题排查。',
+      '',
+      '二、任职要求',
+      '1. 计算机相关专业，扎实的数据结构与算法基础；',
+      '2. 熟悉主流开发框架，有良好的编码习惯；',
+      '3. 具备较强的学习能力与团队协作意识。',
+      '',
+      '三、员工福利',
+      '五险一金、双休、年终奖、定期团建、技术成长体系。'
+    ].join('\n')
+  },
+  {
+    key: 'sales',
+    label: '销售岗模板',
+    text: [
+      '一、岗位职责',
+      '1. 负责目标客户开发与维护，完成销售业绩指标；',
+      '2. 挖掘客户需求，制定并推进销售方案；',
+      '3. 维护客户关系，提升客户满意度与复购率。',
+      '',
+      '二、任职要求',
+      '1. 具备良好的沟通表达与谈判能力；',
+      '2. 有销售相关经验者优先，结果导向、抗压能力强；',
+      '3. 认同公司文化，有强烈的目标达成意愿。',
+      '',
+      '三、员工福利',
+      '底薪 + 高提成、五险一金、双休、销售冠军激励。'
+    ].join('\n')
+  },
+  {
+    key: 'function',
+    label: '职能岗模板',
+    text: [
+      '一、岗位职责',
+      '1. 负责本职能模块的日常运转与流程执行；',
+      '2. 协同各部门推进工作落地，输出阶段性成果；',
+      '3. 持续优化工作流程，提升协作效率。',
+      '',
+      '二、任职要求',
+      '1. 相关专业背景，工作细致、责任心强；',
+      '2. 熟练使用办公软件，具备良好的统筹能力；',
+      '3. 沟通顺畅，能适应多任务并行的工作节奏。',
+      '',
+      '三、员工福利',
+      '五险一金、双休、节日福利、带薪年假。'
+    ].join('\n')
+  }
+];
+
+async function applyDescTemplate(t: { text: string }) {
+  if (editForm.description && editForm.description.trim()) {
+    try {
+      await ElMessageBox.confirm('当前已有岗位描述，套用模板会覆盖现有内容，是否继续？', '提示', {
+        confirmButtonText: '覆盖',
+        cancelButtonText: '取消',
+        type: 'warning'
+      });
+    } catch {
+      return; // 取消则不覆盖
+    }
+  }
+  editForm.description = t.text;
+  editFormRef.value?.validateField?.('description');
+}
+
+// 福利快捷标签：以「、」追加进纯文本福利框，已存在则忽略，不改变 benefits 纯文本存储口径
+const benefitQuickOptions = ['五险一金', '双休', '年终奖', '弹性工作制', '带薪年假', '餐补', '交通补贴', '定期体检'];
+function appendBenefit(b: string) {
+  const cur = (editForm.benefits || '').trim();
+  // 已含该福利（按中英文逗号/顿号切分判断）则不重复追加
+  const exists = cur.split(/[、,，]/).map((s) => s.trim()).includes(b);
+  if (exists) return;
+  editForm.benefits = cur ? `${cur}、${b}` : b;
+}
+
 // 运营后台编辑岗位同样使用三级联动数据源，地区字段只由 cascader 拆分生成。
 const regionOptions = REGIONS.map((province: any) => ({
   label: province.name,
@@ -659,11 +986,31 @@ const editRules = {
   jobName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
   jobType: [{ required: true, message: '请选择用工性质', trigger: 'change' }],
   category: [{ required: true, message: '请选择职位类目', trigger: 'change' }],
-  regionPath: [{ required: true, type: 'array', min: 3, message: '请选择省市区', trigger: 'change' }],
+  // 至少选到省即可（min:1）：配合 checkStrictly 支持「全省/全市」类部分路径岗位的回显与保存，不强制必须到区县
+  regionPath: [{ required: true, type: 'array', min: 1, message: '请至少选择省份', trigger: 'change' }],
   workAddress: [{ required: true, message: '请输入工作地点', trigger: 'blur' }],
   experience: [{ required: true, message: '请选择经验要求', trigger: 'change' }],
   education: [{ required: true, message: '请选择学历要求', trigger: 'change' }],
   recruitNumber: [{ required: true, message: '请输入招聘人数', trigger: 'change' }],
+  // 工作时间相关：仅非全职(isEditPartTime)时必填，全职跳过
+  workTimeType: [
+    {
+      validator: (_rule: any, value: any, callback: (e?: Error) => void) => {
+        if (isEditPartTime.value && !value) callback(new Error('请选择工作时间类型'));
+        else callback();
+      },
+      trigger: 'change'
+    }
+  ],
+  workTime: [
+    {
+      validator: (_rule: any, value: any, callback: (e?: Error) => void) => {
+        if (isEditPartTime.value && !value) callback(new Error('请描述具体工作时间'));
+        else callback();
+      },
+      trigger: 'blur'
+    }
+  ],
   description: [{ required: true, message: '请输入岗位描述', trigger: 'blur' }],
   salaryMin: [
     {
@@ -716,11 +1063,17 @@ async function handleEdit(row: any) {
     editForm.experience = d.experience != null ? String(d.experience) : '';
     editForm.education = d.education != null ? String(d.education) : '';
     editForm.recruitNumber = d.recruitNumber ?? undefined;
+    editForm.workTime = d.workTime ?? '';
+    editForm.workTimeType = d.workTimeType != null ? String(d.workTimeType) : '';
     editForm.description = d.description ?? '';
     editForm.benefits = d.benefits ?? '';
     editForm.teamIntro = d.teamIntro ?? '';
     editForm.additionalConditions = d.additionalConditions ?? '';
     editForm.remark = d.remark ?? '';
+    // 内联审核：记录当前岗位状态，重置审核选项（默认通过）
+    editJobStatus.value = d.status != null ? String(d.status) : '';
+    editAuditForm.status = '1';
+    editAuditForm.remark = '';
     editFormRef.value?.clearValidate?.();
   } catch (error) {
     ElMessage.error('获取岗位详情失败');
@@ -730,34 +1083,44 @@ async function handleEdit(row: any) {
   }
 }
 
-// 保存编辑：只提交结构化地区、薪资和 workAddress。
+// 组装编辑提交 payload：只提交结构化地区、薪资和 workAddress；工作时间仅非全职随单下发。
+function buildEditPayload() {
+  syncEditRegionFromPath();
+  const payload: any = {
+    jobId: editForm.jobId,
+    jobName: editForm.jobName,
+    jobType: editForm.jobType,
+    category: editForm.category,
+    province: editForm.province,
+    city: editForm.city,
+    district: editForm.district,
+    salaryMin: editForm.salaryMin,
+    salaryMax: editForm.salaryMax,
+    salaryUnit: editForm.salaryUnit,
+    workAddress: editForm.workAddress,
+    experience: editForm.experience,
+    education: editForm.education,
+    recruitNumber: editForm.recruitNumber,
+    description: editForm.description,
+    benefits: editForm.benefits,
+    teamIntro: editForm.teamIntro,
+    additionalConditions: editForm.additionalConditions,
+    remark: editForm.remark || undefined
+  };
+  if (isEditPartTime.value) {
+    payload.workTime = editForm.workTime;
+    payload.workTimeType = editForm.workTimeType;
+  }
+  return payload;
+}
+
+// 仅保存编辑（不改状态）
 async function submitEdit() {
   editFormRef.value?.validate(async (valid: boolean) => {
     if (!valid) return;
     editSubmitting.value = true;
     try {
-      syncEditRegionFromPath();
-      await updateJob({
-        jobId: editForm.jobId,
-        jobName: editForm.jobName,
-        jobType: editForm.jobType,
-        category: editForm.category,
-        province: editForm.province,
-        city: editForm.city,
-        district: editForm.district,
-        salaryMin: editForm.salaryMin,
-        salaryMax: editForm.salaryMax,
-        salaryUnit: editForm.salaryUnit,
-        workAddress: editForm.workAddress,
-        experience: editForm.experience,
-        education: editForm.education,
-        recruitNumber: editForm.recruitNumber,
-        description: editForm.description,
-        benefits: editForm.benefits,
-        teamIntro: editForm.teamIntro,
-        additionalConditions: editForm.additionalConditions,
-        remark: editForm.remark || undefined
-      });
+      await updateJob(buildEditPayload());
       ElMessage.success('保存成功');
       editVisible.value = false;
       loadData();
@@ -769,11 +1132,41 @@ async function submitEdit() {
   });
 }
 
+// 保存并审核（仅待审核岗位）：先保存编辑，再提交审核结果（通过上架=1 / 驳回=6）。
+// 驳回必须填原因，与独立审核弹窗口径一致（写入 Job.remark 经 /job/audit）。
+async function submitEditAndAudit() {
+  if (editAuditForm.status === '6' && !editAuditForm.remark.trim()) {
+    ElMessage.warning('驳回岗位请填写驳回原因');
+    return;
+  }
+  editFormRef.value?.validate(async (valid: boolean) => {
+    if (!valid) return;
+    editSubmitting.value = true;
+    try {
+      await updateJob(buildEditPayload());
+      await auditJob({ jobId: editForm.jobId as number, status: editAuditForm.status, remark: editAuditForm.remark.trim() || undefined });
+      ElMessage.success(editAuditForm.status === '1' ? '已保存并通过上架' : '已保存并驳回');
+      editVisible.value = false;
+      loadData();
+      loadStatistics();
+    } catch (error) {
+      ElMessage.error('操作失败');
+    } finally {
+      editSubmitting.value = false;
+    }
+  });
+}
+
 function syncEditRegionFromPath() {
   const [province = '', city = '', district = ''] = editForm.regionPath || [];
   editForm.province = province;
   editForm.city = city;
   editForm.district = district;
+  // 工作地点为空时，用「省+市」预填地址前缀，HR 只需补街道门牌；已填则不覆盖，避免破坏运营已修正的地址
+  if (!String(editForm.workAddress || '').trim() && (province || city)) {
+    editForm.workAddress = `${province}${city}`;
+    editFormRef.value?.validateField?.('workAddress');
+  }
 }
 
 async function loadData() {
@@ -992,6 +1385,16 @@ async function handleDelete(row: any) {
   }
 }
 
+// 新增岗位：进入代发整页（运营代企业发布，需在该页选所属企业）
+function handleCreate() {
+  router.push({ name: 'RecruitmentJobPublish' });
+}
+
+// 复制发布：携带 jobId 进入代发整页，由该页拉全量详情回填
+function handleCopyPublish(row: any) {
+  router.push({ name: 'RecruitmentJobPublish', query: { copyFrom: String(row.jobId) } });
+}
+
 onMounted(() => {
   loadData();
   loadStatistics();
@@ -1155,6 +1558,135 @@ function formatStartDate(val?: string | number): string {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* 编辑弹窗：分组标题(el-divider)上下间距收紧，使三段更紧凑 */
+.job-edit-form :deep(.el-divider) {
+  margin: 4px 0 18px;
+}
+
+.job-edit-form :deep(.el-divider__text) {
+  font-weight: 600;
+  color: #303133;
+}
+
+/* 模块标题：浅蓝文字 + 前置图标，区分不同分组 */
+.section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #2b7fff;
+  font-size: 14px;
+}
+
+/* 表单标签加粗深灰，对标主流招聘平台 */
+.job-edit-form :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: #333;
+}
+
+/* 字段下方浅灰示例小字，弱化不抢视觉 */
+.field-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #a8abb2;
+  line-height: 1.4;
+}
+
+/* 招聘人数：快捷标签在上、输入在下 */
+.recruit-quick,
+.benefit-quick {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.recruit-quick-tag,
+.benefit-quick-tag {
+  cursor: pointer;
+}
+
+/* 描述模板按钮行 */
+.desc-templates {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.desc-templates-label {
+  font-size: 12px;
+  color: #909399;
+}
+
+.desc-field,
+.benefit-field,
+.recruit-field {
+  width: 100%;
+}
+
+/* 用工性质块状单选卡片 */
+.job-type-cards {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.job-type-card {
+  min-width: 60px;
+  padding: 5px 14px;
+  text-align: center;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: #606266;
+  transition: all 0.15s ease;
+}
+
+.job-type-card:hover {
+  background: #f5f7fa;
+  border-color: #c0c4cc;
+}
+
+.job-type-card.active {
+  background: #2b7fff;
+  border-color: #2b7fff;
+  color: #fff;
+}
+
+/* 薪资区间：快捷标签 + 数值输入 + 极低薪提示纵向排布 */
+.salary-field {
+  width: 100%;
+}
+
+.salary-quick {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.salary-quick-tag {
+  cursor: pointer;
+}
+
+.salary-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.salary-tip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #e6a23c;
 }
 
 /* 详情弹窗内福利/工作时间标签的换行排布 */
