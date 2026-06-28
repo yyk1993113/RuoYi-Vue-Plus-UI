@@ -240,9 +240,12 @@
       <el-descriptions :column="2" border v-if="currentUser">
         <el-descriptions-item label="用户ID">{{ currentUser.userId }}</el-descriptions-item>
         <el-descriptions-item label="用户类型">
-          <el-tag v-if="currentUser.userType === 'C'" type="success">求职者</el-tag>
+          <!-- C/B 是招聘业务对求职者/企业的标记;app_user/sys_user 是 RuoYi 框架自带的 sys_user.user_type 值。
+               本页是求职者管理,app端注册用户(app_user)本质即求职者,与 C 统一显示「求职者」;sys_user 为后台系统用户 -->
+          <el-tag v-if="currentUser.userType === 'C' || currentUser.userType === 'app_user'" type="success">求职者</el-tag>
           <el-tag v-else-if="currentUser.userType === 'B'" type="warning">企业</el-tag>
-          <el-tag v-else>{{ currentUser.userType }}</el-tag>
+          <el-tag v-else-if="currentUser.userType === 'sys_user'" type="info">系统用户</el-tag>
+          <el-tag v-else>{{ currentUser.userType || '-' }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="昵称">{{ currentUser.nickName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="账号">{{ currentUser.userName || '-' }}</el-descriptions-item>
