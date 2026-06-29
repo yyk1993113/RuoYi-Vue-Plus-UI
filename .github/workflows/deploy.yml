@@ -26,10 +26,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
 
+      # 注：本仓 .gitignore 忽略了 pnpm-lock.yaml，无提交的 lockfile，故不用 frozen/缓存。
+      # 建议(best practice)：提交 pnpm-lock.yaml 以获得可复现构建 + 缓存加速。
       - name: Install deps
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build (vite build:prod -> dist/)
         run: pnpm build:prod
