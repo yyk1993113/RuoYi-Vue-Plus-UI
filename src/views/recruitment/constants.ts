@@ -38,6 +38,26 @@ const INVOICE_STATUS: Record<string, StatusMeta> = {
 };
 export const invoiceStatusMeta = (status?: string | null): StatusMeta => resolve(INVOICE_STATUS, status, INVOICE_STATUS['2']);
 
+// ========== 台账结算状态 ledger.status：0待结算 / 1已结算 / 2已取消 ==========
+// 来源：后端 Ledger.status。运营端「履约监控台」详情的资金主线展示该任务最新台账的结算状态。
+// 未命中（含 undefined/null）兜底为「待结算 / warning」。
+const LEDGER_STATUS: Record<string, StatusMeta> = {
+  '0': { label: '待结算', type: 'warning' },
+  '1': { label: '已结算', type: 'success' },
+  '2': { label: '已取消', type: 'info' }
+};
+export const ledgerStatusMeta = (status?: string | null): StatusMeta => resolve(LEDGER_STATUS, status, LEDGER_STATUS['0']);
+
+// ========== 履约异常类型 abnormalType（运营端只读预警，无对应数据库字段，为服务端按阈值计算的派生维度）==========
+// pending_timeout 待确认超时 / verify_timeout 待核验超时(催企业核验) / completed_unsettled 完成未结算。
+// 用于异常预警卡标题着色与列表「异常」列打标；未命中兜底为「异常 / danger」。
+const TASK_ABNORMAL: Record<string, StatusMeta> = {
+  pending_timeout: { label: '待确认超时', type: 'warning' },
+  verify_timeout: { label: '待核验超时', type: 'danger' },
+  completed_unsettled: { label: '完成未结算', type: 'danger' }
+};
+export const taskAbnormalMeta = (type?: string | null): StatusMeta => resolve(TASK_ABNORMAL, type, { label: '异常', type: 'danger' });
+
 // ========== 台账发票绑定状态 ledger.invoiceStatus：0未绑定 / 1已绑定 ==========
 // 来源：后端台账 Ledger.invoiceStatus（台账是否已绑定发票）。
 // 注意：这是「台账侧的发票绑定状态」，区别于上方 invoiceStatusMeta（发票自身的开票/作废状态）。

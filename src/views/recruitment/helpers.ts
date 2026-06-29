@@ -37,6 +37,14 @@ export function splitToArray(value?: string | null): string[] {
 }
 
 /**
+ * 日期时间展示：后端已返回 'yyyy-MM-dd HH:mm:ss' 字符串，这里仅做空值兜底（'-'），
+ * 避免列表/详情/时间线在字段缺失时渲染出 undefined。
+ */
+export function formatDateTime(value?: string | null): string {
+  return value ? String(value) : '-';
+}
+
+/**
  * 岗位薪资展示：只接受结构化 salaryMin / salaryMax / salaryUnit。
  */
 export function formatSalary(min?: number | string | null, max?: number | string | null, unit?: string | null): string {

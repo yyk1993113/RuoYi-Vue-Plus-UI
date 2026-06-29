@@ -200,6 +200,29 @@ export interface TaskVO {
   statusName?: string;
   remark?: string;
   createTime?: string;
+  updateTime?: string;
+  // 薪资（来自 job JOIN）与三段履约照片
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryUnit?: string;
+  arrivalPhotos?: string;
+  midPhotos?: string;
+  finishPhotos?: string;
+  // 核验结果（B 端录入）
+  workHours?: number;
+  settleAmount?: number;
+  // 资金主线：该任务最新一条台账（后端详情 LEFT JOIN ledger，无台账时为空）
+  ledgerId?: number;
+  orderNo?: string;
+  ledgerStatus?: string; // 台账结算状态 0待结算/1已结算/2已取消
+  ledgerInvoiceStatus?: string; // 台账发票绑定状态 0未绑定/1已绑定
+}
+
+// 履约异常统计（运营端只读预警卡，对应后端 TaskAbnormalStatVO）
+export interface TaskAbnormalStat {
+  pendingTimeout: number; // 待确认超时
+  verifyTimeout: number; // 待核验超时
+  completedUnsettled: number; // 完成未结算
 }
 
 // ========== 台账相关 ==========
@@ -225,11 +248,14 @@ export interface LedgerVO {
   orderNo?: string;
   // 发票绑定状态 0:未绑定 1:已绑定（后端 Ledger.invoiceStatus）
   invoiceStatus?: string;
-  // 台账业务状态（后端 Ledger.status）
+  // 台账业务状态（后端 Ledger.status）0待结算/1已结算/2已取消
   status?: string;
   timestamp?: string;
   amount?: number;
   createTime?: string;
+  // 结算可追溯字段（运营标记已结算时回填）
+  settleTime?: string;
+  settleRemark?: string;
 }
 
 // ========== 发票相关 ==========
@@ -457,6 +483,12 @@ export interface TaskQuery {
   companyId?: number;
   userId?: number;
   status?: string;
+  // 运营端监控台筛选维度（后端 AdminRecruitmentController#listTask 已支持）
+  companyName?: string; // 企业名模糊
+  jobName?: string; // 岗位名模糊
+  beginTime?: string; // 创建时间起（'yyyy-MM-dd HH:mm:ss'）
+  endTime?: string; // 创建时间止
+  abnormalType?: string; // 异常类型：pending_timeout/verify_timeout/completed_unsettled
 }
 
 export interface LedgerQuery {
@@ -465,6 +497,7 @@ export interface LedgerQuery {
   companyId?: number;
   userId?: number;
   orderNo?: string;
+  status?: string; // 结算状态筛选 0待结算/1已结算/2已取消
 }
 
 export interface InvoiceQuery {
@@ -1272,12 +1305,19 @@ export function getTask(taskId: number) {
   return request.get<any>(`${baseUrl}/task/${taskId}`);
 }
 
-export function verifyTask(data: { taskId: number; status: string; remark?: string }) {
+// 平台代核验：通过(completed)时需带 workHours/settleAmount；驳回(rejected)时需带 remark。
+// 行为对齐企业端 verify（仅可核验待核验任务、台账有则更新无则不创建），后端会写运营审计。
+export function verifyTask(data: { taskId: number; status: string; remark?: string; workHours?: number; settleAmount?: number }) {
   return request.post(`${baseUrl}/task/verify`, data);
 }
 
 export function getTaskStatistics() {
   return request.get<any>(`${baseUrl}/task/statistics`);
+}
+
+// 履约异常统计（只读）：阈值（天）可调，后端默认 待确认2/待核验3/完成未结算7
+export function getTaskAbnormalStatistics(params?: { pendingDays?: number; verifyDays?: number; settleDays?: number }) {
+  return request.get<TaskAbnormalStat>(`${baseUrl}/task/abnormal-statistics`, { params });
 }
 
 // ---------- 台账管理 ----------
@@ -1292,6 +1332,11 @@ export function getLedger(ledgerId: number) {
 
 export function getLedgerStatistics() {
   return request.get<any>(`${baseUrl}/ledger/statistics`);
+}
+
+// 标记台账已结算（单条/批量）：后端仅对「待结算」生效、限财务/超管、写审计
+export function settleLedger(data: { ledgerIds: number[]; remark?: string }) {
+  return request.post(`${baseUrl}/ledger/settle`, data);
 }
 
 // ---------- 发票管理 ----------

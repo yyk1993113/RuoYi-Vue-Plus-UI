@@ -147,7 +147,7 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         path: 'task',
         component: () => import('@/views/recruitment/task.vue'),
         name: 'RecruitmentTask',
-        meta: { title: '任务管理', icon: 'my-task' }
+        meta: { title: '履约管理', icon: 'my-task' }
       },
       {
         path: 'ledger',
@@ -161,7 +161,7 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/recruitment/invoice.vue'),
         name: 'RecruitmentInvoice',
         meta: { title: '发票管理', icon: 'pdf' }
-      },
+      }
     ]
   }
 ];
