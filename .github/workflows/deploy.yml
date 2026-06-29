@@ -1,0 +1,76 @@
+name: deploy
+
+# 【验证阶段·未合闸】跑通"构建→传OSS→预签名→签名调webhook"整条链，只发 ping、不真部署。
+# 待该仓有代码要发布到生产时，改为真部署版并合闸（照搬 findwordmanager 的 deploy.yml：
+#   把 ping 段换成 component=admin 真部署 + 打开 push:main 触发器）。
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-admin
+  cancel-in-progress: false
+
+jobs:
+  validate-chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (vite build:prod -> dist/)
+        run: pnpm build:prod
+
+      - name: Package dist
+        run: |
+          test -f dist/index.html || { echo "构建产物缺 dist/index.html"; exit 1; }
+          tar czf dist.tgz -C dist .
+          ls -la dist.tgz
+
+      - name: Upload to OSS, presign & verify chain (NO deploy)
+        env:
+          OSS_AK_ID: ${{ secrets.ALIYUN_OSS_AK_ID }}
+          OSS_AK_SECRET: ${{ secrets.ALIYUN_OSS_AK_SECRET }}
+          DEPLOY_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
+          OSS_BUCKET: yjtnj
+          OSS_ENDPOINT: oss-cn-beijing.aliyuncs.com
+          COMPONENT: admin
+        run: |
+          set -euo pipefail
+          SHA="${GITHUB_SHA::8}"
+          export OBJ="deploy/${COMPONENT}/${SHA}-${GITHUB_RUN_ID}.tgz"
+
+          echo "::group::上传产物到 OSS 并生成预签名 URL"
+          URL="$(OBJ="$OBJ" LOCAL_FILE=dist.tgz python3 .github/ci/oss_put.py)"
+          echo "presigned host: $(echo "$URL" | sed -E 's#(https?://[^/]+/).*#\1...#')"
+          echo "::endgroup::"
+
+          echo "::group::自检：下载预签名 URL 并验 gzip"
+          curl -fsSL -o /tmp/selfcheck.tgz "$URL"
+          tar tzf /tmp/selfcheck.tgz >/dev/null && echo "✅ 预签名 URL 内容是有效 tar.gz" || { echo "❌ 非gzip"; head -c 240 /tmp/selfcheck.tgz; exit 1; }
+          echo "::endgroup::"
+
+          echo "::group::发 ping 到部署 webhook（验签名鉴权+接收器，不部署）"
+          BODY="$(printf '{"component":"ping","version":"%s"}' "$SHA")"
+          SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$DEPLOY_SECRET" | sed 's/^.*= //')"
+          RESP="$(curl -sS -X POST https://api.zgypzp.com/_deploy \
+            -H "X-Deploy-Signature: $SIG" -H "Content-Type: application/json" \
+            --data "$BODY" -w $'\n%{http_code}')"
+          CODE="$(printf '%s' "$RESP" | tail -1)"
+          printf '%s\n' "$RESP" | sed '$d'
+          echo "::endgroup::"
+          [ "$CODE" = "200" ] || { echo "❌ webhook ping 失败 HTTP=$CODE"; exit 1; }
+          echo "✅ 运营台(admin) 新链路验证通过：构建 + 传OSS + 预签名可下 + 签名webhook通（未部署）"
