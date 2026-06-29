@@ -42,7 +42,13 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="岗位名称" prop="jobName">
-              <el-input v-model="form.jobName" placeholder="请输入岗位名称" maxlength="50" show-word-limit />
+              <!-- 岗位名称：BOSS 直聘式职位类目级联选择器（左类目/右职位+搜索）；选中后自动把一级类目带入职位类目（@pick），下拉数据源亦由其透传（@categories-loaded） -->
+              <job-position-picker
+                v-model="form.jobName"
+                @valid-change="onJobNameValidChange"
+                @pick="onJobNamePick"
+                @categories-loaded="onCategoriesLoaded"
+              />
             </el-form-item>
           </el-col>
         </el-row>
@@ -69,6 +75,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="职位类目" prop="category">
+              <!-- 职位类目：与岗位名称同源（一级类目来自职位类目库，经 @categories-loaded 透传）；选岗位名称会自动带入 -->
               <el-select v-model="form.category" placeholder="请选择职位类目" clearable filterable style="width: 100%">
                 <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
               </el-select>
@@ -250,10 +257,11 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { addJob, saveJobDraft, listCompany, getJobFullDetail } from '@/api/recruitment';
+// 岗位名称：BOSS 直聘式职位类目级联选择器（数据源=职位类目库 /api/app/jobCategory/tree）；职位类目与其同源
+import JobPositionPicker from './components/JobPositionPicker.vue';
 import { unwrapList, formatSalary } from './helpers';
 import {
   jobTypeOptions,
-  categoryOptions,
   experienceOptions,
   educationOptions,
   salaryUnitOptions,
@@ -324,10 +332,53 @@ async function searchCompany(keyword: string) {
   }
 }
 
+// ===== 岗位名称 / 职位类目：来源职位类目库（与 manager 一致，JobPositionPicker 驱动） =====
+// 职位类目一级目录与「岗位名称」同源：由 JobPositionPicker 经 @categories-loaded 透传；value/label 均用一级类目名。
+const taxonomyCategories = ref<{ id: number | string; name: string }[]>([]);
+const categoryOptions = computed(() => {
+  const opts = taxonomyCategories.value.map((c) => ({ value: c.name, label: c.name }));
+  // 复制发布回显兜底：旧 category 值（如历史占位码 tech）不在一级目录里时补一项，避免下拉显示空白
+  if (form.category && !opts.some((o) => o.value === form.category)) {
+    opts.unshift({ value: form.category, label: form.category });
+  }
+  return opts;
+});
+
+// 职位类目树加载完成：作为职位类目下拉数据源
+function onCategoriesLoaded(cats: { id: number | string; name: string }[]) {
+  taxonomyCategories.value = cats;
+}
+
+// 选定岗位名称：自动带入其一级类目并触发该字段校验
+function onJobNamePick(payload: { name: string; category: string }) {
+  if (payload.category) {
+    form.category = payload.category;
+    formRef.value?.validateField?.('category');
+  }
+}
+
+// 岗位名称是否为「职位库内标准职位」：由 JobPositionPicker 经 valid-change 透传，参与提交校验。
+const jobNameStandard = ref(true);
+function onJobNameValidChange(v: boolean) {
+  jobNameStandard.value = v;
+  // 值变更后重新触发该字段校验，及时清除/显示「标准职位」错误
+  formRef.value?.validateField?.('jobName');
+}
+
 // ===== 校验规则 =====
 const rules = {
   companyId: [{ required: true, message: '请选择所属企业', trigger: 'change' }],
-  jobName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
+  jobName: [
+    { required: true, message: '请选择岗位名称', trigger: 'change' },
+    // 必须是职位类目库内的标准职位（jobNameStandard 由 JobPositionPicker 透传）
+    {
+      validator: (_rule: any, value: string, callback: (e?: Error) => void) => {
+        if (value && !jobNameStandard.value) callback(new Error('请选择下拉内标准职位类目'));
+        else callback();
+      },
+      trigger: 'change'
+    }
+  ],
   jobType: [{ required: true, message: '请选择用工性质', trigger: 'change' }],
   category: [{ required: true, message: '请选择职位类目', trigger: 'change' }],
   regionPath: [{ required: true, type: 'array', min: 3, message: '请选择省市区', trigger: 'change' }],
@@ -661,6 +712,7 @@ async function loadCopyFrom(jobId: string) {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown);
+  // 职位类目树由 JobPositionPicker 内部自行加载，这里无需预拉
   if (isCopy.value) {
     loadCopyFrom(String(route.query.copyFrom));
   } else {

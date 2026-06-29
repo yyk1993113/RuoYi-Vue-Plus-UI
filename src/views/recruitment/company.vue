@@ -475,6 +475,19 @@
           :disabled="!!editSubmitting && editSubmitting !== 'submit'"
           @click="submit"
         >提交</el-button>
+        <!-- 待审核(0)：运营可在编辑弹窗内直接发起审核，复用「企业审核」对话框（通过/驳回），不改保存/提交逻辑 -->
+        <el-button
+          v-if="form.status === '0'"
+          type="success"
+          :disabled="!!editSubmitting"
+          @click="handleAuditFromEdit('1')"
+        >审核通过</el-button>
+        <el-button
+          v-if="form.status === '0'"
+          type="danger"
+          :disabled="!!editSubmitting"
+          @click="handleAuditFromEdit('2')"
+        >审核拒绝</el-button>
         <el-button :disabled="!!editSubmitting" @click="editVisible = false">取消</el-button>
       </template>
     </el-dialog>
@@ -988,6 +1001,13 @@ function handleAudit(row: any, status: string) {
   auditVisible.value = true;
   // 清除上一次的校验态，避免残留红框
   auditFormRef.value?.clearValidate?.();
+}
+
+// 从「企业编辑」弹窗内直接发起审核：先关编辑弹窗再开审核对话框，避免审核完成后背后残留过期的编辑框。
+// 仅复用现有审核流程，不改动 保存/提交/存草稿 的既有逻辑。
+function handleAuditFromEdit(status: string) {
+  editVisible.value = false;
+  handleAudit(form.value, status);
 }
 
 async function submitAudit() {
