@@ -329,18 +329,22 @@
                 <el-descriptions-item label="办公地址" :span="2">{{ cert.officeAddress || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="审核意见" :span="2">{{ cert.auditRemark || '-' }}</el-descriptions-item>
               </el-descriptions>
-              <!-- 认证材料图片：营业执照 / 法人身份证正反面 / 对公账户凭证 / 授权书 / 办公实景（可多图） -->
+              <!-- 认证材料图片：营业执照 / 法人身份证附件 / 对公账户凭证 / 授权书 / 办公实景（可多图） -->
               <div class="cert-images cert-images-wrap">
-                <div v-for="img in certImageList(cert)" :key="img.label + img.url" class="cert-item">
-                  <div class="cert-label">{{ img.label }}</div>
-                  <el-image
-                    :src="img.url"
-                    :preview-src-list="certPreviewList(cert)"
-                    :initial-index="img.index"
-                    :preview-teleported="true"
-                    fit="cover"
-                    class="cert-img cert-img-sm"
-                  />
+                <div v-for="group in certImageList(cert)" :key="group.label" class="cert-item">
+                  <div class="cert-label">{{ group.label }}</div>
+                  <div class="cert-img-row">
+                    <el-image
+                      v-for="(url, index) in group.urls"
+                      :key="group.label + index"
+                      :src="url"
+                      :preview-src-list="certPreviewList(cert)"
+                      :initial-index="group.startIndex + index"
+                      :preview-teleported="true"
+                      fit="cover"
+                      class="cert-img cert-img-sm"
+                    />
+                  </div>
                 </div>
                 <div v-if="certImageList(cert).length === 0" class="cert-empty">未上传认证材料</div>
               </div>
@@ -420,7 +424,7 @@
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="法人身份证正反面">
+              <el-form-item label="法人身份证附件">
                 <imageUpload v-model="form.idCardPhotoIds" :limit="2" @update:modelValue="handleOssIdCarPhotoChange"/>
               </el-form-item>
             </el-col>
@@ -896,7 +900,7 @@ async function loadCompanyCertImages(company: any) {
   const isOssId = (t: string) => /^\d+$/.test(t); // 纯数字视为 OSS id，其余（含 http/相对路径）按 URL 直用
   const fields = [
     { label: '营业执照正负本', value: company?.businessLicense },
-    { label: '法人身份证正反面', value: company?.idCardPhotoIds },
+    { label: '法人身份证附件', value: company?.idCardPhotoIds },
     { label: '对公账户凭证', value: company?.bankAccountIds },
     { label: '办公场地实景', value: company?.companyAddressIds },
     { label: '招聘授权书', value: company?.recruitmentAuthorizationIds },
@@ -972,25 +976,27 @@ function auditLogDotType(action?: string): 'primary' | 'success' | 'warning' | '
   return 'primary';
 }
 
-// 认证材料图片清单（带标签 + 在合并预览列表中的索引）。officePhotos 可能为逗号分隔多图。
-function certImageList(cert: CompanyCertVO): { label: string; url: string; index: number }[] {
-  const list: { label: string; url: string }[] = [];
-  const push = (label: string, url?: string) => {
-    if (url && String(url).trim()) list.push({ label, url: String(url).trim() });
-  };
-  push('营业执照', cert.businessLicense);
-  push('法人身份证(正)', cert.legalPersonIdFront);
-  push('法人身份证(反)', cert.legalPersonIdBack);
-  push('对公账户凭证', cert.bankAccountProof);
-  push('招聘授权书', cert.authLetter);
-  // officePhotos 为逗号分隔多图地址，统一切割（含中文逗号兼容）
-  splitToArray(cert.officePhotos).forEach((url, i) => push(`办公实景${i + 1}`, url));
-  return list.map((item, index) => ({ ...item, index }));
+// 认证材料图片清单（按材料类型分组 + 在合并预览列表中的起始索引）。
+function certImageList(cert: CompanyCertVO): { label: string; urls: string[]; startIndex: number }[] {
+  const groups = [
+    { label: '营业执照', urls: splitToArray(cert.businessLicense) },
+    { label: '法人身份证附件', urls: [cert.legalPersonIdFront, cert.legalPersonIdBack].flatMap((url) => splitToArray(url)) },
+    { label: '对公账户凭证', urls: splitToArray(cert.bankAccountProof) },
+    { label: '招聘授权书', urls: splitToArray(cert.authLetter) },
+    { label: '办公实景', urls: splitToArray(cert.officePhotos) }
+  ].filter((group) => group.urls.length > 0);
+
+  let startIndex = 0;
+  return groups.map((group) => {
+    const item = { ...group, startIndex };
+    startIndex += group.urls.length;
+    return item;
+  });
 }
 
 // 单条认证记录的预览图地址列表（与 certImageList 顺序一致，供 el-image 放大轮播）。
 function certPreviewList(cert: CompanyCertVO): string[] {
-  return certImageList(cert).map((i) => i.url);
+  return certImageList(cert).flatMap((i) => i.urls);
 }
 
 function handleAudit(row: any, status: string) {
