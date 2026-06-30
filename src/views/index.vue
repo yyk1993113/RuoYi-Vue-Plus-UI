@@ -33,7 +33,8 @@
           <el-divider class="kpi-divider" />
           <div class="kpi-badges">
             <span class="badge success"><el-icon><CircleCheck /></el-icon> 已认证 {{ overview.approvedCompanies || 0 }}</span>
-            <span class="badge warning" v-if="overview.pendingCompanies > 0"><el-icon><Clock /></el-icon> 待审核 {{ overview.pendingCompanies }}</span>
+            <!-- 待审核用红色(danger)突出,提示运营尽快处理待审企业 -->
+            <span class="badge danger" v-if="overview.pendingCompanies > 0"><el-icon><Clock /></el-icon> 待审核 {{ overview.pendingCompanies }}</span>
             <span class="badge info"><el-icon><User /></el-icon> 活跃 {{ overview.activeCompanies || 0 }}</span>
             <span class="badge danger" v-if="overview.silencedCompanies > 0"><el-icon><CloseBold /></el-icon> 已禁言 {{ overview.silencedCompanies }}</span>
           </div>
@@ -58,7 +59,8 @@
           <el-divider class="kpi-divider" />
           <div class="kpi-badges">
             <span class="badge success"><el-icon><CircleCheck /></el-icon> 已上线 {{ overview.onlineJobs || 0 }}</span>
-            <span class="badge warning" v-if="overview.pendingJobs > 0"><el-icon><Clock /></el-icon> 待审核 {{ overview.pendingJobs }}</span>
+            <!-- 待审核用红色(danger)突出,提示运营尽快处理待审职位 -->
+            <span class="badge danger" v-if="overview.pendingJobs > 0"><el-icon><Clock /></el-icon> 待审核 {{ overview.pendingJobs }}</span>
             <span class="badge info"><el-icon><Collection /></el-icon> 职位类型 {{ jobTypeDist.length }} 种</span>
           </div>
           <div class="kpi-trend up" v-if="overview.newJobsDelta > 0">

@@ -1,5 +1,4 @@
 import zhCN from 'element-plus/es/locale/lang/zh-cn';
-import enUS from 'element-plus/es/locale/lang/en';
 import { defineStore } from 'pinia';
 import { useStorage } from '@vueuse/core';
 import { ref, reactive, computed } from 'vue';
@@ -16,12 +15,9 @@ export const useAppStore = defineStore('app', () => {
 
   // 语言
   const language = useStorage('language', 'zh_CN');
-  const languageObj: any = {
-    en_US: enUS,
-    zh_CN: zhCN
-  };
+  // B 端后台固定使用 Element Plus 中文语言包，避免分页等内置组件随历史 language 缓存切到英文。
   const locale = computed(() => {
-    return languageObj[language.value];
+    return zhCN;
   });
 
   const toggleSideBar = (withoutAnimation: boolean) => {
