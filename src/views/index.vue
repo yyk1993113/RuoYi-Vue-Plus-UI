@@ -112,7 +112,7 @@
             <span class="badge success"><el-icon><Connection /></el-icon> 联系方式交换 {{ exchangeStat.exchangedCount || 0 }} 次</span>
           </div>
           <div class="kpi-trend neutral">
-            <el-icon><InfoFilled /></el-icon> 交换成功率 {{ ((exchangeStat.exchangeRate || 0) * 100).toFixed(1) }}%
+            <el-icon><InfoFilled /></el-icon> 交换成功率 {{ (exchangeStat.exchangeRate || 0).toFixed(1) }}%
           </div>
         </el-card>
       </el-col>
@@ -364,6 +364,7 @@ const hotJobs = ref<HotJobVO[]>([]);
 const recentJobs = ref<any[]>([]);
 const recentApplies = ref<any[]>([]);
 const exceptionApplies = ref<ExceptionApplyVO[]>([]);
+// 后端 exchangeRate 已返回百分数(0-100)，模板直接展示，不能再按小数比例二次乘 100。
 const exchangeStat = reactive({ totalCount: 0, exchangedCount: 0, failedCount: 0, exchangeRate: 0 });
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
