@@ -30,7 +30,7 @@
             :key="card.type"
             class="warn-item"
             :class="[card.cls, { active: queryParams.abnormalType === card.type }]"
-            @click="toggleAbnormal(card.type)"
+            @click="handleWarnCard(card)"
           >
             {{ card.label }}<b>{{ abnormalStat[card.field] || 0 }}</b
             ><i v-if="card.hint">{{ card.hint }}</i>
@@ -238,6 +238,9 @@
                 </el-descriptions-item>
                 <el-descriptions-item label="结算状态">
                   <el-tag :type="ledgerStatusMeta(currentTask.ledgerStatus).type">{{ ledgerStatusMeta(currentTask.ledgerStatus).label }}</el-tag>
+                  <el-button v-if="String(currentTask.ledgerStatus) === '0'" class="ml-2" link type="success" @click="goPendingLedger(currentTask.orderNo)"
+                    >去结算</el-button
+                  >
                 </el-descriptions-item>
                 <el-descriptions-item label="发票状态" :span="2">
                   <el-tag :type="ledgerInvoiceStatusMeta(currentTask.ledgerInvoiceStatus).type">{{
@@ -308,7 +311,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, type FormRules } from 'element-plus';
 import { Refresh, Clock, Warning, Money } from '@element-plus/icons-vue';
-import { listTask, getTaskStatistics, getTaskAbnormalStatistics, getTask, verifyTask, taskExportUrl } from '@/api/recruitment';
+import { listTask, getTaskStatistics, getTaskAbnormalStatistics, getTask, verifyTask, taskExportUrl, listLedger } from '@/api/recruitment';
 import { download } from '@/utils/request';
 import { unwrapList, splitToArray, formatSalary, formatMoney, formatDateTime } from './helpers';
 import { taskStatusMeta, taskAbnormalMeta, ledgerStatusMeta, ledgerInvoiceStatusMeta } from './constants';
@@ -374,13 +377,15 @@ const statistics = reactive<Record<string, number>>({
 const abnormalStat = reactive<Record<string, number>>({
   pendingTimeout: 0,
   verifyTimeout: 0,
+  pendingSettlement: 0,
   completedUnsettled: 0
 });
 
-// 异常预警卡定义（点选 → abnormalType 筛选）
+// 异常预警卡定义：履约异常走 task abnormalType；待结算提醒来自台账 status=0，并跳到台账页处理。
 const abnormalCards = [
   { type: 'pending_timeout', field: 'pendingTimeout', label: '待确认超时', hint: '>2天', icon: Clock, cls: 'warn-orange' },
   { type: 'verify_timeout', field: 'verifyTimeout', label: '待核验超时', hint: '催企业核验', icon: Warning, cls: 'warn-red' },
+  { type: 'settlement_pending', field: 'pendingSettlement', label: '待结算提醒', hint: '去结算', icon: Money, cls: 'warn-green' },
   { type: 'completed_unsettled', field: 'completedUnsettled', label: '完成未结算', hint: '>7天', icon: Money, cls: 'warn-red' }
 ];
 
@@ -443,6 +448,8 @@ function rowAbnormal(row: any): string {
   const days = (ms: number) => (ms ? (now - ms) / 86400000 : 0);
   if (row.status === 'pending_confirm' && days(toMs(row.createTime)) > 2) return 'pending_timeout';
   if (row.status === 'submitted' && days(toMs(row.updateTime)) > 3) return 'verify_timeout';
+  // 待结算由最新台账 ledgerStatus=0 派生，直接提示运营去台账页完成结算闭环。
+  if (row.status === 'completed' && String(row.ledgerStatus) === '0') return 'settlement_pending';
   if (row.status === 'completed' && !row.ledgerId && days(toMs(row.createTime)) > 7) return 'completed_unsettled';
   return '';
 }
@@ -475,8 +482,13 @@ async function loadStatistics() {
 
 async function loadAbnormal() {
   try {
-    const res = await getTaskAbnormalStatistics();
-    Object.assign(abnormalStat, res.data || {});
+    const [taskRes, pendingLedgerRes] = await Promise.all([
+      getTaskAbnormalStatistics(),
+      // 后端尚未把待结算数并入 TaskAbnormalStatVO；这里复用台账列表 total 做准确数量提醒。
+      listLedger({ pageNum: 1, pageSize: 1, status: '0' } as any)
+    ]);
+    Object.assign(abnormalStat, taskRes.data || {});
+    abnormalStat.pendingSettlement = unwrapList(pendingLedgerRes).total;
   } catch (error) {
     console.error('加载异常统计失败:', error);
   }
@@ -569,6 +581,15 @@ function toggleAbnormal(type: string) {
   loadData();
 }
 
+// 预警条入口分流：待结算是资金台账待办，先跳台账页；其它异常留在履约列表内筛选。
+function handleWarnCard(card: any) {
+  if (card.type === 'settlement_pending') {
+    goPendingLedger();
+    return;
+  }
+  toggleAbnormal(card.type);
+}
+
 // 导出：复用全局 download（POST + 当前筛选条件），后端 /export/task 已就绪
 function handleExport() {
   queryParams.beginTime = dateRange.value?.[0] || '';
@@ -594,6 +615,9 @@ async function handleDetail(row: any) {
 // 资金主线跳转：台账页按订单号检索 / 发票页
 function goLedger(orderNo?: string) {
   router.push({ path: '/recruitment/ledger', query: orderNo ? { orderNo } : {} });
+}
+function goPendingLedger(orderNo?: string) {
+  router.push({ path: '/recruitment/ledger', query: { status: '0', ...(orderNo ? { orderNo } : {}) } });
 }
 function goInvoice() {
   router.push('/recruitment/invoice');
@@ -708,6 +732,9 @@ onMounted(() => {
 }
 .warn-red b {
   color: #f56c6c;
+}
+.warn-green b {
+  color: #67c23a;
 }
 .warn-item.active b {
   color: #fff;

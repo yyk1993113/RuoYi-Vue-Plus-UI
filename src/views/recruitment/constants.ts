@@ -49,11 +49,12 @@ const LEDGER_STATUS: Record<string, StatusMeta> = {
 export const ledgerStatusMeta = (status?: string | null): StatusMeta => resolve(LEDGER_STATUS, status, LEDGER_STATUS['0']);
 
 // ========== 履约异常类型 abnormalType（运营端只读预警，无对应数据库字段，为服务端按阈值计算的派生维度）==========
-// pending_timeout 待确认超时 / verify_timeout 待核验超时(催企业核验) / completed_unsettled 完成未结算。
+// pending_timeout 待确认超时 / verify_timeout 待核验超时(催企业核验) / settlement_pending 待结算 / completed_unsettled 完成未结算。
 // 用于异常预警卡标题着色与列表「异常」列打标；未命中兜底为「异常 / danger」。
 const TASK_ABNORMAL: Record<string, StatusMeta> = {
   pending_timeout: { label: '待确认超时', type: 'warning' },
   verify_timeout: { label: '待核验超时', type: 'danger' },
+  settlement_pending: { label: '待结算', type: 'warning' },
   completed_unsettled: { label: '完成未结算', type: 'danger' }
 };
 export const taskAbnormalMeta = (type?: string | null): StatusMeta => resolve(TASK_ABNORMAL, type, { label: '异常', type: 'danger' });

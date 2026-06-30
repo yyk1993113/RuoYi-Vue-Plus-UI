@@ -222,6 +222,7 @@ export interface TaskVO {
 export interface TaskAbnormalStat {
   pendingTimeout: number; // 待确认超时
   verifyTimeout: number; // 待核验超时
+  pendingSettlement?: number; // 待结算提醒：临时由前端用 ledger/list status=0 补齐，后端待并入统计 VO
   completedUnsettled: number; // 完成未结算
 }
 
@@ -231,6 +232,8 @@ export interface LedgerStatistics {
   totalCount: number;
   totalAmount: number;
   todayAmount: number;
+  pendingCount?: number; // 待结算台账数，后端待补字段
+  pendingAmount?: number; // 待结算金额合计，后端待补字段
 }
 
 export interface LedgerVO {
@@ -488,7 +491,7 @@ export interface TaskQuery {
   jobName?: string; // 岗位名模糊
   beginTime?: string; // 创建时间起（'yyyy-MM-dd HH:mm:ss'）
   endTime?: string; // 创建时间止
-  abnormalType?: string; // 异常类型：pending_timeout/verify_timeout/completed_unsettled
+  abnormalType?: string; // 异常类型：pending_timeout/verify_timeout/completed_unsettled；settlement_pending 为待补后端筛选
 }
 
 export interface LedgerQuery {

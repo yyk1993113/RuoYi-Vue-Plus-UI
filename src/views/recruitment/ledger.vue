@@ -6,8 +6,8 @@
   -->
   <div class="p-4">
     <!-- 统计卡片 -->
-    <el-row :gutter="20" class="mb-4">
-      <el-col :span="8">
+    <el-row :gutter="16" class="mb-4">
+      <el-col :xs="24" :sm="12" :md="6">
         <el-card shadow="hover" class="stat-mini-card">
           <div class="stat-mini">
             <span class="label">台账总数</span>
@@ -15,7 +15,19 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="8">
+      <el-col :xs="24" :sm="12" :md="6">
+        <el-card shadow="hover" class="stat-mini-card warning clickable" @click="filterBySettleStatus('0')">
+          <div class="stat-mini">
+            <span class="label">待结算金额</span>
+            <span class="value warning">{{ pendingAmountText }}</span>
+            <span class="hint">
+              {{ statistics.pendingCount || 0 }} 笔待结算
+              <template v-if="pendingAmountPartial">，金额为估算</template>
+            </span>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="12" :md="6">
         <el-card shadow="hover" class="stat-mini-card success">
           <div class="stat-mini">
             <span class="label">累计金额</span>
@@ -23,7 +35,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="8">
+      <el-col :xs="24" :sm="12" :md="6">
         <el-card shadow="hover" class="stat-mini-card primary">
           <div class="stat-mini">
             <span class="label">今日金额</span>
@@ -171,7 +183,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { listLedger, getLedgerStatistics, getLedger, settleLedger } from '@/api/recruitment';
+import { listLedger, getLedgerStatistics, getLedger, settleLedger, type LedgerVO } from '@/api/recruitment';
 import { unwrapList, formatMoney } from './helpers';
 // 台账结算状态(0待结算/1已结算/2已取消) 与 发票绑定状态(0未绑定/1已绑定) → el-tag 文案/颜色，映射集中在 constants.ts
 import { ledgerStatusMeta, ledgerInvoiceStatusMeta } from './constants';
@@ -192,6 +204,8 @@ const settleableSelection = computed(() => selectedRows.value.filter((r) => r.st
 const settleVisible = ref(false);
 const settleTargets = ref<any[]>([]);
 const settleRemark = ref('');
+const pendingAmountLoading = ref(false);
+const pendingAmountPartial = ref(false);
 
 const queryParams = reactive({
   pageNum: 1,
@@ -205,7 +219,14 @@ const queryParams = reactive({
 const statistics = reactive({
   totalCount: 0,
   totalAmount: 0,
-  todayAmount: 0
+  todayAmount: 0,
+  pendingCount: 0,
+  pendingAmount: undefined as number | undefined
+});
+
+const pendingAmountText = computed(() => {
+  if (pendingAmountLoading.value && statistics.pendingAmount == null) return '加载中';
+  return statistics.pendingAmount == null ? '--' : `¥${formatMoney(statistics.pendingAmount)}`;
 });
 
 async function loadData() {
@@ -225,9 +246,33 @@ async function loadData() {
 async function loadStatistics() {
   try {
     const res = await getLedgerStatistics();
-    Object.assign(statistics, res.data || {});
+    const data = res.data || {};
+    Object.assign(statistics, data);
+    // 待结算金额/笔数是新增统计契约；后端未补前，前端用待结算列表做临时兜底，避免卡片空白。
+    if (data.pendingAmount == null || data.pendingCount == null) {
+      await loadPendingLedgerFallback();
+    } else {
+      pendingAmountPartial.value = false;
+    }
   } catch (error) {
     console.error('加载台账统计失败:', error);
+  }
+}
+
+async function loadPendingLedgerFallback() {
+  pendingAmountLoading.value = true;
+  try {
+    const fallbackPageSize = 500;
+    const res = await listLedger({ pageNum: 1, pageSize: fallbackPageSize, status: '0' } as any);
+    const list = unwrapList<LedgerVO>(res);
+    statistics.pendingCount = list.total;
+    statistics.pendingAmount = list.rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+    pendingAmountPartial.value = list.total > list.rows.length;
+  } catch (error) {
+    pendingAmountPartial.value = false;
+    console.error('加载待结算台账兜底统计失败:', error);
+  } finally {
+    pendingAmountLoading.value = false;
   }
 }
 
@@ -243,6 +288,13 @@ function resetQuery() {
   queryParams.companyId = undefined;
   queryParams.userId = undefined;
   queryParams.status = '';
+  loadData();
+}
+
+// 统计卡联动筛选：待结算金额卡对应 ledger.status=0，点击后直接看待结算明细。
+function filterBySettleStatus(status: string) {
+  queryParams.status = status;
+  queryParams.pageNum = 1;
   loadData();
 }
 
@@ -302,6 +354,11 @@ onMounted(() => {
   if (typeof qOrderNo === 'string' && qOrderNo) {
     queryParams.orderNo = qOrderNo;
   }
+  // 支持从履约页「待结算提醒」跳转携带 ?status=0，落地即筛待结算台账。
+  const qStatus = route.query.status;
+  if (typeof qStatus === 'string' && ['0', '1', '2'].includes(qStatus)) {
+    queryParams.status = qStatus;
+  }
   loadData();
   loadStatistics();
 });
@@ -324,10 +381,18 @@ onMounted(() => {
 .stat-mini-card {
   text-align: center;
 }
+.stat-mini-card.clickable {
+  cursor: pointer;
+}
+.stat-mini-card.clickable:hover {
+  border-color: var(--el-color-warning);
+}
 .stat-mini {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  min-height: 92px;
   padding: 10px 0;
 }
 .stat-mini .label {
@@ -345,6 +410,15 @@ onMounted(() => {
 }
 .stat-mini .value.primary {
   color: #409eff;
+}
+.stat-mini .value.warning {
+  color: #e6a23c;
+}
+.stat-mini .hint {
+  min-height: 18px;
+  margin-top: 6px;
+  color: #909399;
+  font-size: 12px;
 }
 
 .amount {
