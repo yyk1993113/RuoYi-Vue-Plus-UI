@@ -444,6 +444,23 @@ function syncCategoryPathFromId() {
   form.categoryPath = id ? findCategoryPath(id) : [];
 }
 
+function applyCategorySnapshot(categoryId: unknown, categoryText: unknown) {
+  form.categoryId = categoryId != null ? String(categoryId) : '';
+  form.category = String(categoryText || '');
+  if (form.categoryId) {
+    syncCategoryPathFromId();
+    return;
+  }
+  // 兼容复制发布时历史详情只返回类目名称、没有 categoryId 的记录。
+  const path = findCategoryPathByLabel(form.category);
+  form.categoryPath = path;
+  const selected = path.length ? findCategoryOptionById(path[path.length - 1]) : undefined;
+  if (selected) {
+    form.categoryId = selected.value;
+    form.category = selected.label;
+  }
+}
+
 function findCategoryOptionById(id: string): CategoryOption | undefined {
   if (!id) return undefined;
   const stack = [...categoryOptions.value];
@@ -461,6 +478,18 @@ function findCategoryPath(id: string, nodes: CategoryOption[] = categoryOptions.
     const path = [...parents, node.value];
     if (node.value === id) return path;
     const childPath = findCategoryPath(id, node.children || [], path);
+    if (childPath.length) return childPath;
+  }
+  return [];
+}
+
+function findCategoryPathByLabel(label: string, nodes: CategoryOption[] = categoryOptions.value, parents: string[] = []): string[] {
+  const text = String(label || '').trim();
+  if (!text) return [];
+  for (const node of nodes) {
+    const path = [...parents, node.value];
+    if (node.label === text) return path;
+    const childPath = findCategoryPathByLabel(text, node.children || [], path);
     if (childPath.length) return childPath;
   }
   return [];
@@ -787,9 +816,7 @@ async function loadCopyFrom(jobId: string) {
     if (d.companyId) companyOptions.value = [{ companyId: d.companyId, companyName: d.companyName || `企业#${d.companyId}` }];
     form.jobName = d.jobName || d.positionName || '';
     form.jobType = d.jobType != null ? String(d.jobType) : '0';
-    form.categoryId = d.categoryId != null ? String(d.categoryId) : '';
-    form.category = String(d.categoryName || d.category || '');
-    syncCategoryPathFromId();
+    applyCategorySnapshot(d.categoryId, d.categoryName || d.category);
     form.province = d.province ?? '';
     form.city = d.city ?? '';
     form.district = d.district ?? '';

@@ -1122,6 +1122,23 @@ function syncEditCategoryPathFromId() {
   editForm.categoryPath = id ? findCategoryPath(id) : [];
 }
 
+function applyEditCategorySnapshot(categoryId: unknown, categoryText: unknown) {
+  editForm.categoryId = categoryId != null ? String(categoryId) : '';
+  editForm.category = String(categoryText || '');
+  if (editForm.categoryId) {
+    syncEditCategoryPathFromId();
+    return;
+  }
+  // 兼容历史详情只返回类目名称、没有 categoryId 的记录。
+  const path = findCategoryPathByLabel(editForm.category);
+  editForm.categoryPath = path;
+  const selected = path.length ? findCategoryOptionById(path[path.length - 1]) : undefined;
+  if (selected) {
+    editForm.categoryId = selected.value;
+    editForm.category = selected.label;
+  }
+}
+
 function findCategoryOptionById(id: string): CategoryOption | undefined {
   if (!id) return undefined;
   const stack = [...categoryOptions.value];
@@ -1139,6 +1156,18 @@ function findCategoryPath(id: string, nodes: CategoryOption[] = categoryOptions.
     const path = [...parents, node.value];
     if (node.value === id) return path;
     const childPath = findCategoryPath(id, node.children || [], path);
+    if (childPath.length) return childPath;
+  }
+  return [];
+}
+
+function findCategoryPathByLabel(label: string, nodes: CategoryOption[] = categoryOptions.value, parents: string[] = []): string[] {
+  const text = String(label || '').trim();
+  if (!text) return [];
+  for (const node of nodes) {
+    const path = [...parents, node.value];
+    if (node.label === text) return path;
+    const childPath = findCategoryPathByLabel(text, node.children || [], path);
     if (childPath.length) return childPath;
   }
   return [];
@@ -1216,9 +1245,7 @@ async function handleEdit(row: any) {
     editForm.jobId = d.jobId ?? row.jobId;
     editForm.jobName = d.jobName || d.positionName || '';
     editForm.jobType = d.jobType != null ? String(d.jobType) : '0';
-    editForm.categoryId = d.categoryId != null ? String(d.categoryId) : '';
-    editForm.category = String(d.categoryName || d.category || '');
-    syncEditCategoryPathFromId();
+    applyEditCategorySnapshot(d.categoryId, d.categoryName || d.category);
     editForm.province = d.province ?? '';
     editForm.city = d.city ?? '';
     editForm.district = d.district ?? '';
