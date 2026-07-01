@@ -383,11 +383,11 @@ function submitCategory() {
 
 async function handleDelCategory(data: JobCategoryVO) {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除类别「${data.name}」吗？存在子类别或职位时将无法删除。`,
-      '提示',
-      { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' }
-    );
+    await ElMessageBox.confirm(`确定要删除类别「${data.name}」吗？存在子类别或职位时将无法删除。`, '提示', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning'
+    });
     await delJobCategory(data.id!);
     ElMessage.success('删除成功');
     if (currentCategory.value && String(currentCategory.value.id) === String(data.id)) {

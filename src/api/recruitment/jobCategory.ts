@@ -69,9 +69,7 @@ export function delJobCategory(categoryId: string | number) {
 
 // 诊断：两张表在库中的真实列结构（存量表与实体映射不一致时，加载失败后调用展示比对）
 export function getJobCategoryTableInfo() {
-  return request.get<{ tableName: string; columnName: string; columnType: string; columnKey: string }[]>(
-    `${baseUrl}/jobCategory/tableInfo`
-  );
+  return request.get<{ tableName: string; columnName: string; columnType: string; columnKey: string }[]>(`${baseUrl}/jobCategory/tableInfo`);
 }
 
 // ---------- 职位（右表） ----------

@@ -107,7 +107,10 @@ watch(
         list = val as OssVO[];
       } else if (props.valueType === 'url' && isDirectUrlValue(val)) {
         // 内容管理保存 URL 时不再反查 OSS；历史数字 id 仍走 listByIds，保证编辑旧数据能正常预览。
-        list = val.split(',').map((item) => item.trim()).filter(Boolean);
+        list = val
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean);
       } else {
         const res = await listByIds(val);
 

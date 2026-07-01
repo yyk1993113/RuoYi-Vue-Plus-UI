@@ -177,13 +177,7 @@
         </el-table-column>
         <el-table-column label="岗位数" width="100" align="center">
           <template #default="{ row }">
-            <el-button
-              v-if="row.objectType === 'company'"
-              link
-              type="primary"
-              class="count-link"
-              @click="openJobDialog(row)"
-            >
+            <el-button v-if="row.objectType === 'company'" link type="primary" class="count-link" @click="openJobDialog(row)">
               {{ row.jobCount || 0 }}
             </el-button>
             <span v-else>-</span>
@@ -399,9 +393,7 @@ const totalMetrics = computed<MetricCardItem[]>(() => [
 ]);
 
 const showDetailStatusFilter = computed(() => detailQuery.metric === 'company' || detailQuery.metric === 'jobSeeker');
-const detailKeywordPlaceholder = computed(() =>
-  detailQuery.metric === 'company' ? '请输入企业名称/联系人/手机号' : '请输入姓名/昵称/手机号'
-);
+const detailKeywordPlaceholder = computed(() => (detailQuery.metric === 'company' ? '请输入企业名称/联系人/手机号' : '请输入姓名/昵称/手机号'));
 const detailStatusOptions = computed(() => {
   if (detailQuery.metric === 'company') {
     return [
@@ -795,7 +787,10 @@ onBeforeUnmount(() => {
   border: 1px solid #e4edf8;
   border-radius: 8px;
   cursor: pointer;
-  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
 
   &:hover {
     border-color: #9fc4ff;

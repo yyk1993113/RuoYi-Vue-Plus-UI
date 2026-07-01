@@ -1512,12 +1512,19 @@ export interface AuthLetterTemplateFile {
   uploadedAt?: string;
 }
 
-// 当前招聘授权书模板：由运营上传 .docx 后保存为 rec_config JSON。
-export function getAuthLetterTemplate() {
-  return request.get<AuthLetterTemplateFile>(`${configBaseUrl}/auth-letter-template`);
+export interface AuthLetterTemplateSet {
+  legalRepresentative?: AuthLetterTemplateFile;
+  operator?: AuthLetterTemplateFile;
 }
 
-export const authLetterTemplateUploadUrl = `${configBaseUrl}/auth-letter-template/upload`;
+// 当前招聘授权书模板：运营分别上传法人版/经办人版 PDF 后保存为 rec_config JSON。
+export function getAuthLetterTemplate() {
+  return request.get<AuthLetterTemplateSet>(`${configBaseUrl}/auth-letter-template`);
+}
+
+export function authLetterTemplateUploadUrl(type: keyof AuthLetterTemplateSet) {
+  return `${configBaseUrl}/auth-letter-template/upload?type=${type}`;
+}
 
 // 配置列表（分页，支持 configKey 模糊 / configGroup 过滤）：GET /admin/config/list，返回 TableDataInfo（rows/total）
 export function listRecConfig(query: { pageNum?: number; pageSize?: number; configKey?: string; configGroup?: string }) {

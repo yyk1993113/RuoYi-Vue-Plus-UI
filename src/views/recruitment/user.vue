@@ -1,12 +1,13 @@
 ﻿<template>
   <div class="p-4">
-
     <!-- ========== 区块一：统计概览 ========== -->
     <el-row :gutter="16" class="mb-4">
       <el-col :xs="24" :sm="12" :md="4">
         <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'total' }" @click="handleStatQuery('total')">
           <div class="stat-inner">
-            <div class="stat-icon primary"><el-icon><User /></el-icon></div>
+            <div class="stat-icon primary">
+              <el-icon><User /></el-icon>
+            </div>
             <div class="stat-body">
               <span class="stat-label">求职者总数</span>
               <span class="stat-value primary">{{ stats.totalCount || 0 }}</span>
@@ -17,7 +18,9 @@
       <el-col :xs="24" :sm="12" :md="4">
         <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'normal' }" @click="handleStatQuery('normal')">
           <div class="stat-inner">
-            <div class="stat-icon success"><el-icon><CircleCheck /></el-icon></div>
+            <div class="stat-icon success">
+              <el-icon><CircleCheck /></el-icon>
+            </div>
             <div class="stat-body">
               <span class="stat-label">正常用户</span>
               <span class="stat-value success">{{ stats.normalCount || 0 }}</span>
@@ -28,7 +31,9 @@
       <el-col :xs="24" :sm="12" :md="4">
         <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'applied' }" @click="handleStatQuery('applied')">
           <div class="stat-inner">
-            <div class="stat-icon warning"><el-icon><Document /></el-icon></div>
+            <div class="stat-icon warning">
+              <el-icon><Document /></el-icon>
+            </div>
             <div class="stat-body">
               <span class="stat-label">有投递记录</span>
               <span class="stat-value warning">{{ stats.appliedCount || 0 }}</span>
@@ -39,7 +44,9 @@
       <el-col :xs="24" :sm="12" :md="4">
         <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'pending' }" @click="handleStatQuery('pending')">
           <div class="stat-inner">
-            <div class="stat-icon info"><el-icon><Clock /></el-icon></div>
+            <div class="stat-icon info">
+              <el-icon><Clock /></el-icon>
+            </div>
             <div class="stat-body">
               <span class="stat-label">待处理投递</span>
               <span class="stat-value info">{{ stats.pendingApplyCount || 0 }}</span>
@@ -50,7 +57,9 @@
       <el-col :xs="24" :sm="12" :md="4">
         <el-card shadow="hover" class="stat-card" :class="{ active: activeStat === 'silenced' }" @click="handleStatQuery('silenced')">
           <div class="stat-inner">
-            <div class="stat-icon danger"><el-icon><WarnTriangleFilled /></el-icon></div>
+            <div class="stat-icon danger">
+              <el-icon><WarnTriangleFilled /></el-icon>
+            </div>
             <div class="stat-body">
               <span class="stat-label">已禁言</span>
               <span class="stat-value danger">{{ stats.silencedCount || 0 }}</span>
@@ -61,7 +70,9 @@
       <el-col :xs="24" :sm="12" :md="4">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-inner">
-            <div class="stat-icon purple"><el-icon><TrendCharts /></el-icon></div>
+            <div class="stat-icon purple">
+              <el-icon><TrendCharts /></el-icon>
+            </div>
             <div class="stat-body">
               <span class="stat-label">累计面试</span>
               <span class="stat-value purple">{{ totalInterviews || 0 }}</span>
@@ -98,7 +109,7 @@
       <template #header>
         <div class="card-header">
           <span class="header-title">求职者列表</span>
-          <div style="display: flex; gap: 8px;">
+          <div style="display: flex; gap: 8px">
             <el-button type="success" plain icon="Download" @click="handleExport">导出</el-button>
             <el-button type="primary" plain icon="Refresh" @click="loadData" :loading="loading">刷新</el-button>
           </div>
@@ -213,26 +224,16 @@
         <!-- 操作 -->
         <el-table-column label="操作" width="150" fixed="right" align="center">
           <template #default="{ row }">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap">
               <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
-              <el-button link type="danger" @click="handleSilence(row)" v-if="row.isRecruitmentSilenced !== '1'">
-                禁言
-              </el-button>
-              <el-button link type="success" @click="handleUnsilence(row)" v-else>
-                解禁
-              </el-button>
+              <el-button link type="danger" @click="handleSilence(row)" v-if="row.isRecruitmentSilenced !== '1'"> 禁言 </el-button>
+              <el-button link type="success" @click="handleUnsilence(row)" v-else> 解禁 </el-button>
             </div>
           </template>
         </el-table-column>
       </el-table>
 
-      <pagination
-        v-show="total > 0"
-        v-model:page="queryParams.pageNum"
-        v-model:limit="queryParams.pageSize"
-        :total="total"
-        @pagination="loadData"
-      />
+      <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="loadData" />
     </el-card>
 
     <!-- ========== 区块四：详情对话框 ========== -->
@@ -294,21 +295,15 @@
       </el-descriptions>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
-        <el-button type="danger" @click="openSilence(currentUser)" v-if="currentUser?.isRecruitmentSilenced !== '1'">
-          禁言该用户
-        </el-button>
-        <el-button type="success" @click="handleUnsilence(currentUser)" v-else>
-          解除禁言
-        </el-button>
+        <el-button type="danger" @click="openSilence(currentUser)" v-if="currentUser?.isRecruitmentSilenced !== '1'"> 禁言该用户 </el-button>
+        <el-button type="success" @click="handleUnsilence(currentUser)" v-else> 解除禁言 </el-button>
       </template>
     </el-dialog>
 
     <!-- ========== 区块五：禁言对话框 ========== -->
     <el-dialog v-model="silenceVisible" title="禁言求职者" width="500px" append-to-body>
       <el-form ref="silenceFormRef" :model="silenceForm" label-width="100px">
-        <el-alert type="warning" :closable="false" style="margin-bottom: 16px">
-          禁言后该求职者将无法查看招聘信息、投递职位、联系企业
-        </el-alert>
+        <el-alert type="warning" :closable="false" style="margin-bottom: 16px"> 禁言后该求职者将无法查看招聘信息、投递职位、联系企业 </el-alert>
         <el-form-item label="用户">
           <el-input :model-value="silenceForm.nickName || silenceForm.userName" disabled />
         </el-form-item>
@@ -336,10 +331,22 @@
     <el-dialog v-model="applyDialogVisible" :title="applyDialogTitle" width="1180px" append-to-body>
       <el-form :model="applyQueryParams" :inline="true" class="apply-dialog-query">
         <el-form-item label="投递编号">
-          <el-input v-model="applyQueryParams.applyId" placeholder="精确投递ID" clearable style="width: 150px" @keyup.enter="handleApplyDialogQuery" />
+          <el-input
+            v-model="applyQueryParams.applyId"
+            placeholder="精确投递ID"
+            clearable
+            style="width: 150px"
+            @keyup.enter="handleApplyDialogQuery"
+          />
         </el-form-item>
         <el-form-item label="企业编号">
-          <el-input v-model="applyQueryParams.companyId" placeholder="精确企业ID" clearable style="width: 150px" @keyup.enter="handleApplyDialogQuery" />
+          <el-input
+            v-model="applyQueryParams.companyId"
+            placeholder="精确企业ID"
+            clearable
+            style="width: 150px"
+            @keyup.enter="handleApplyDialogQuery"
+          />
         </el-form-item>
         <el-form-item label="投递时间">
           <el-date-picker
@@ -354,13 +361,31 @@
           />
         </el-form-item>
         <el-form-item label="岗位名称">
-          <el-input v-model="applyQueryParams.jobName" placeholder="请输入岗位名称" clearable style="width: 180px" @keyup.enter="handleApplyDialogQuery" />
+          <el-input
+            v-model="applyQueryParams.jobName"
+            placeholder="请输入岗位名称"
+            clearable
+            style="width: 180px"
+            @keyup.enter="handleApplyDialogQuery"
+          />
         </el-form-item>
         <el-form-item label="求职者">
-          <el-input v-model="applyQueryParams.userName" placeholder="请输入求职者" clearable style="width: 150px" @keyup.enter="handleApplyDialogQuery" />
+          <el-input
+            v-model="applyQueryParams.userName"
+            placeholder="请输入求职者"
+            clearable
+            style="width: 150px"
+            @keyup.enter="handleApplyDialogQuery"
+          />
         </el-form-item>
         <el-form-item label="企业名称">
-          <el-input v-model="applyQueryParams.companyName" placeholder="请输入企业名称" clearable style="width: 180px" @keyup.enter="handleApplyDialogQuery" />
+          <el-input
+            v-model="applyQueryParams.companyName"
+            placeholder="请输入企业名称"
+            clearable
+            style="width: 180px"
+            @keyup.enter="handleApplyDialogQuery"
+          />
         </el-form-item>
         <el-form-item label="投递状态">
           <el-select v-model="applyQueryParams.status" placeholder="全部" clearable style="width: 140px">
@@ -414,7 +439,6 @@
         @pagination="loadApplyDialogData"
       />
     </el-dialog>
-
   </div>
 </template>
 
@@ -429,7 +453,7 @@ import {
   silenceUser,
   unsilenceUser,
   type ApplyVO,
-  type RecruitmentUserVO,
+  type RecruitmentUserVO
 } from '@/api/recruitment';
 import { download } from '@/utils/request';
 import { unwrapList } from './helpers';
@@ -459,7 +483,7 @@ const queryParams = reactive({
   userName: '',
   phonenumber: '',
   isSilenced: '',
-  applyFilter: '',
+  applyFilter: ''
 });
 
 const applyQueryParams = reactive({
@@ -472,7 +496,7 @@ const applyQueryParams = reactive({
   isRead: '',
   jobName: '',
   userName: '',
-  companyName: '',
+  companyName: ''
 });
 
 const stats = reactive({
@@ -480,13 +504,11 @@ const stats = reactive({
   silencedCount: 0,
   normalCount: 0,
   appliedCount: 0,
-  pendingApplyCount: 0,
+  pendingApplyCount: 0
 });
 
 // 全局累计面试数（来自表格数据）
-const totalInterviews = computed(() =>
-  tableData.value.reduce((sum, u) => sum + (u.interviewApplies || 0), 0)
-);
+const totalInterviews = computed(() => tableData.value.reduce((sum, u) => sum + (u.interviewApplies || 0), 0));
 
 const applyDialogTitle = computed(() => {
   const userName = applyDialogUser.value?.nickName || applyDialogUser.value?.userName || '求职者';
@@ -522,7 +544,7 @@ const silenceForm = reactive<RecruitmentUserVO & { reason: string }>({
   loginDate: '',
   createTime: '',
   remark: '',
-  reason: '',
+  reason: ''
 });
 
 async function loadData() {
@@ -534,7 +556,7 @@ async function loadData() {
       userName: queryParams.userName || undefined,
       phone: queryParams.phonenumber || undefined,
       isRecruitmentSilenced: queryParams.isSilenced || undefined,
-      applyFilter: queryParams.applyFilter || undefined,
+      applyFilter: queryParams.applyFilter || undefined
     });
     // 列表拆包：本接口 /user/listWithStats 后端用 R<TableDataInfo> 包了一层（与 listJob/listApply 等
     // 「直接返回 TableDataInfo、顶层 rows/total」的项目约定不一致），数据在 res.data.{rows,total}。
@@ -545,7 +567,7 @@ async function loadData() {
     tableData.value = list.rows.map((item) => ({
       ...item,
       phone: item.phone || item.phonenumber || '',
-      phonenumber: item.phonenumber || item.phone || '',
+      phonenumber: item.phonenumber || item.phone || ''
     }));
     total.value = list.total;
   } catch (e) {
@@ -695,11 +717,11 @@ async function submitSilence() {
 async function handleUnsilence(row: RecruitmentUserVO | null) {
   if (!row) return;
   try {
-    await ElMessageBox.confirm(
-      '确定要取消该求职者的禁言状态吗？取消后用户可以正常查看职位信息。',
-      '提示',
-      { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' }
-    );
+    await ElMessageBox.confirm('确定要取消该求职者的禁言状态吗？取消后用户可以正常查看职位信息。', '提示', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning'
+    });
     await unsilenceUser({ userId: row.userId });
     ElMessage.success('已解除禁言');
     detailVisible.value = false;
@@ -751,7 +773,7 @@ async function loadApplyDialogData() {
       userName: applyQueryParams.userName || undefined,
       companyName: applyQueryParams.companyName || undefined,
       beginTime: applyDateRange.value.length === 2 ? applyDateRange.value[0] : undefined,
-      endTime: applyDateRange.value.length === 2 ? applyDateRange.value[1] : undefined,
+      endTime: applyDateRange.value.length === 2 ? applyDateRange.value[1] : undefined
     });
     const list = unwrapList<ApplyVO>(res);
     applyDialogData.value = list.rows;
@@ -794,17 +816,23 @@ onMounted(() => {
 });
 
 function handleExport() {
-  download('/admin/recruitment/user/export', {
-    userName: queryParams.userName || undefined,
-    phone: queryParams.phonenumber || undefined,
-    isRecruitmentSilenced: queryParams.isSilenced || undefined,
-    applyFilter: queryParams.applyFilter || undefined,
-  }, `求职者数据_${new Date().getTime()}.xlsx`);
+  download(
+    '/admin/recruitment/user/export',
+    {
+      userName: queryParams.userName || undefined,
+      phone: queryParams.phonenumber || undefined,
+      isRecruitmentSilenced: queryParams.isSilenced || undefined,
+      applyFilter: queryParams.applyFilter || undefined
+    },
+    `求职者数据_${new Date().getTime()}.xlsx`
+  );
 }
 </script>
 
 <style scoped>
-.mb-4 { margin-bottom: 16px; }
+.mb-4 {
+  margin-bottom: 16px;
+}
 
 .card-header {
   display: flex;
@@ -827,7 +855,7 @@ function handleExport() {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
 }
 .stat-card.active {
-  border-color: #409EFF;
+  border-color: #409eff;
   box-shadow: 0 4px 16px rgba(64, 158, 255, 0.18) !important;
 }
 .stat-inner {
@@ -845,35 +873,108 @@ function handleExport() {
   font-size: 22px;
   flex-shrink: 0;
 }
-.stat-icon.primary { background: #ECF5FF; color: #409EFF; }
-.stat-icon.success { background: #F0F9EB; color: #67C23A; }
-.stat-icon.warning { background: #FDF6EC; color: #E6A23C; }
-.stat-icon.info { background: #F4F4F5; color: #909399; }
-.stat-icon.danger { background: #FEF0F0; color: #F56C6C; }
-.stat-icon.purple { background: #F0EEFF; color: #7C6FFF; }
+.stat-icon.primary {
+  background: #ecf5ff;
+  color: #409eff;
+}
+.stat-icon.success {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+.stat-icon.warning {
+  background: #fdf6ec;
+  color: #e6a23c;
+}
+.stat-icon.info {
+  background: #f4f4f5;
+  color: #909399;
+}
+.stat-icon.danger {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+.stat-icon.purple {
+  background: #f0eeff;
+  color: #7c6fff;
+}
 
-.stat-body { display: flex; flex-direction: column; gap: 4px; }
-.stat-label { font-size: 13px; color: #909399; }
-.stat-value { font-size: 26px; font-weight: 800; line-height: 1; }
-.stat-value.primary { color: #409EFF; }
-.stat-value.success { color: #67C23A; }
-.stat-value.warning { color: #E6A23C; }
-.stat-value.info { color: #909399; }
-.stat-value.danger { color: #F56C6C; }
-.stat-value.purple { color: #7C6FFF; }
+.stat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stat-label {
+  font-size: 13px;
+  color: #909399;
+}
+.stat-value {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+}
+.stat-value.primary {
+  color: #409eff;
+}
+.stat-value.success {
+  color: #67c23a;
+}
+.stat-value.warning {
+  color: #e6a23c;
+}
+.stat-value.info {
+  color: #909399;
+}
+.stat-value.danger {
+  color: #f56c6c;
+}
+.stat-value.purple {
+  color: #7c6fff;
+}
 
 /* ---------- 表格内用户信息 ---------- */
-.user-info { display: flex; align-items: center; gap: 10px; }
-.user-detail .name { font-weight: 600; color: #303133; line-height: 1.3; }
-.user-detail .sub { font-size: 12px; color: #909399; margin-top: 2px; }
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.user-detail .name {
+  font-weight: 600;
+  color: #303133;
+  line-height: 1.3;
+}
+.user-detail .sub {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 2px;
+}
 
 /* ---------- 联系方式 ---------- */
-.contact-info { display: flex; flex-direction: column; gap: 4px; }
-.contact-item { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #606266; }
-.email-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+.contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #606266;
+}
+.email-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+}
 
 /* ---------- 投递统计芯片 ---------- */
-.apply-stats { display: flex; align-items: center; gap: 4px; justify-content: center; }
+.apply-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: center;
+}
 .stat-chip {
   display: flex;
   flex-direction: column;
@@ -885,17 +986,45 @@ function handleExport() {
   transition: transform 0.2s;
   min-width: 44px;
 }
-.stat-chip:hover { transform: scale(1.08); }
-.chip-num { font-size: 16px; font-weight: 800; line-height: 1.2; }
-.chip-label { font-size: 10px; margin-top: 2px; }
-.stat-chip.total { background: #F0F9EB; color: #67C23A; }
-.stat-chip.pending { background: #FDF6EC; color: #E6A23C; }
-.stat-chip.interview { background: #ECF5FF; color: #409EFF; }
-.stat-chip.hired { background: #E8F8EE; color: #22C55E; }
-.stat-chip.rejected { background: #FEF0F0; color: #F56C6C; }
+.stat-chip:hover {
+  transform: scale(1.08);
+}
+.chip-num {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.chip-label {
+  font-size: 10px;
+  margin-top: 2px;
+}
+.stat-chip.total {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+.stat-chip.pending {
+  background: #fdf6ec;
+  color: #e6a23c;
+}
+.stat-chip.interview {
+  background: #ecf5ff;
+  color: #409eff;
+}
+.stat-chip.hired {
+  background: #e8f8ee;
+  color: #22c55e;
+}
+.stat-chip.rejected {
+  background: #fef0f0;
+  color: #f56c6c;
+}
 
 /* ---------- 详情统计 ---------- */
-.detail-stats { display: flex; gap: 8px; flex-wrap: wrap; }
+.detail-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .detail-stat-chip {
   padding: 3px 10px;
   border-radius: 6px;
@@ -904,12 +1033,29 @@ function handleExport() {
   cursor: pointer;
   transition: transform 0.2s;
 }
-.detail-stat-chip:hover { transform: translateY(-1px); }
-.detail-stat-chip.total { background: #F0F9EB; color: #67C23A; }
-.detail-stat-chip.pending { background: #FDF6EC; color: #E6A23C; }
-.detail-stat-chip.interview { background: #ECF5FF; color: #409EFF; }
-.detail-stat-chip.hired { background: #E8F8EE; color: #22C55E; }
-.detail-stat-chip.rejected { background: #FEF0F0; color: #F56C6C; }
+.detail-stat-chip:hover {
+  transform: translateY(-1px);
+}
+.detail-stat-chip.total {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+.detail-stat-chip.pending {
+  background: #fdf6ec;
+  color: #e6a23c;
+}
+.detail-stat-chip.interview {
+  background: #ecf5ff;
+  color: #409eff;
+}
+.detail-stat-chip.hired {
+  background: #e8f8ee;
+  color: #22c55e;
+}
+.detail-stat-chip.rejected {
+  background: #fef0f0;
+  color: #f56c6c;
+}
 
 .resume-attachment {
   display: flex;
@@ -923,17 +1069,25 @@ function handleExport() {
   white-space: nowrap;
 }
 
-.text-muted { color: #C0C4CC; }
+.text-muted {
+  color: #c0c4cc;
+}
 
 .apply-dialog-query {
   padding: 14px 16px 2px;
   margin-bottom: 12px;
-  background: #F8FAFC;
-  border: 1px solid #EBEEF5;
+  background: #f8fafc;
+  border: 1px solid #ebeef5;
   border-radius: 8px;
 }
 
 /* 注册/最后登录合并列：上行注册时间、下行最近登录（灰色小字） */
-.time-cell { font-size: 12px; line-height: 1.6; }
-.time-cell .sub { color: #909399; font-size: 11px; }
+.time-cell {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.time-cell .sub {
+  color: #909399;
+  font-size: 11px;
+}
 </style>

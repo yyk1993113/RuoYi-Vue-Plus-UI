@@ -20,7 +20,9 @@
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" scroll-to-error class="publish-form">
         <!-- 模块1：基础岗位信息 -->
         <el-divider content-position="left">
-          <span class="section-title"><el-icon><Document /></el-icon>基础岗位信息</span>
+          <span class="section-title"
+            ><el-icon><Document /></el-icon>基础岗位信息</span
+          >
         </el-divider>
         <el-row :gutter="24">
           <el-col :span="12">
@@ -99,7 +101,9 @@
           <el-col :span="12">
             <el-form-item label="工作地点" prop="workAddress">
               <el-input v-model="form.workAddress" placeholder="请输入详细地址（如：张江路 88 号 3 号楼）" maxlength="200">
-                <template #prefix><el-icon><LocationInformation /></el-icon></template>
+                <template #prefix
+                  ><el-icon><LocationInformation /></el-icon
+                ></template>
               </el-input>
               <div class="field-hint">选好省市区后会自动预填地址前缀，补充街道门牌即可，例：合肥市高新区创新产业园 A 栋</div>
             </el-form-item>
@@ -108,7 +112,9 @@
 
         <!-- 模块2：招聘要求 -->
         <el-divider content-position="left">
-          <span class="section-title"><el-icon><Filter /></el-icon>招聘要求</span>
+          <span class="section-title"
+            ><el-icon><Filter /></el-icon>招聘要求</span
+          >
         </el-divider>
         <el-form-item label="薪资区间" prop="salaryMin">
           <div class="salary-field">
@@ -123,13 +129,34 @@
                   :type="isSalaryQuickActive(q) ? 'primary' : 'info'"
                   :effect="isSalaryQuickActive(q) ? 'dark' : 'plain'"
                   @click="applySalaryQuick(q)"
-                >{{ q.label }}</el-tag>
+                  >{{ q.label }}</el-tag
+                >
               </div>
             </div>
             <div class="salary-inputs">
-              <el-input-number v-model="form.salaryMin" :disabled="form.negotiable" :min="0" :max="9999999" :precision="0" controls-position="right" placeholder="最低" style="width: 150px" @change="revalidateSalary" />
+              <el-input-number
+                v-model="form.salaryMin"
+                :disabled="form.negotiable"
+                :min="0"
+                :max="9999999"
+                :precision="0"
+                controls-position="right"
+                placeholder="最低"
+                style="width: 150px"
+                @change="revalidateSalary"
+              />
               <span>至</span>
-              <el-input-number v-model="form.salaryMax" :disabled="form.negotiable" :min="0" :max="9999999" :precision="0" controls-position="right" placeholder="最高" style="width: 150px" @change="revalidateSalary" />
+              <el-input-number
+                v-model="form.salaryMax"
+                :disabled="form.negotiable"
+                :min="0"
+                :max="9999999"
+                :precision="0"
+                controls-position="right"
+                placeholder="最高"
+                style="width: 150px"
+                @change="revalidateSalary"
+              />
               <el-select v-model="form.salaryUnit" :disabled="form.negotiable" style="width: 110px" @change="revalidateSalary">
                 <el-option v-for="u in salaryUnitOptions" :key="u.value" :label="u.label" :value="u.value" />
               </el-select>
@@ -166,10 +193,19 @@
                 :type="form.recruitNumber === n ? 'primary' : 'info'"
                 :effect="form.recruitNumber === n ? 'dark' : 'plain'"
                 @click="applyRecruitQuick(n)"
-              >{{ n }} 人</el-tag>
+                >{{ n }} 人</el-tag
+              >
             </div>
             <div class="recruit-input">
-              <el-input-number v-model="form.recruitNumber" :min="1" :max="9999" :precision="0" :controls="false" style="width: 150px" @change="revalidateRecruit" />
+              <el-input-number
+                v-model="form.recruitNumber"
+                :min="1"
+                :max="9999"
+                :precision="0"
+                :controls="false"
+                style="width: 150px"
+                @change="revalidateRecruit"
+              />
               <span style="margin-left: 8px; color: #606266">人</span>
             </div>
           </div>
@@ -177,7 +213,9 @@
 
         <!-- 模块3：岗位详情 -->
         <el-divider content-position="left">
-          <span class="section-title"><el-icon><Tickets /></el-icon>岗位详情</span>
+          <span class="section-title"
+            ><el-icon><Tickets /></el-icon>岗位详情</span
+          >
         </el-divider>
         <el-form-item label="岗位描述" prop="description">
           <div class="desc-field">
@@ -191,19 +229,49 @@
         <el-form-item label="岗位福利">
           <div class="benefit-field">
             <div class="benefit-quick">
-              <el-tag v-for="b in benefitQuickOptions" :key="b" class="benefit-quick-tag" type="success" effect="plain" @click="appendBenefit(b)">+ {{ b }}</el-tag>
+              <el-tag v-for="b in benefitQuickOptions" :key="b" class="benefit-quick-tag" type="success" effect="plain" @click="appendBenefit(b)"
+                >+ {{ b }}</el-tag
+              >
             </div>
-            <el-input v-model="form.benefits" type="textarea" :rows="3" placeholder="选填：如五险一金、餐补、年终奖、弹性工作等" maxlength="500" show-word-limit />
+            <el-input
+              v-model="form.benefits"
+              type="textarea"
+              :rows="3"
+              placeholder="选填：如五险一金、餐补、年终奖、弹性工作等"
+              maxlength="500"
+              show-word-limit
+            />
           </div>
         </el-form-item>
         <el-form-item label="职位亮点">
-          <el-input v-model="form.highlights" type="textarea" :rows="2" placeholder="选填：一句话亮点，如「核心团队 / 期权激励 / 0-1 机会」" maxlength="200" show-word-limit />
+          <el-input
+            v-model="form.highlights"
+            type="textarea"
+            :rows="2"
+            placeholder="选填：一句话亮点，如「核心团队 / 期权激励 / 0-1 机会」"
+            maxlength="200"
+            show-word-limit
+          />
         </el-form-item>
         <el-form-item label="团队介绍">
-          <el-input v-model="form.teamIntro" type="textarea" :rows="3" placeholder="选填：介绍团队规模、氛围、技术栈等" maxlength="500" show-word-limit />
+          <el-input
+            v-model="form.teamIntro"
+            type="textarea"
+            :rows="3"
+            placeholder="选填：介绍团队规模、氛围、技术栈等"
+            maxlength="500"
+            show-word-limit
+          />
         </el-form-item>
         <el-form-item label="附加条件">
-          <el-input v-model="form.additionalConditions" type="textarea" :rows="3" placeholder="选填：任职附加条件（如需自带工具、接受出差、持有相关证书等）" maxlength="500" show-word-limit />
+          <el-input
+            v-model="form.additionalConditions"
+            type="textarea"
+            :rows="3"
+            placeholder="选填：任职附加条件（如需自带工具、接受出差、持有相关证书等）"
+            maxlength="500"
+            show-word-limit
+          />
         </el-form-item>
       </el-form>
     </el-card>
@@ -211,7 +279,9 @@
     <!-- 底部固定悬浮操作栏：滚动始终可见 -->
     <div class="publish-footer-bar">
       <div class="left">
-        <span v-if="lastAutoSavedText" class="autosave-tip"><el-icon><CircleCheck /></el-icon>{{ lastAutoSavedText }}</span>
+        <span v-if="lastAutoSavedText" class="autosave-tip"
+          ><el-icon><CircleCheck /></el-icon>{{ lastAutoSavedText }}</span
+        >
       </div>
       <div class="right">
         <el-button @click="handleReset">重置表单</el-button>
@@ -231,7 +301,9 @@
           <span class="c-tag">{{ labelOf(educationOptions, form.education) || '学历不限' }}</span>
         </div>
         <div class="c-company">{{ selectedCompanyName || '所属企业' }}</div>
-        <div class="c-location"><el-icon><Location /></el-icon>{{ previewLocation }}</div>
+        <div class="c-location">
+          <el-icon><Location /></el-icon>{{ previewLocation }}
+        </div>
         <div v-if="previewBenefits.length" class="c-benefits">
           <span v-for="(b, i) in previewBenefits" :key="i" class="c-benefit">{{ b }}</span>
         </div>
@@ -503,7 +575,12 @@ const previewLocation = computed(() => {
   const region = [form.province, form.city, form.district].filter(Boolean).join('');
   return form.workAddress || region || '工作地点';
 });
-const previewBenefits = computed(() => (form.benefits || '').split(/[、,，\n]/).map((s) => s.trim()).filter(Boolean));
+const previewBenefits = computed(() =>
+  (form.benefits || '')
+    .split(/[、,，\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+);
 
 function handlePreview() {
   previewVisible.value = true;

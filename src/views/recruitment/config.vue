@@ -115,30 +115,34 @@
         <el-card v-loading="loading" shadow="hover" class="mb-4 cfg-card">
           <template #header>
             <div class="cfg-card-header">
-              <span class="cfg-title">招聘授权书模板</span>
+              <span class="cfg-title">招聘授权书 PDF 模板</span>
             </div>
           </template>
           <div class="template-upload">
-            <div v-if="authLetterTemplate?.ossId" class="template-file-card">
+            <div v-for="item in templateTypes" :key="item.type" class="template-file-card">
               <el-icon><Document /></el-icon>
               <div class="template-file-main">
-                <div class="template-file-name">{{ authLetterTemplate.originalName || '招聘授权书模板.docx' }}</div>
-                <div class="template-file-meta">当前生效模板，仅支持 .docx</div>
+                <div class="template-file-name">
+                  {{ authLetterTemplate[item.type]?.originalName || item.emptyName }}
+                </div>
+                <div class="template-file-meta">{{ item.label }}，仅支持 PDF</div>
               </div>
-              <el-button link type="primary" @click="openUrl(authLetterTemplate.url)">打开</el-button>
+              <el-button link type="primary" :disabled="!authLetterTemplate[item.type]?.url" @click="openUrl(authLetterTemplate[item.type]?.url)">
+                打开
+              </el-button>
+              <el-upload
+                :action="templateUploadUrl(item.type)"
+                :headers="uploadHeaders"
+                :show-file-list="false"
+                accept=".pdf,application/pdf"
+                :before-upload="(file) => beforeTemplateUpload(file, item.type)"
+                :on-success="(res) => handleTemplateUploadSuccess(res, item.type)"
+                :on-error="() => handleTemplateUploadError(item.type)"
+              >
+                <el-button type="primary" :loading="templateUploading[item.type]">上传 PDF</el-button>
+              </el-upload>
             </div>
-            <el-upload
-              :action="templateUploadUrl"
-              :headers="uploadHeaders"
-              :show-file-list="false"
-              accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              :before-upload="beforeTemplateUpload"
-              :on-success="handleTemplateUploadSuccess"
-              :on-error="handleTemplateUploadError"
-            >
-              <el-button type="primary" :loading="templateUploading">上传 .docx 模板</el-button>
-            </el-upload>
-            <div class="template-tip">上传后立即作为企业端下载模板生效，旧企业已提交材料不会被覆盖。</div>
+            <div class="template-tip">上传后立即作为企业端下载模板生效；企业需选择身份后下载对应 PDF。</div>
           </div>
         </el-card>
       </el-col>
@@ -195,7 +199,7 @@ import {
   getAuthLetterTemplate,
   authLetterTemplateUploadUrl,
   listConfigDictData,
-  type AuthLetterTemplateFile,
+  type AuthLetterTemplateSet,
   type RecConfigVO,
   type ConfigDictDataVO
 } from '@/api/recruitment';
@@ -245,13 +249,7 @@ const parttimeFields: CfgField[] = [
   { key: 'parttime.option3', label: '选项三文案', group: 'parttime', placeholder: '兼职三选一·选项三' }
 ];
 // 所有字段汇总（按分组取，便于初始化与保存）
-const allFields: CfgField[] = [
-  ...navCFields,
-  ...navBFields,
-  ...popupFields,
-  ...messageFields,
-  ...parttimeFields
-];
+const allFields: CfgField[] = [...navCFields, ...navBFields, ...popupFields, ...messageFields, ...parttimeFields];
 
 // 响应式 KV 值模型：configKey -> configValue（字符串）
 const model = reactive<Record<string, string>>({});
@@ -265,10 +263,24 @@ const saving = reactive<Record<string, boolean>>({
   message: false,
   parttime: false
 });
-const authLetterTemplate = ref<AuthLetterTemplateFile | null>(null);
-const templateUploading = ref(false);
-const templateUploadUrl = `${import.meta.env.VITE_APP_BASE_API}${authLetterTemplateUploadUrl}`;
+type AuthLetterTemplateType = keyof AuthLetterTemplateSet;
+
+const templateTypes: { type: AuthLetterTemplateType; label: string; emptyName: string }[] = [
+  { type: 'legalRepresentative', label: '法人版确认书', emptyName: '未上传法人版确认书.pdf' },
+  { type: 'operator', label: '经办人授权书', emptyName: '未上传经办人授权书.pdf' }
+];
+
+// 招聘授权书模板按操作者身份拆成两个 PDF，避免企业下载错版本后被审核驳回。
+const authLetterTemplate = ref<AuthLetterTemplateSet>({});
+const templateUploading = reactive<Record<AuthLetterTemplateType, boolean>>({
+  legalRepresentative: false,
+  operator: false
+});
 const uploadHeaders = ref(globalHeaders());
+
+function templateUploadUrl(type: AuthLetterTemplateType) {
+  return `${import.meta.env.VITE_APP_BASE_API}${authLetterTemplateUploadUrl(type)}`;
+}
 
 // 拉取全部已配置项：逐 key GET /admin/config/get，命中则回填 model
 async function loadAllConfigs() {
@@ -322,39 +334,39 @@ function openUrl(url?: string) {
 async function loadAuthLetterTemplate() {
   try {
     const res = await getAuthLetterTemplate();
-    authLetterTemplate.value = res.data || null;
+    authLetterTemplate.value = res.data || {};
   } catch (e) {
-    authLetterTemplate.value = null;
+    authLetterTemplate.value = {};
   }
 }
 
-function beforeTemplateUpload(file: File) {
-  const isDocx = file.name.toLowerCase().endsWith('.docx');
+function beforeTemplateUpload(file: File, type: AuthLetterTemplateType) {
+  const isPdf = file.name.toLowerCase().endsWith('.pdf');
   const isLt10M = file.size / 1024 / 1024 < 10;
-  if (!isDocx) {
-    ElMessage.error('招聘授权书模板只支持 .docx 文件');
+  if (!isPdf) {
+    ElMessage.error('招聘授权书模板只支持 PDF 文件');
     return false;
   }
   if (!isLt10M) {
     ElMessage.error('模板文件大小不能超过 10MB');
     return false;
   }
-  templateUploading.value = true;
+  templateUploading[type] = true;
   return true;
 }
 
-function handleTemplateUploadSuccess(res: any) {
-  templateUploading.value = false;
+function handleTemplateUploadSuccess(res: any, type: AuthLetterTemplateType) {
+  templateUploading[type] = false;
   if (res.code === 200) {
-    authLetterTemplate.value = res.data || null;
+    authLetterTemplate.value = res.data || {};
     ElMessage.success('模板已上传并生效');
   } else {
     ElMessage.error(res.msg || '模板上传失败');
   }
 }
 
-function handleTemplateUploadError() {
-  templateUploading.value = false;
+function handleTemplateUploadError(type: AuthLetterTemplateType) {
+  templateUploading[type] = false;
   ElMessage.error('模板上传失败');
 }
 

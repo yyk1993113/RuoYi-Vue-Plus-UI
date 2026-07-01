@@ -7,9 +7,7 @@
           <el-icon class="intro-icon"><Download /></el-icon>
           <span>数据导出中心</span>
         </div>
-        <div class="intro-desc">
-          统一导出运营台各业务域数据（Excel）。单次导出上限 1 万条；导出动作会写入审计留痕。
-        </div>
+        <div class="intro-desc">统一导出运营台各业务域数据（Excel）。单次导出上限 1 万条；导出动作会写入审计留痕。</div>
       </div>
     </el-card>
 
@@ -27,13 +25,7 @@
                 <div class="export-sub">{{ item.desc }}</div>
               </div>
             </div>
-            <el-button
-              type="primary"
-              icon="Download"
-              class="export-btn"
-              :loading="loadingKey === item.key"
-              @click="handleExport(item)"
-            >
+            <el-button type="primary" icon="Download" class="export-btn" :loading="loadingKey === item.key" @click="handleExport(item)">
               导出 Excel
             </el-button>
           </div>
@@ -79,7 +71,15 @@ interface ExportItem {
 
 // markRaw 避免图标组件被 Vue 响应式代理（图标是无状态组件，纯展示）。
 const exportItems: ExportItem[] = [
-  { key: 'company', title: '企业数据', desc: '入驻企业基础信息', url: companyExportUrl, fileLabel: '企业数据', icon: markRaw(OfficeBuilding), color: '#2b7fff' },
+  {
+    key: 'company',
+    title: '企业数据',
+    desc: '入驻企业基础信息',
+    url: companyExportUrl,
+    fileLabel: '企业数据',
+    icon: markRaw(OfficeBuilding),
+    color: '#2b7fff'
+  },
   { key: 'job', title: '岗位数据', desc: '发布岗位明细', url: jobExportUrl, fileLabel: '岗位数据', icon: markRaw(Briefcase), color: '#2b7fff' },
   { key: 'apply', title: '投递数据', desc: '求职投递记录', url: applyExportUrl, fileLabel: '投递记录', icon: markRaw(Document), color: '#13c2c2' },
   { key: 'user', title: '用户数据', desc: '求职者账号信息', url: userExportUrl, fileLabel: '求职者数据', icon: markRaw(User), color: '#722ed1' },

@@ -94,28 +94,19 @@
               <span class="rate-num">{{ percentage }}%</span>
             </template>
           </el-progress>
-          <div class="rate-sub">
-            通过 {{ stats.companyApprovedCount ?? 0 }} / 驳回 {{ stats.companyRejectedCount ?? 0 }}
-          </div>
+          <div class="rate-sub">通过 {{ stats.companyApprovedCount ?? 0 }} / 驳回 {{ stats.companyRejectedCount ?? 0 }}</div>
         </el-card>
       </el-col>
       <!-- 岗位审核通过率 -->
       <el-col :xs="24" :sm="12" :md="6">
         <el-card shadow="hover" class="rate-card">
           <div class="kpi-label">岗位审核通过率</div>
-          <el-progress
-            type="dashboard"
-            :percentage="clampPercent(stats.jobApprovalRate)"
-            :color="rateColor(stats.jobApprovalRate)"
-            :width="120"
-          >
+          <el-progress type="dashboard" :percentage="clampPercent(stats.jobApprovalRate)" :color="rateColor(stats.jobApprovalRate)" :width="120">
             <template #default="{ percentage }">
               <span class="rate-num">{{ percentage }}%</span>
             </template>
           </el-progress>
-          <div class="rate-sub">
-            通过 {{ stats.jobApprovedCount ?? 0 }} / 驳回 {{ stats.jobRejectedCount ?? 0 }}
-          </div>
+          <div class="rate-sub">通过 {{ stats.jobApprovedCount ?? 0 }} / 驳回 {{ stats.jobRejectedCount ?? 0 }}</div>
         </el-card>
       </el-col>
       <!-- 复访率（估算） -->
@@ -125,12 +116,7 @@
             复访率
             <el-tag type="warning" size="small" effect="plain">估算</el-tag>
           </div>
-          <el-progress
-            type="dashboard"
-            :percentage="clampPercent(stats.revisitRate)"
-            :color="'#E6A23C'"
-            :width="120"
-          >
+          <el-progress type="dashboard" :percentage="clampPercent(stats.revisitRate)" :color="'#E6A23C'" :width="120">
             <template #default="{ percentage }">
               <span class="rate-num">{{ percentage }}%</span>
             </template>
@@ -145,12 +131,7 @@
             30 天留存率
             <el-tag type="warning" size="small" effect="plain">估算</el-tag>
           </div>
-          <el-progress
-            type="dashboard"
-            :percentage="clampPercent(stats.retentionRate)"
-            :color="'#9B59B6'"
-            :width="120"
-          >
+          <el-progress type="dashboard" :percentage="clampPercent(stats.retentionRate)" :color="'#9B59B6'" :width="120">
             <template #default="{ percentage }">
               <span class="rate-num">{{ percentage }}%</span>
             </template>
@@ -215,7 +196,7 @@ const funnelCards = computed(() => [
   { key: 'partTimeSelectionCount', label: '履约选择', value: stats.partTimeSelectionCount, color: 'success' },
   { key: 'fulfillmentCompletedCount', label: '履约完成', value: stats.fulfillmentCompletedCount, color: 'success' },
   { key: 'ledgerGeneratedCount', label: '台账生成', value: stats.ledgerGeneratedCount, color: 'primary' },
-  { key: 'invoiceUploadedCount', label: '发票上传', value: stats.invoiceUploadedCount, color: 'danger' },
+  { key: 'invoiceUploadedCount', label: '发票上传', value: stats.invoiceUploadedCount, color: 'danger' }
 ]);
 
 // ---------- 工具函数 ----------
@@ -244,7 +225,7 @@ function renderFunnelChart() {
     { name: '履约选择', value: stats.partTimeSelectionCount ?? 0 },
     { name: '履约完成', value: stats.fulfillmentCompletedCount ?? 0 },
     { name: '台账生成', value: stats.ledgerGeneratedCount ?? 0 },
-    { name: '发票上传', value: stats.invoiceUploadedCount ?? 0 },
+    { name: '发票上传', value: stats.invoiceUploadedCount ?? 0 }
   ];
   const colors = ['#2b7fff', '#409EFF', '#E6A23C', '#67C23A', '#13C2C2', '#F56C6C'];
   funnelChart.setOption(
@@ -268,9 +249,9 @@ function renderFunnelChart() {
           labelLine: { show: false },
           itemStyle: { borderColor: '#fff', borderWidth: 1 },
           emphasis: { label: { fontSize: 14, fontWeight: 'bold' } },
-          data,
-        },
-      ],
+          data
+        }
+      ]
     },
     true
   );
@@ -294,7 +275,7 @@ function renderAuditChart() {
           data: [stats.companyApprovedCount ?? 0, stats.jobApprovedCount ?? 0],
           itemStyle: { color: '#67C23A', borderRadius: [4, 4, 0, 0] },
           barWidth: '28%',
-          label: { show: true, position: 'top', fontSize: 11 },
+          label: { show: true, position: 'top', fontSize: 11 }
         },
         {
           name: '驳回',
@@ -302,9 +283,9 @@ function renderAuditChart() {
           data: [stats.companyRejectedCount ?? 0, stats.jobRejectedCount ?? 0],
           itemStyle: { color: '#F56C6C', borderRadius: [4, 4, 0, 0] },
           barWidth: '28%',
-          label: { show: true, position: 'top', fontSize: 11 },
-        },
-      ],
+          label: { show: true, position: 'top', fontSize: 11 }
+        }
+      ]
     },
     true
   );

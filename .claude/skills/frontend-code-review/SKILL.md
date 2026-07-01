@@ -16,7 +16,7 @@ description: 审查 RuoYi-Vue-Plus-UI(平台运营总后台,Vue3+TS+Element Plus
 ## When NOT to use this skill
 
 - **后端代码**:Java / RuoYi 在独立仓 `RuoYi-Vue-Plus`,不归本技能。
-- **接口契约对齐**(路径、字段对齐后端 VO):用工作区根的 `api-contract` 技能。
+- **接口契约对齐**(路径、字段对齐后端 VO):按工作区根 `.agents/references/api-contract.md` 核对。
 - **框架自带页面**(`system/monitor/tool/workflow` 等 plus-ui 原生页)的成片重写:框架页保持跟随上游,只审业务性小改。
 - **生成/审测试**:本仓无测试框架(`@vue/test-utils` 在 devDeps 但无 runner/脚本),不强行引入。
 - **写新功能 / 重构**:本技能只审、不改业务码。
@@ -52,7 +52,7 @@ description: 审查 RuoYi-Vue-Plus-UI(平台运营总后台,Vue3+TS+Element Plus
 <不阻塞当前需求的优化建议>
 
 ### Verification
-<已做/建议的验证:`pnpm lint:eslint`、`pnpm build:prod`、`pnpm dev`(:8081, admin/admin123)页面点验;哪些无法静态验证>
+<已做/建议的验证:`pnpm lint:eslint`、`pnpm build:prod`、`pnpm dev`(:8081, 使用当前 dev 快照账号)页面点验;哪些无法静态验证>
 
 ### Next step
 是否需要我现在应用这些修改?

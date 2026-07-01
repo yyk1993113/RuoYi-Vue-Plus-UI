@@ -32,11 +32,19 @@
           </div>
           <el-divider class="kpi-divider" />
           <div class="kpi-badges">
-            <span class="badge success"><el-icon><CircleCheck /></el-icon> 已认证 {{ overview.approvedCompanies || 0 }}</span>
+            <span class="badge success"
+              ><el-icon><CircleCheck /></el-icon> 已认证 {{ overview.approvedCompanies || 0 }}</span
+            >
             <!-- 待审核用红色(danger)突出,提示运营尽快处理待审企业 -->
-            <span class="badge danger" v-if="overview.pendingCompanies > 0"><el-icon><Clock /></el-icon> 待审核 {{ overview.pendingCompanies }}</span>
-            <span class="badge info"><el-icon><User /></el-icon> 活跃 {{ overview.activeCompanies || 0 }}</span>
-            <span class="badge danger" v-if="overview.silencedCompanies > 0"><el-icon><CloseBold /></el-icon> 已禁言 {{ overview.silencedCompanies }}</span>
+            <span class="badge danger" v-if="overview.pendingCompanies > 0"
+              ><el-icon><Clock /></el-icon> 待审核 {{ overview.pendingCompanies }}</span
+            >
+            <span class="badge info"
+              ><el-icon><User /></el-icon> 活跃 {{ overview.activeCompanies || 0 }}</span
+            >
+            <span class="badge danger" v-if="overview.silencedCompanies > 0"
+              ><el-icon><CloseBold /></el-icon> 已禁言 {{ overview.silencedCompanies }}</span
+            >
           </div>
           <div class="kpi-trend up" v-if="overview.newCompaniesDelta > 0">
             <el-icon><Top /></el-icon> 本周期新增 {{ overview.newCompaniesDelta }} 家
@@ -58,10 +66,16 @@
           </div>
           <el-divider class="kpi-divider" />
           <div class="kpi-badges">
-            <span class="badge success"><el-icon><CircleCheck /></el-icon> 已上线 {{ overview.onlineJobs || 0 }}</span>
+            <span class="badge success"
+              ><el-icon><CircleCheck /></el-icon> 已上线 {{ overview.onlineJobs || 0 }}</span
+            >
             <!-- 待审核用红色(danger)突出,提示运营尽快处理待审职位 -->
-            <span class="badge danger" v-if="overview.pendingJobs > 0"><el-icon><Clock /></el-icon> 待审核 {{ overview.pendingJobs }}</span>
-            <span class="badge info"><el-icon><Collection /></el-icon> 职位类型 {{ jobTypeDist.length }} 种</span>
+            <span class="badge danger" v-if="overview.pendingJobs > 0"
+              ><el-icon><Clock /></el-icon> 待审核 {{ overview.pendingJobs }}</span
+            >
+            <span class="badge info"
+              ><el-icon><Collection /></el-icon> 职位类型 {{ jobTypeDist.length }} 种</span
+            >
           </div>
           <div class="kpi-trend up" v-if="overview.newJobsDelta > 0">
             <el-icon><Top /></el-icon> 本周期新增 {{ overview.newJobsDelta }} 个职位
@@ -83,9 +97,15 @@
           </div>
           <el-divider class="kpi-divider" />
           <div class="kpi-badges">
-            <span class="badge info"><el-icon><Clock /></el-icon> 待处理 {{ overview.pendingApplies || 0 }}</span>
-            <span class="badge primary"><el-icon><CircleCheck /></el-icon> 已处理 {{ overview.processedApplies || 0 }}</span>
-            <span class="badge success"><el-icon><Calendar /></el-icon> 今日投递 {{ overview.todayApplies || 0 }}</span>
+            <span class="badge info"
+              ><el-icon><Clock /></el-icon> 待处理 {{ overview.pendingApplies || 0 }}</span
+            >
+            <span class="badge primary"
+              ><el-icon><CircleCheck /></el-icon> 已处理 {{ overview.processedApplies || 0 }}</span
+            >
+            <span class="badge success"
+              ><el-icon><Calendar /></el-icon> 今日投递 {{ overview.todayApplies || 0 }}</span
+            >
           </div>
           <div class="kpi-trend up" v-if="overview.newAppliesDelta > 0">
             <el-icon><Top /></el-icon> 本周期新增 {{ overview.newAppliesDelta }} 条投递
@@ -107,9 +127,15 @@
           </div>
           <el-divider class="kpi-divider" />
           <div class="kpi-badges">
-            <span class="badge warning"><el-icon><Clock /></el-icon> 进行中 {{ overview.inProgressTasks || 0 }}</span>
-            <span class="badge danger" v-if="exceptionApplies.length > 0"><el-icon><Warning /></el-icon> 异常 {{ exceptionApplies.length }}</span>
-            <span class="badge success"><el-icon><Connection /></el-icon> 联系方式交换 {{ exchangeStat.exchangedCount || 0 }} 次</span>
+            <span class="badge warning"
+              ><el-icon><Clock /></el-icon> 进行中 {{ overview.inProgressTasks || 0 }}</span
+            >
+            <span class="badge danger" v-if="exceptionApplies.length > 0"
+              ><el-icon><Warning /></el-icon> 异常 {{ exceptionApplies.length }}</span
+            >
+            <span class="badge success"
+              ><el-icon><Connection /></el-icon> 联系方式交换 {{ exchangeStat.exchangedCount || 0 }} 次</span
+            >
           </div>
           <div class="kpi-trend neutral">
             <el-icon><InfoFilled /></el-icon> 交换成功率 {{ (exchangeStat.exchangeRate || 0).toFixed(1) }}%
@@ -193,18 +219,15 @@
             </div>
           </template>
           <div class="mini-list">
-            <div
-              v-for="job in recentJobs"
-              :key="job.jobId"
-              class="mini-item"
-              @click="navigateTo('/recruitment/job')"
-            >
+            <div v-for="job in recentJobs" :key="job.jobId" class="mini-item" @click="navigateTo('/recruitment/job')">
               <div class="mini-info">
                 <span class="mini-title">{{ job.jobName }}</span>
                 <span class="mini-sub">{{ job.companyName }} · {{ job.location || '未知' }}</span>
               </div>
               <div class="mini-right">
-                <span class="mini-count"><el-icon><User /></el-icon> {{ job.applyCount || 0 }}</span>
+                <span class="mini-count"
+                  ><el-icon><User /></el-icon> {{ job.applyCount || 0 }}</span
+                >
                 <span class="mini-time">{{ formatDate(job.createTime) }}</span>
               </div>
             </div>
@@ -223,12 +246,7 @@
             </div>
           </template>
           <div class="mini-list">
-            <div
-              v-for="apply in recentApplies"
-              :key="apply.applyId"
-              class="mini-item"
-              @click="navigateTo('/recruitment/apply')"
-            >
+            <div v-for="apply in recentApplies" :key="apply.applyId" class="mini-item" @click="navigateTo('/recruitment/apply')">
               <div class="mini-info">
                 <span class="mini-title">{{ apply.userName }}</span>
                 <span class="mini-sub">{{ apply.jobName }} · {{ apply.companyName }}</span>
@@ -257,12 +275,7 @@
             </div>
           </template>
           <div class="mini-list">
-            <div
-              v-for="item in exceptionApplies"
-              :key="item.applyId"
-              class="mini-item exception-item"
-              @click="navigateTo('/recruitment/apply')"
-            >
+            <div v-for="item in exceptionApplies" :key="item.applyId" class="mini-item exception-item" @click="navigateTo('/recruitment/apply')">
               <div class="mini-info">
                 <span class="mini-title">{{ item.jobName }}</span>
                 <span class="mini-sub">{{ item.userName }} · {{ item.companyName }}</span>
@@ -299,7 +312,7 @@ import {
   Calendar,
   Warning,
   Connection,
-  InfoFilled,
+  InfoFilled
 } from '@element-plus/icons-vue';
 import {
   getOverview,
@@ -312,15 +325,9 @@ import {
   getRecentApplies,
   getCompanyTrend,
   getUserTrend,
-  getApplyStatusDistribution,
+  getApplyStatusDistribution
 } from '@/api/recruitment';
-import type {
-  RecruitmentOverview,
-  ApplyTrend,
-  JobTypeDistribution,
-  HotJobVO,
-  ExceptionApplyVO,
-} from '@/api/recruitment';
+import type { RecruitmentOverview, ApplyTrend, JobTypeDistribution, HotJobVO, ExceptionApplyVO } from '@/api/recruitment';
 import { formatDate as formatDateUtil } from '@/utils';
 
 const router = useRouter();
@@ -384,7 +391,7 @@ function getApplyStatusTagType(status: string) {
     '0': 'info',
     '1': 'warning',
     '2': 'success',
-    '3': 'danger',
+    '3': 'danger'
   };
   return map[status] || 'info';
 }
@@ -393,58 +400,68 @@ function getApplyStatusTagType(status: string) {
 function initTrendChart(data: ApplyTrend[], label: string, color: string) {
   if (!trendChartRef.value) return;
   if (!trendChart) trendChart = echarts.init(trendChartRef.value);
-  trendChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'line' } },
-    grid: { left: '3%', right: '4%', bottom: '3%', top: '10%', containLabel: true },
-    xAxis: {
-      type: 'category',
-      data: data.map(d => d.date),
-      axisLabel: { fontSize: 11, color: '#606266' },
-      axisLine: { lineStyle: { color: '#E4E7ED' } },
-    },
-    yAxis: {
-      type: 'value',
-      minInterval: 1,
-      axisLabel: { fontSize: 11, color: '#606266' },
-      splitLine: { lineStyle: { color: '#F0F2F5' } },
-    },
-    series: [{
-      name: label,
-      type: 'line',
-      data: data.map(d => d.count),
-      smooth: true,
-      lineStyle: { color, width: 2.5 },
-      areaStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: color + '55' },
-          { offset: 1, color: color + '05' },
-        ]),
+  trendChart.setOption(
+    {
+      tooltip: { trigger: 'axis', axisPointer: { type: 'line' } },
+      grid: { left: '3%', right: '4%', bottom: '3%', top: '10%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: data.map((d) => d.date),
+        axisLabel: { fontSize: 11, color: '#606266' },
+        axisLine: { lineStyle: { color: '#E4E7ED' } }
       },
-      itemStyle: { color, borderRadius: [4, 4, 0, 0] },
-    }],
-  }, true);
+      yAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: { fontSize: 11, color: '#606266' },
+        splitLine: { lineStyle: { color: '#F0F2F5' } }
+      },
+      series: [
+        {
+          name: label,
+          type: 'line',
+          data: data.map((d) => d.count),
+          smooth: true,
+          lineStyle: { color, width: 2.5 },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: color + '55' },
+              { offset: 1, color: color + '05' }
+            ])
+          },
+          itemStyle: { color, borderRadius: [4, 4, 0, 0] }
+        }
+      ]
+    },
+    true
+  );
 }
 
 function initJobTypeChart() {
   if (!jobTypeChartRef.value) return;
   if (!jobTypeChart) jobTypeChart = echarts.init(jobTypeChartRef.value);
   const colors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#1ABC9C', '#E74C3C'];
-  jobTypeChart.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-    legend: { orient: 'vertical', right: '2%', top: 'center', textStyle: { fontSize: 11 }, itemWidth: 10, itemHeight: 10 },
-    color: colors,
-    series: [{
-      name: '职位类型',
-      type: 'pie',
-      radius: ['38%', '65%'],
-      center: ['38%', '50%'],
-      itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
-      label: { show: false },
-      emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold' } },
-      labelLine: { show: false },
-      data: jobTypeDist.value.map((d, i) => ({ name: d.typeName, value: d.count, itemStyle: { color: colors[i % colors.length] } })),
-    }],
-  }, true);
+  jobTypeChart.setOption(
+    {
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      legend: { orient: 'vertical', right: '2%', top: 'center', textStyle: { fontSize: 11 }, itemWidth: 10, itemHeight: 10 },
+      color: colors,
+      series: [
+        {
+          name: '职位类型',
+          type: 'pie',
+          radius: ['38%', '65%'],
+          center: ['38%', '50%'],
+          itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false },
+          emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold' } },
+          labelLine: { show: false },
+          data: jobTypeDist.value.map((d, i) => ({ name: d.typeName, value: d.count, itemStyle: { color: colors[i % colors.length] } }))
+        }
+      ]
+    },
+    true
+  );
 }
 
 // 后端为避免 SQL 字符集问题返回英文安全键，这里只负责前端展示翻译。
@@ -457,7 +474,7 @@ const APPLY_STATUS_NAME_MAP: Record<string, string> = {
   '0': '已投递',
   '1': '面试邀请',
   '2': '已录用',
-  '3': '已拒绝',
+  '3': '已拒绝'
 };
 
 function applyStatusDisplayName(name?: string | null) {
@@ -476,56 +493,64 @@ function initApplyStatusChart() {
     '已投递': '#409EFF',
     '面试邀请': '#E6A23C',
     '已录用': '#67C23A',
-    '已拒绝': '#F56C6C',
+    '已拒绝': '#F56C6C'
   };
   const total = applyStatusDist.value.reduce((sum, d) => sum + d.value, 0);
-  applyStatusChart.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-    legend: { orient: 'vertical', right: '2%', top: 'center', textStyle: { fontSize: 11 }, itemWidth: 10, itemHeight: 10 },
-    series: [{
-      name: '投递状态',
-      type: 'pie',
-      radius: ['42%', '68%'],
-      center: ['38%', '50%'],
-      itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
-      label: { show: false },
-      emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold' } },
-      labelLine: { show: false },
-      data: applyStatusDist.value.map(d => ({
-        name: applyStatusDisplayName(d.name),
-        value: d.value,
-        itemStyle: { color: statusColors[d.name] || '#909399' },
-      })),
-    }],
-  }, true);
+  applyStatusChart.setOption(
+    {
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      legend: { orient: 'vertical', right: '2%', top: 'center', textStyle: { fontSize: 11 }, itemWidth: 10, itemHeight: 10 },
+      series: [
+        {
+          name: '投递状态',
+          type: 'pie',
+          radius: ['42%', '68%'],
+          center: ['38%', '50%'],
+          itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false },
+          emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold' } },
+          labelLine: { show: false },
+          data: applyStatusDist.value.map((d) => ({
+            name: applyStatusDisplayName(d.name),
+            value: d.value,
+            itemStyle: { color: statusColors[d.name] || '#909399' }
+          }))
+        }
+      ]
+    },
+    true
+  );
 }
 
 function initHotJobChart() {
   if (!hotJobChartRef.value) return;
   if (!hotJobChart) hotJobChart = echarts.init(hotJobChartRef.value);
-  const sorted = [...hotJobs.value]
-    .sort((a, b) => (b.applyCount || 0) - (a.applyCount || 0))
-    .slice(0, 10);
+  const sorted = [...hotJobs.value].sort((a, b) => (b.applyCount || 0) - (a.applyCount || 0)).slice(0, 10);
   const colors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#1ABC9C', '#E74C3C', '#34495E', '#2C3E50'];
-  hotJobChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: '1%', right: '4%', bottom: '3%', top: '3%', containLabel: true },
-    xAxis: { type: 'value', axisLabel: { fontSize: 10, color: '#606266' }, splitLine: { lineStyle: { color: '#F0F2F5' } } },
-    yAxis: {
-      type: 'category',
-      data: sorted.map(d => d.jobName).reverse(),
-      axisLabel: { fontSize: 10, color: '#606266', width: 90, overflow: 'truncate' },
-      axisLine: { lineStyle: { color: '#E4E7ED' } },
+  hotJobChart.setOption(
+    {
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: '1%', right: '4%', bottom: '3%', top: '3%', containLabel: true },
+      xAxis: { type: 'value', axisLabel: { fontSize: 10, color: '#606266' }, splitLine: { lineStyle: { color: '#F0F2F5' } } },
+      yAxis: {
+        type: 'category',
+        data: sorted.map((d) => d.jobName).reverse(),
+        axisLabel: { fontSize: 10, color: '#606266', width: 90, overflow: 'truncate' },
+        axisLine: { lineStyle: { color: '#E4E7ED' } }
+      },
+      series: [
+        {
+          name: hotJobType.value === 'apply' ? '投递量' : '浏览量',
+          type: 'bar',
+          data: sorted.map((d) => (hotJobType.value === 'apply' ? d.applyCount : d.browseCount) || 0).reverse(),
+          itemStyle: { color: (params: any) => colors[params.dataIndex % colors.length], borderRadius: [0, 4, 4, 0] },
+          barWidth: '55%',
+          label: { show: true, position: 'right', fontSize: 10, color: '#606266' }
+        }
+      ]
     },
-    series: [{
-      name: hotJobType.value === 'apply' ? '投递量' : '浏览量',
-      type: 'bar',
-      data: sorted.map(d => (hotJobType.value === 'apply' ? d.applyCount : d.browseCount) || 0).reverse(),
-      itemStyle: { color: (params: any) => colors[params.dataIndex % colors.length], borderRadius: [0, 4, 4, 0] },
-      barWidth: '55%',
-      label: { show: true, position: 'right', fontSize: 10, color: '#606266' },
-    }],
-  }, true);
+    true
+  );
 }
 
 function handleResize() {
@@ -551,7 +576,7 @@ async function loadAllData() {
       recentAppliesRes,
       companyTrendRes,
       userTrendRes,
-      applyStatusRes,
+      applyStatusRes
     ] = await Promise.all([
       getOverview(),
       getApplyTrend(days),
@@ -563,7 +588,7 @@ async function loadAllData() {
       getRecentApplies({ pageNum: 1, pageSize: 6 }),
       getCompanyTrend({ days }),
       getUserTrend({ days }),
-      getApplyStatusDistribution(),
+      getApplyStatusDistribution()
     ]);
 
     Object.assign(overview, overviewRes.data || {});
@@ -590,7 +615,7 @@ function renderAllCharts() {
   const trendMap: Record<string, { data: ApplyTrend[]; label: string; color: string }> = {
     apply: { data: applyTrendData.value, label: '投递量', color: '#409EFF' },
     company: { data: companyTrendData.value, label: '入驻企业', color: '#67C23A' },
-    user: { data: userTrendData.value, label: '新增求职者', color: '#E6A23C' },
+    user: { data: userTrendData.value, label: '新增求职者', color: '#E6A23C' }
   };
   const t = trendMap[trendType.value];
   if (t.data.length > 0) initTrendChart(t.data, t.label, t.color);
@@ -608,14 +633,14 @@ function handleTrendTypeChange() {
   const trendMap: Record<string, { data: ApplyTrend[]; label: string; color: string }> = {
     apply: { data: applyTrendData.value, label: '投递量', color: '#409EFF' },
     company: { data: companyTrendData.value, label: '入驻企业', color: '#67C23A' },
-    user: { data: userTrendData.value, label: '新增求职者', color: '#E6A23C' },
+    user: { data: userTrendData.value, label: '新增求职者', color: '#E6A23C' }
   };
   const t = trendMap[trendType.value];
   if (t.data.length > 0) initTrendChart(t.data, t.label, t.color);
 }
 
 function loadHotJobs() {
-  getHotJobs({ limit: 10, type: hotJobType.value }).then(res => {
+  getHotJobs({ limit: 10, type: hotJobType.value }).then((res) => {
     hotJobs.value = res.data || [];
     initHotJobChart();
   });
@@ -625,9 +650,12 @@ function loadHotJobs() {
 onMounted(() => {
   loadAllData();
   window.addEventListener('resize', handleResize);
-  refreshTimer = setInterval(() => {
-    loadAllData();
-  }, 5 * 60 * 1000);
+  refreshTimer = setInterval(
+    () => {
+      loadAllData();
+    },
+    5 * 60 * 1000
+  );
 });
 
 onUnmounted(() => {
@@ -643,7 +671,7 @@ onUnmounted(() => {
 <style scoped>
 .dashboard-container {
   padding: 20px;
-  background: #F5F7FA;
+  background: #f5f7fa;
   min-height: calc(100vh - 84px);
 }
 
@@ -675,7 +703,9 @@ onUnmounted(() => {
 }
 
 /* ---------- 通用间距 ---------- */
-.mb-16 { margin-bottom: 16px; }
+.mb-16 {
+  margin-bottom: 16px;
+}
 
 /* ---------- KPI 卡片 ---------- */
 .kpi-card {
@@ -706,10 +736,22 @@ onUnmounted(() => {
   font-size: 22px;
   flex-shrink: 0;
 }
-.kpi-icon-wrap.primary { background: #ECF5FF; color: #409EFF; }
-.kpi-icon-wrap.success { background: #F0F9EB; color: #67C23A; }
-.kpi-icon-wrap.warning { background: #FDF6EC; color: #E6A23C; }
-.kpi-icon-wrap.danger  { background: #FEF0F0; color: #F56C6C; }
+.kpi-icon-wrap.primary {
+  background: #ecf5ff;
+  color: #409eff;
+}
+.kpi-icon-wrap.success {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+.kpi-icon-wrap.warning {
+  background: #fdf6ec;
+  color: #e6a23c;
+}
+.kpi-icon-wrap.danger {
+  background: #fef0f0;
+  color: #f56c6c;
+}
 
 .kpi-meta {
   display: flex;
@@ -729,14 +771,22 @@ onUnmounted(() => {
   line-height: 1.1;
   font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
 }
-.kpi-value.primary { color: #409EFF; }
-.kpi-value.success { color: #67C23A; }
-.kpi-value.warning { color: #E6A23C; }
-.kpi-value.danger  { color: #F56C6C; }
+.kpi-value.primary {
+  color: #409eff;
+}
+.kpi-value.success {
+  color: #67c23a;
+}
+.kpi-value.warning {
+  color: #e6a23c;
+}
+.kpi-value.danger {
+  color: #f56c6c;
+}
 
 .kpi-divider {
   margin: 0 0 10px;
-  border-color: #F0F2F5;
+  border-color: #f0f2f5;
 }
 
 .kpi-badges {
@@ -755,12 +805,29 @@ onUnmounted(() => {
   font-size: 11px;
   font-weight: 500;
 }
-.badge .el-icon { font-size: 11px; }
-.badge.primary { background: #ECF5FF; color: #409EFF; }
-.badge.success { background: #F0F9EB; color: #67C23A; }
-.badge.warning { background: #FDF6EC; color: #E6A23C; }
-.badge.danger  { background: #FEF0F0; color: #F56C6C; }
-.badge.info    { background: #F4F4F5; color: #909399; }
+.badge .el-icon {
+  font-size: 11px;
+}
+.badge.primary {
+  background: #ecf5ff;
+  color: #409eff;
+}
+.badge.success {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+.badge.warning {
+  background: #fdf6ec;
+  color: #e6a23c;
+}
+.badge.danger {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+.badge.info {
+  background: #f4f4f5;
+  color: #909399;
+}
 
 .kpi-trend {
   display: flex;
@@ -768,12 +835,20 @@ onUnmounted(() => {
   gap: 4px;
   font-size: 11px;
   padding-top: 6px;
-  border-top: 1px dashed #F0F2F5;
+  border-top: 1px dashed #f0f2f5;
 }
-.kpi-trend .el-icon { font-size: 12px; }
-.kpi-trend.up      { color: #67C23A; }
-.kpi-trend.down    { color: #F56C6C; }
-.kpi-trend.neutral { color: #909399; }
+.kpi-trend .el-icon {
+  font-size: 12px;
+}
+.kpi-trend.up {
+  color: #67c23a;
+}
+.kpi-trend.down {
+  color: #f56c6c;
+}
+.kpi-trend.neutral {
+  color: #909399;
+}
 
 /* ---------- 图表卡片 ---------- */
 .chart-card {
@@ -790,7 +865,7 @@ onUnmounted(() => {
 }
 
 .exception-card :deep(.el-card__header) {
-  background: #FEF0F0;
+  background: #fef0f0;
   border-radius: 12px 12px 0 0;
 }
 
@@ -805,14 +880,14 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 10px 4px;
-  border-bottom: 1px solid #F5F7FA;
+  border-bottom: 1px solid #f5f7fa;
   cursor: pointer;
   transition: background 0.2s;
   border-radius: 6px;
   margin-bottom: 2px;
 }
 .mini-item:hover {
-  background: #F5F7FA;
+  background: #f5f7fa;
   padding-left: 8px;
 }
 .mini-item:last-child {
@@ -859,18 +934,20 @@ onUnmounted(() => {
   align-items: center;
   gap: 2px;
   font-size: 11px;
-  color: #409EFF;
+  color: #409eff;
   font-weight: 600;
 }
-.mini-count .el-icon { font-size: 11px; }
+.mini-count .el-icon {
+  font-size: 11px;
+}
 
 .mini-time {
   font-size: 10px;
-  color: #C0C4CC;
+  color: #c0c4cc;
 }
 
 .exception-item .mini-title {
-  color: #C00000;
+  color: #c00000;
 }
 
 /* ---------- 卡片头部 ---------- */
@@ -890,7 +967,12 @@ onUnmounted(() => {
     align-items: flex-start;
     gap: 10px;
   }
-  .kpi-value { font-size: 24px; }
-  .kpi-badges { flex-direction: column; gap: 4px; }
+  .kpi-value {
+    font-size: 24px;
+  }
+  .kpi-badges {
+    flex-direction: column;
+    gap: 4px;
+  }
 }
 </style>

@@ -9,12 +9,7 @@
     -->
     <el-card shadow="never">
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
-        <el-tab-pane
-          v-for="cfg in tabConfigs"
-          :key="cfg.key"
-          :label="cfg.label"
-          :name="cfg.key"
-        />
+        <el-tab-pane v-for="cfg in tabConfigs" :key="cfg.key" :label="cfg.label" :name="cfg.key" />
       </el-tabs>
 
       <!-- 查询 + 操作条 -->
@@ -45,9 +40,7 @@
           <el-button type="primary" plain icon="Plus" @click="handleAdd">新增</el-button>
         </el-col>
         <el-col :span="1.5">
-          <el-button type="danger" plain icon="Delete" :disabled="selectedIds.length === 0" @click="handleDelete()">
-            删除
-          </el-button>
+          <el-button type="danger" plain icon="Delete" :disabled="selectedIds.length === 0" @click="handleDelete()"> 删除 </el-button>
         </el-col>
         <el-col :span="1.5">
           <el-button plain icon="Refresh" @click="loadData">刷新</el-button>
@@ -114,13 +107,7 @@
         </el-table-column>
       </el-table>
 
-      <pagination
-        v-show="total > 0"
-        v-model:page="queryParams.pageNum"
-        v-model:limit="queryParams.pageSize"
-        :total="total"
-        @pagination="loadData"
-      />
+      <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="loadData" />
     </el-card>
 
     <!-- 新增/编辑弹窗：表单字段由 currentConfig.fields 驱动 -->
@@ -129,12 +116,7 @@
         <template v-for="field in currentConfig.fields" :key="field.prop">
           <el-form-item :label="field.label" :prop="field.prop">
             <!-- 图片上传 -->
-            <image-upload
-              v-if="field.type === 'image'"
-              v-model="form[field.prop]"
-              :limit="1"
-              value-type="url"
-            />
+            <image-upload v-if="field.type === 'image'" v-model="form[field.prop]" :limit="1" value-type="url" />
             <!-- 数字 -->
             <el-input-number
               v-else-if="field.type === 'number'"
@@ -166,12 +148,7 @@
               inline-prompt
             />
             <!-- 普通文本输入 -->
-            <el-input
-              v-else
-              v-model="form[field.prop]"
-              :placeholder="field.placeholder || `请输入${field.label}`"
-              :maxlength="field.maxlength"
-            />
+            <el-input v-else v-model="form[field.prop]" :placeholder="field.placeholder || `请输入${field.label}`" :maxlength="field.maxlength" />
             <div v-if="field.tip" class="form-tip">{{ field.tip }}</div>
           </el-form-item>
         </template>
@@ -190,15 +167,40 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormRules } from 'element-plus';
 import {
   // 轮播图
-  listBanner, getBanner, addBanner, updateBanner, delBanner, changeBannerStatus,
+  listBanner,
+  getBanner,
+  addBanner,
+  updateBanner,
+  delBanner,
+  changeBannerStatus,
   // 金刚区
-  listKingkong, getKingkong, addKingkong, updateKingkong, delKingkong, changeKingkongStatus,
+  listKingkong,
+  getKingkong,
+  addKingkong,
+  updateKingkong,
+  delKingkong,
+  changeKingkongStatus,
   // 技能课程
-  listCourse, getCourse, addCourse, updateCourse, delCourse, changeCourseStatus,
+  listCourse,
+  getCourse,
+  addCourse,
+  updateCourse,
+  delCourse,
+  changeCourseStatus,
   // 求职干货
-  listArticle, getArticle, addArticle, updateArticle, delArticle, changeArticleStatus,
+  listArticle,
+  getArticle,
+  addArticle,
+  updateArticle,
+  delArticle,
+  changeArticleStatus,
   // 求职服务
-  listJobService, getJobService, addJobService, updateJobService, delJobService, changeJobServiceStatus
+  listJobService,
+  getJobService,
+  addJobService,
+  updateJobService,
+  delJobService,
+  changeJobServiceStatus
 } from '@/api/recruitment/content';
 import { unwrapList, splitToArray } from './helpers';
 
@@ -426,7 +428,14 @@ const tabConfigs: TabConfig[] = [
       name: [{ required: true, message: '请输入名称', trigger: 'blur' }]
     },
     defaults: { sort: 0, status: '1' },
-    api: { list: listJobService, get: getJobService, add: addJobService, update: updateJobService, del: delJobService, changeStatus: changeJobServiceStatus }
+    api: {
+      list: listJobService,
+      get: getJobService,
+      add: addJobService,
+      update: updateJobService,
+      del: delJobService,
+      changeStatus: changeJobServiceStatus
+    }
   }
 ];
 

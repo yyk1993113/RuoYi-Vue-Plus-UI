@@ -214,8 +214,12 @@
                       <el-tag size="small" :type="taskTagType(t.status)">{{ t.statusName || t.status }}</el-tag>
                     </div>
                     <div class="task-meta">
-                      <span v-if="t.workTime"><el-icon><Clock /></el-icon> {{ formatTime(t.workTime) }}</span>
-                      <span v-if="t.address"><el-icon><Location /></el-icon> {{ t.address }}</span>
+                      <span v-if="t.workTime"
+                        ><el-icon><Clock /></el-icon> {{ formatTime(t.workTime) }}</span
+                      >
+                      <span v-if="t.address"
+                        ><el-icon><Location /></el-icon> {{ t.address }}</span
+                      >
                     </div>
                     <div v-if="t.remark" class="task-remark">{{ t.remark }}</div>
                   </div>

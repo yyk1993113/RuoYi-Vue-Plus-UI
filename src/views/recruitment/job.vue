@@ -3,7 +3,15 @@
     <!-- 统计卡片 -->
     <el-row :gutter="20" class="mb-4">
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card stat-clickable" role="button" tabindex="0" @click="handleStatFilter('all')" @keyup.enter="handleStatFilter('all')" @keyup.space="handleStatFilter('all')">
+        <el-card
+          shadow="hover"
+          class="stat-mini-card stat-clickable"
+          role="button"
+          tabindex="0"
+          @click="handleStatFilter('all')"
+          @keyup.enter="handleStatFilter('all')"
+          @keyup.space="handleStatFilter('all')"
+        >
           <div class="stat-mini">
             <span class="label">岗位总数</span>
             <span class="value">{{ statistics.totalCount || 0 }}</span>
@@ -11,7 +19,15 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card stat-clickable warning" role="button" tabindex="0" @click="handleStatFilter('pending')" @keyup.enter="handleStatFilter('pending')" @keyup.space="handleStatFilter('pending')">
+        <el-card
+          shadow="hover"
+          class="stat-mini-card stat-clickable warning"
+          role="button"
+          tabindex="0"
+          @click="handleStatFilter('pending')"
+          @keyup.enter="handleStatFilter('pending')"
+          @keyup.space="handleStatFilter('pending')"
+        >
           <div class="stat-mini">
             <span class="label">待审核</span>
             <span class="value warning">{{ statistics.pendingCount || 0 }}</span>
@@ -19,7 +35,15 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card stat-clickable success" role="button" tabindex="0" @click="handleStatFilter('online')" @keyup.enter="handleStatFilter('online')" @keyup.space="handleStatFilter('online')">
+        <el-card
+          shadow="hover"
+          class="stat-mini-card stat-clickable success"
+          role="button"
+          tabindex="0"
+          @click="handleStatFilter('online')"
+          @keyup.enter="handleStatFilter('online')"
+          @keyup.space="handleStatFilter('online')"
+        >
           <div class="stat-mini">
             <span class="label">已上架</span>
             <span class="value success">{{ statistics.onlineCount || 0 }}</span>
@@ -27,7 +51,15 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card stat-clickable info" role="button" tabindex="0" @click="handleStatFilter('offline')" @keyup.enter="handleStatFilter('offline')" @keyup.space="handleStatFilter('offline')">
+        <el-card
+          shadow="hover"
+          class="stat-mini-card stat-clickable info"
+          role="button"
+          tabindex="0"
+          @click="handleStatFilter('offline')"
+          @keyup.enter="handleStatFilter('offline')"
+          @keyup.space="handleStatFilter('offline')"
+        >
           <div class="stat-mini">
             <span class="label">已下架</span>
             <span class="value info">{{ statistics.offlineCount || 0 }}</span>
@@ -81,7 +113,14 @@
           <el-input v-model="queryParams.workAddress" placeholder="请输入工作地点" clearable style="width: 180px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item v-show="showMoreQuery" label="投递人数" prop="applyCount">
-          <el-input-number v-model="queryParams.applyCount" :min="0" :precision="0" controls-position="right" placeholder="投递人数" style="width: 130px" />
+          <el-input-number
+            v-model="queryParams.applyCount"
+            :min="0"
+            :precision="0"
+            controls-position="right"
+            placeholder="投递人数"
+            style="width: 130px"
+          />
         </el-form-item>
         <el-form-item v-show="showMoreQuery" label="发布时间">
           <el-date-picker
@@ -157,22 +196,12 @@
         </el-table-column>
         <el-table-column label="推荐" width="80" align="center">
           <template #default="{ row }">
-            <el-switch
-              v-model="row.isRecommend"
-              active-value="1"
-              inactive-value="0"
-              @change="handleRecommendChange(row)"
-            />
+            <el-switch v-model="row.isRecommend" active-value="1" inactive-value="0" @change="handleRecommendChange(row)" />
           </template>
         </el-table-column>
         <el-table-column label="热门" width="80" align="center">
           <template #default="{ row }">
-            <el-switch
-              v-model="row.isHot"
-              active-value="1"
-              inactive-value="0"
-              @change="handleHotChange(row)"
-            />
+            <el-switch v-model="row.isHot" active-value="1" inactive-value="0" @change="handleHotChange(row)" />
           </template>
         </el-table-column>
         <el-table-column label="状态" width="100" align="center">
@@ -184,29 +213,29 @@
         <!-- 240px 容纳 详情/编辑/更多 三按钮单行展示；nowrap 防止"更多"折到第二行 -->
         <el-table-column label="操作" width="240" fixed="right" align="center">
           <template #default="{ row }">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: nowrap; white-space: nowrap;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: nowrap; white-space: nowrap">
               <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
               <el-button link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
               <el-dropdown trigger="click">
                 <span class="el-dropdown-link">
-                  <el-button link type="primary">更多<el-icon class="el-icon--right"><arrow-down /></el-icon></el-button>
+                  <el-button link type="primary"
+                    >更多<el-icon class="el-icon--right"><arrow-down /></el-icon
+                  ></el-button>
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
                     <!-- 候选人入口仅审核通过后展示：待审核(0)/草稿(3)岗位尚无有效投递，隐藏避免误导；
                          已上架(1)/已下架(2)/已满员(4)/已结束(5)均为通过后状态，保留查看历史候选人 -->
-                    <el-dropdown-item
-                      v-if="row.status !== '0' && row.status !== '3'"
-                      icon="user"
-                      @click="handleSelectApplyUsers(row)"
-                    >候选人</el-dropdown-item>
+                    <el-dropdown-item v-if="row.status !== '0' && row.status !== '3'" icon="user" @click="handleSelectApplyUsers(row)"
+                      >候选人</el-dropdown-item
+                    >
                     <el-dropdown-item v-if="row.status === '0'" icon="CircleCheck" @click="handleAudit(row, '1')">审核通过</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '6')">审核拒绝</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '1'" icon="Bottom" @click="handleStatusChange(row, '2')">下架</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '2'" icon="Top" @click="handleStatusChange(row, '1')">上架</el-dropdown-item>
                     <!-- 复制发布：进入代发整页并按 jobId 回填原岗位信息，少量修改即可重发 -->
-                  <el-dropdown-item icon="CopyDocument" @click="handleCopyPublish(row)">复制发布</el-dropdown-item>
-                  <el-dropdown-item icon="Delete" @click="handleDelete(row)">删除</el-dropdown-item>
+                    <el-dropdown-item icon="CopyDocument" @click="handleCopyPublish(row)">复制发布</el-dropdown-item>
+                    <el-dropdown-item icon="Delete" @click="handleDelete(row)">删除</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -215,13 +244,7 @@
         </el-table-column>
       </el-table>
 
-      <pagination
-        v-show="total > 0"
-        v-model:page="queryParams.pageNum"
-        v-model:limit="queryParams.pageSize"
-        :total="total"
-        @pagination="loadData"
-      />
+      <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="loadData" />
     </el-card>
 
     <!-- 岗位详情对话框：完整字段（数据来源 GET /admin/recruitment/jobDetail/{jobId} → JobFullVO，枚举译名由后端 *Name 提供） -->
@@ -239,12 +262,18 @@
             <el-tag :type="jobTypeMeta(currentJob.jobType).type">{{ jobTypeMeta(currentJob.jobType).label }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="职位类目">{{ currentJob.category || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="薪资范围">{{ formatSalary(currentJob.salaryMin, currentJob.salaryMax, currentJob.salaryUnit) }}</el-descriptions-item>
-          <el-descriptions-item label="招聘人数">{{ currentJob.recruitNumber != null ? currentJob.recruitNumber + ' 人' : '-' }}</el-descriptions-item>
+          <el-descriptions-item label="薪资范围">{{
+            formatSalary(currentJob.salaryMin, currentJob.salaryMax, currentJob.salaryUnit)
+          }}</el-descriptions-item>
+          <el-descriptions-item label="招聘人数">{{
+            currentJob.recruitNumber != null ? currentJob.recruitNumber + ' 人' : '-'
+          }}</el-descriptions-item>
           <el-descriptions-item label="经验要求">{{ currentJob.experienceName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="学历要求">{{ currentJob.educationName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="期望到岗时间">{{ formatStartDate(currentJob.expectedStartDate) }}</el-descriptions-item>
-          <el-descriptions-item label="省市区">{{ [currentJob.province, currentJob.city, currentJob.district].filter(Boolean).join(' / ') || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="省市区">{{
+            [currentJob.province, currentJob.city, currentJob.district].filter(Boolean).join(' / ') || '-'
+          }}</el-descriptions-item>
           <el-descriptions-item label="工作地点">{{ currentJob.workAddress || '未知' }}</el-descriptions-item>
 
           <!-- 兼职工作时间（仅在有数据时展示，benefits/workTime 为 JSON，已在 computed 中解析） -->
@@ -319,10 +348,20 @@
     <el-dialog v-model="editVisible" title="编辑岗位" width="880px" append-to-body>
       <!-- 字段集与排序对齐 B 端发布岗位表单：名称/性质/类目/地点/薪资/经验/学历/人数/描述。
            表单按「基础信息 / 招聘要求 / 岗位详情」三段分组(el-divider 标题)，短字段双栏(el-col :span=12)以压缩弹窗高度。 -->
-      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="100px" v-loading="editLoading" scroll-to-error class="job-edit-form">
+      <el-form
+        ref="editFormRef"
+        :model="editForm"
+        :rules="editRules"
+        label-width="100px"
+        v-loading="editLoading"
+        scroll-to-error
+        class="job-edit-form"
+      >
         <!-- 模块1：基础岗位信息 -->
         <el-divider content-position="left">
-          <span class="section-title"><el-icon><Document /></el-icon>基础岗位信息</span>
+          <span class="section-title"
+            ><el-icon><Document /></el-icon>基础岗位信息</span
+          >
         </el-divider>
         <el-row :gutter="20">
           <el-col :span="12">
@@ -377,7 +416,9 @@
           <el-col :span="12">
             <el-form-item label="工作地点" prop="workAddress">
               <el-input v-model="editForm.workAddress" placeholder="请输入详细地址（如：张江路 88 号 3 号楼）" maxlength="200">
-                <template #prefix><el-icon><LocationInformation /></el-icon></template>
+                <template #prefix
+                  ><el-icon><LocationInformation /></el-icon
+                ></template>
               </el-input>
               <div class="field-hint">选好省市区后会自动预填地址前缀，补充街道门牌即可，例：合肥市高新区创新产业园 A 栋</div>
             </el-form-item>
@@ -386,7 +427,9 @@
 
         <!-- 模块2：招聘要求 -->
         <el-divider content-position="left">
-          <span class="section-title"><el-icon><Filter /></el-icon>招聘要求</span>
+          <span class="section-title"
+            ><el-icon><Filter /></el-icon>招聘要求</span
+          >
         </el-divider>
         <el-form-item label="薪资区间" prop="salaryMin">
           <div class="salary-field">
@@ -399,12 +442,31 @@
                 :type="isSalaryQuickActive(q) ? 'primary' : 'info'"
                 :effect="isSalaryQuickActive(q) ? 'dark' : 'plain'"
                 @click="applySalaryQuick(q)"
-              >{{ q.label }}</el-tag>
+                >{{ q.label }}</el-tag
+              >
             </div>
             <div class="salary-inputs">
-              <el-input-number v-model="editForm.salaryMin" :min="0" :max="9999999" :precision="0" controls-position="right" placeholder="最低" style="width: 150px" @change="revalidateSalary" />
+              <el-input-number
+                v-model="editForm.salaryMin"
+                :min="0"
+                :max="9999999"
+                :precision="0"
+                controls-position="right"
+                placeholder="最低"
+                style="width: 150px"
+                @change="revalidateSalary"
+              />
               <span>至</span>
-              <el-input-number v-model="editForm.salaryMax" :min="0" :max="9999999" :precision="0" controls-position="right" placeholder="最高" style="width: 150px" @change="revalidateSalary" />
+              <el-input-number
+                v-model="editForm.salaryMax"
+                :min="0"
+                :max="9999999"
+                :precision="0"
+                controls-position="right"
+                placeholder="最高"
+                style="width: 150px"
+                @change="revalidateSalary"
+              />
               <el-select v-model="editForm.salaryUnit" style="width: 100px" @change="revalidateSalary">
                 <el-option label="元/月" value="1" />
                 <el-option label="元/天" value="0" />
@@ -446,11 +508,20 @@
                 :type="editForm.recruitNumber === n ? 'primary' : 'info'"
                 :effect="editForm.recruitNumber === n ? 'dark' : 'plain'"
                 @click="applyRecruitQuick(n)"
-              >{{ n }} 人</el-tag>
+                >{{ n }} 人</el-tag
+              >
             </div>
             <div class="recruit-input">
               <!-- 去上下箭头(:controls=false)防误触，:precision=0 限正整数 -->
-              <el-input-number v-model="editForm.recruitNumber" :min="1" :max="9999" :precision="0" :controls="false" style="width: 150px" @change="revalidateRecruit" />
+              <el-input-number
+                v-model="editForm.recruitNumber"
+                :min="1"
+                :max="9999"
+                :precision="0"
+                :controls="false"
+                style="width: 150px"
+                @change="revalidateRecruit"
+              />
               <span style="margin-left: 8px; color: #606266">人</span>
             </div>
           </div>
@@ -474,7 +545,9 @@
 
         <!-- 模块3：岗位详情 -->
         <el-divider content-position="left">
-          <span class="section-title"><el-icon><Tickets /></el-icon>岗位详情</span>
+          <span class="section-title"
+            ><el-icon><Tickets /></el-icon>岗位详情</span
+          >
         </el-divider>
         <el-form-item label="岗位描述" prop="description">
           <div class="desc-field">
@@ -499,16 +572,39 @@
           <div class="benefit-field">
             <!-- 快捷福利标签：点击把标签文字以「、」追加进纯文本框，不改变 benefits 的纯文本存储口径 -->
             <div class="benefit-quick">
-              <el-tag v-for="b in benefitQuickOptions" :key="b" class="benefit-quick-tag" type="success" effect="plain" @click="appendBenefit(b)">+ {{ b }}</el-tag>
+              <el-tag v-for="b in benefitQuickOptions" :key="b" class="benefit-quick-tag" type="success" effect="plain" @click="appendBenefit(b)"
+                >+ {{ b }}</el-tag
+              >
             </div>
-            <el-input v-model="editForm.benefits" type="textarea" :rows="3" placeholder="选填：如五险一金、餐补、年终奖、弹性工作等" maxlength="500" show-word-limit />
+            <el-input
+              v-model="editForm.benefits"
+              type="textarea"
+              :rows="3"
+              placeholder="选填：如五险一金、餐补、年终奖、弹性工作等"
+              maxlength="500"
+              show-word-limit
+            />
           </div>
         </el-form-item>
         <el-form-item label="团队介绍">
-          <el-input v-model="editForm.teamIntro" type="textarea" :rows="3" placeholder="选填：介绍团队规模、氛围、技术栈等" maxlength="500" show-word-limit />
+          <el-input
+            v-model="editForm.teamIntro"
+            type="textarea"
+            :rows="3"
+            placeholder="选填：介绍团队规模、氛围、技术栈等"
+            maxlength="500"
+            show-word-limit
+          />
         </el-form-item>
         <el-form-item label="附加条件">
-          <el-input v-model="editForm.additionalConditions" type="textarea" :rows="3" placeholder="选填：任职附加条件（如需自带工具、接受出差、持有相关证书等）" maxlength="500" show-word-limit />
+          <el-input
+            v-model="editForm.additionalConditions"
+            type="textarea"
+            :rows="3"
+            placeholder="选填：任职附加条件（如需自带工具、接受出差、持有相关证书等）"
+            maxlength="500"
+            show-word-limit
+          />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="editForm.remark" type="textarea" :rows="2" placeholder="运营备注（选填）" maxlength="200" show-word-limit />
@@ -517,7 +613,9 @@
         <!-- 内联审核：仅待审核(0)岗位展示。通过=上架(status 1)，驳回=独立驳回态(status 6，原因必填，将告知企业) -->
         <template v-if="editJobStatus === '0'">
           <el-divider content-position="left">
-            <span class="section-title"><el-icon><CircleCheck /></el-icon>岗位审核</span>
+            <span class="section-title"
+              ><el-icon><CircleCheck /></el-icon>岗位审核</span
+            >
           </el-divider>
           <el-form-item label="审核结果">
             <el-radio-group v-model="editAuditForm.status">
@@ -549,62 +647,68 @@
 
     <el-dialog v-model="handleSelectApplyUsersVisible" title="投递人员" width="85%" append-to-body>
       <!-- ========== 数据表格 ========== -->
-        <el-table  :data="SelectApplyUsertableData" border stripe>
-          <el-table-column label="投递ID" prop="applyId" width="200" align="center" />
-          <el-table-column label="求职者信息" min-width="160">
-            <template #default="{ row }">
-              <div class="user-cell">
-                <el-avatar :size="34" :src="row.avatarUrl || row.avatar" style="background: #2b7fff; flex-shrink: 0">
-                  {{ (row.userName || 'U').charAt(0) }}
-                </el-avatar>
-                <div class="user-detail">
-                  <div class="name">{{ row.userName || (row.userId ? '用户#' + row.userId : '未知用户') }}</div>
-                  <div class="phone">{{ displayPhone(row) }}</div>
-                </div>
+      <el-table :data="SelectApplyUsertableData" border stripe>
+        <el-table-column label="投递ID" prop="applyId" width="200" align="center" />
+        <el-table-column label="求职者信息" min-width="160">
+          <template #default="{ row }">
+            <div class="user-cell">
+              <el-avatar :size="34" :src="row.avatarUrl || row.avatar" style="background: #2b7fff; flex-shrink: 0">
+                {{ (row.userName || 'U').charAt(0) }}
+              </el-avatar>
+              <div class="user-detail">
+                <div class="name">{{ row.userName || (row.userId ? '用户#' + row.userId : '未知用户') }}</div>
+                <div class="phone">{{ displayPhone(row) }}</div>
               </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="岗位信息" min-width="150">
-            <template #default="{ row }">
-              <div class="job-cell">
-                <div class="job-name">{{ row.jobName || (row.jobId ? '岗位#' + row.jobId : '-') }}</div>
-                <div class="salary">{{ formatSalary(row.salaryMin, row.salaryMax, row.salaryUnit) }}</div>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="投递时间" prop="applyTime" width="160" align="center" />
-          <el-table-column label="状态" width="150" align="center">
-            <template #default="{ row }">
-              <el-tag v-if="row.status === '0'" :type="row.isRead === '0' ? 'warning' : 'info'" size="small">
-                {{ row.isRead === '0' ? '新投递' : '已投递' }}
-              </el-tag>
-              <el-tag v-else-if="row.status === '1'" type="primary" size="small">面试邀请</el-tag>
-              <el-tag v-else-if="row.status === '2'" type="success" size="small">已录用</el-tag>
-              <el-tag v-else type="danger" size="small">已拒绝</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="已读" width="150" align="center">
-            <template #default="{ row }">
-              <el-tag v-if="row.isRead === '1'" type="success" size="small">已读</el-tag>
-              <el-tag v-else type="warning" size="small">未读</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="联系方式" width="150" align="center">
-            <template #default="{ row }">
-              <el-tag v-if="row.exchangeStatus === 'accepted' || row.exchangeStatus === 'exchanged'" type="success" size="small">已交换</el-tag>
-              <span v-else class="text-muted">-</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="80" fixed="right" align="center">
-            <template #default="{ row }">
-              <div style="display: flex; align-items: center; justify-content: center; gap: 8px">
-                <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
-              </div>
-            </template>
-          </el-table-column>
-        </el-table>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="岗位信息" min-width="150">
+          <template #default="{ row }">
+            <div class="job-cell">
+              <div class="job-name">{{ row.jobName || (row.jobId ? '岗位#' + row.jobId : '-') }}</div>
+              <div class="salary">{{ formatSalary(row.salaryMin, row.salaryMax, row.salaryUnit) }}</div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="投递时间" prop="applyTime" width="160" align="center" />
+        <el-table-column label="状态" width="150" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.status === '0'" :type="row.isRead === '0' ? 'warning' : 'info'" size="small">
+              {{ row.isRead === '0' ? '新投递' : '已投递' }}
+            </el-tag>
+            <el-tag v-else-if="row.status === '1'" type="primary" size="small">面试邀请</el-tag>
+            <el-tag v-else-if="row.status === '2'" type="success" size="small">已录用</el-tag>
+            <el-tag v-else type="danger" size="small">已拒绝</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="已读" width="150" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.isRead === '1'" type="success" size="small">已读</el-tag>
+            <el-tag v-else type="warning" size="small">未读</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="联系方式" width="150" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.exchangeStatus === 'accepted' || row.exchangeStatus === 'exchanged'" type="success" size="small">已交换</el-tag>
+            <span v-else class="text-muted">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="80" fixed="right" align="center">
+          <template #default="{ row }">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 8px">
+              <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
       <template #footer>
-        <pagination v-show="total1 > 0" v-model:page="queryParams1.pageNum" v-model:limit="queryParams1.pageSize" :total="total1" @pagination="loadData1" />
+        <pagination
+          v-show="total1 > 0"
+          v-model:page="queryParams1.pageNum"
+          v-model:limit="queryParams1.pageSize"
+          :total="total1"
+          @pagination="loadData1"
+        />
       </template>
     </el-dialog>
   </div>
@@ -623,7 +727,8 @@ import {
   delJob,
   updateJob,
   refreshJobRecommendCache,
-  listApply2, listApply
+  listApply2,
+  listApply
 } from '@/api/recruitment';
 import type { JobFullVO } from '@/api/recruitment';
 import { download } from '@/utils/request';
@@ -658,16 +763,18 @@ const workTimeList = computed<string[]>(() => {
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [String(raw)];
-    return parsed.map((it: any) => {
-      if (it == null) return '';
-      if (typeof it === 'string') return it;
-      const day = it.day ?? it.week ?? it.date ?? it.label ?? '';
-      const start = it.start ?? it.startTime ?? it.from ?? '';
-      const end = it.end ?? it.endTime ?? it.to ?? '';
-      const range = start || end ? `${start}${start && end ? '-' : ''}${end}` : '';
-      const text = `${day}${day && range ? ' ' : ''}${range}`.trim();
-      return text || JSON.stringify(it);
-    }).filter(Boolean);
+    return parsed
+      .map((it: any) => {
+        if (it == null) return '';
+        if (typeof it === 'string') return it;
+        const day = it.day ?? it.week ?? it.date ?? it.label ?? '';
+        const start = it.start ?? it.startTime ?? it.from ?? '';
+        const end = it.end ?? it.endTime ?? it.to ?? '';
+        const range = start || end ? `${start}${start && end ? '-' : ''}${end}` : '';
+        const text = `${day}${day && range ? ' ' : ''}${range}`.trim();
+        return text || JSON.stringify(it);
+      })
+      .filter(Boolean);
   } catch {
     // 非合法 JSON 时原样展示，避免详情空白
     return [String(raw)];
@@ -681,7 +788,7 @@ const benefitsList = computed<string[]>(() => {
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.map((it: any) => (typeof it === 'string' ? it : it?.label ?? it?.name ?? JSON.stringify(it))).filter(Boolean);
+      return parsed.map((it: any) => (typeof it === 'string' ? it : (it?.label ?? it?.name ?? JSON.stringify(it)))).filter(Boolean);
     }
     return [String(parsed)];
   } catch {
@@ -963,7 +1070,10 @@ const benefitQuickOptions = ['五险一金', '双休', '年终奖', '弹性工�
 function appendBenefit(b: string) {
   const cur = (editForm.benefits || '').trim();
   // 已含该福利（按中英文逗号/顿号切分判断）则不重复追加
-  const exists = cur.split(/[、,，]/).map((s) => s.trim()).includes(b);
+  const exists = cur
+    .split(/[、,，]/)
+    .map((s) => s.trim())
+    .includes(b);
   if (exists) return;
   editForm.benefits = cur ? `${cur}、${b}` : b;
 }
@@ -1206,8 +1316,7 @@ async function loadData1() {
       // 后端按错误ID过滤导致列表恒空（后端 @RequestParam Long 会自行解析字符串）
       jobId: queryParams1.jobId ? String(queryParams1.jobId) : undefined
     };
-    let res: any;
-    res = await listApply(params);
+    const res: any = await listApply(params);
 
     const list = unwrapList(res);
     SelectApplyUsertableData.value = list.rows;
@@ -1321,8 +1430,8 @@ function handleAudit(row: any, status: string) {
 }
 
 // 从岗位行进入投递人员弹窗：只透传雪花 jobId 字符串，避免大整数精度丢失。
-function handleSelectApplyUsers(row: any){
-  handleSelectApplyUsersVisible.value=true;
+function handleSelectApplyUsers(row: any) {
+  handleSelectApplyUsersVisible.value = true;
   queryParams1.jobId = row.jobId;
   loadData1();
 }
@@ -1428,7 +1537,9 @@ function formatStartDate(val?: string | number): string {
 
 .stat-clickable {
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .stat-clickable:hover {
@@ -1519,11 +1630,11 @@ function formatStartDate(val?: string | number): string {
 }
 
 .stat-mini .value.warning {
-  color: #E6A23C;
+  color: #e6a23c;
 }
 
 .stat-mini .value.success {
-  color: #67C23A;
+  color: #67c23a;
 }
 
 .stat-mini .value.info {
@@ -1546,7 +1657,7 @@ function formatStartDate(val?: string | number): string {
 }
 
 .job-salary {
-  color: #F56C6C;
+  color: #f56c6c;
   font-weight: 600;
   margin-top: 4px;
 }

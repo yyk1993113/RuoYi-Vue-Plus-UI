@@ -82,8 +82,8 @@ import notice from './notice/index.vue';
 import router from '@/router';
 import { ElMessageBoxOptions } from 'element-plus/es/components/message-box/src/message-box.type';
 import { NavTypeEnum } from '@/enums/NavTypeEnum';
-import Logo from "@/layout/components/Sidebar/Logo.vue";
-import TopBar from './TopBar'
+import Logo from '@/layout/components/Sidebar/Logo.vue';
+import TopBar from './TopBar';
 
 const appStore = useAppStore();
 const userStore = useUserStore();
@@ -258,7 +258,6 @@ watch(
     overflow: hidden;
     margin-left: 8px;
   }
-
 
   .errLog-container {
     display: inline-block;

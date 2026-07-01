@@ -84,7 +84,7 @@
         <el-table-column label="绑定台账" min-width="150" align="center">
           <template #default="{ row }">
             <div v-if="row.ledgerId">
-              <div>{{ row.ledgerOrderNo || ('台账#' + row.ledgerId) }}</div>
+              <div>{{ row.ledgerOrderNo || '台账#' + row.ledgerId }}</div>
               <el-button link type="primary" size="small" @click="handleBindOpen(row)">改绑</el-button>
             </div>
             <el-button v-else link type="primary" @click="handleBindOpen(row)">绑定台账</el-button>
@@ -109,11 +109,13 @@
         <el-table-column label="上传时间" prop="createTime" width="160" align="center" />
         <el-table-column label="操作" width="180" fixed="right" align="center">
           <template #default="{ row }">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 8px">
               <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
               <el-dropdown v-if="row.status === '0'" trigger="click">
                 <span class="el-dropdown-link">
-                  <el-button link type="primary">更多<el-icon class="el-icon--right"><arrow-down /></el-icon></el-button>
+                  <el-button link type="primary"
+                    >更多<el-icon class="el-icon--right"><arrow-down /></el-icon
+                  ></el-button>
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
@@ -127,13 +129,7 @@
         </el-table-column>
       </el-table>
 
-      <pagination
-        v-show="total > 0"
-        v-model:page="queryParams.pageNum"
-        v-model:limit="queryParams.pageSize"
-        :total="total"
-        @pagination="loadData"
-      />
+      <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="loadData" />
     </el-card>
 
     <!-- 发票详情对话框：详情走 getInvoice(/admin/recruitment/invoice/{id})，含企业名/备注等 -->

@@ -3,7 +3,15 @@
     <!-- 统计卡片 -->
     <el-row :gutter="20" class="mb-4">
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card stat-clickable" role="button" tabindex="0" @click="handleStatFilter('all')" @keyup.enter="handleStatFilter('all')" @keyup.space="handleStatFilter('all')">
+        <el-card
+          shadow="hover"
+          class="stat-mini-card stat-clickable"
+          role="button"
+          tabindex="0"
+          @click="handleStatFilter('all')"
+          @keyup.enter="handleStatFilter('all')"
+          @keyup.space="handleStatFilter('all')"
+        >
           <div class="stat-mini">
             <span class="label">企业总数</span>
             <span class="value">{{ statistics.totalCount || 0 }}</span>
@@ -11,7 +19,15 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card stat-clickable warning" role="button" tabindex="0" @click="handleStatFilter('pending')" @keyup.enter="handleStatFilter('pending')" @keyup.space="handleStatFilter('pending')">
+        <el-card
+          shadow="hover"
+          class="stat-mini-card stat-clickable warning"
+          role="button"
+          tabindex="0"
+          @click="handleStatFilter('pending')"
+          @keyup.enter="handleStatFilter('pending')"
+          @keyup.space="handleStatFilter('pending')"
+        >
           <div class="stat-mini">
             <span class="label">待审核</span>
             <span class="value warning">{{ statistics.pendingCount || 0 }}</span>
@@ -19,7 +35,15 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card stat-clickable success" role="button" tabindex="0" @click="handleStatFilter('approved')" @keyup.enter="handleStatFilter('approved')" @keyup.space="handleStatFilter('approved')">
+        <el-card
+          shadow="hover"
+          class="stat-mini-card stat-clickable success"
+          role="button"
+          tabindex="0"
+          @click="handleStatFilter('approved')"
+          @keyup.enter="handleStatFilter('approved')"
+          @keyup.space="handleStatFilter('approved')"
+        >
           <div class="stat-mini">
             <span class="label">已认证</span>
             <span class="value success">{{ statistics.approvedCount || 0 }}</span>
@@ -27,7 +51,15 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card stat-clickable danger" role="button" tabindex="0" @click="handleStatFilter('disabled')" @keyup.enter="handleStatFilter('disabled')" @keyup.space="handleStatFilter('disabled')">
+        <el-card
+          shadow="hover"
+          class="stat-mini-card stat-clickable danger"
+          role="button"
+          tabindex="0"
+          @click="handleStatFilter('disabled')"
+          @keyup.enter="handleStatFilter('disabled')"
+          @keyup.space="handleStatFilter('disabled')"
+        >
           <div class="stat-mini">
             <span class="label">已禁用</span>
             <span class="value danger">{{ statistics.disabledCount || 0 }}</span>
@@ -39,7 +71,15 @@
     <!-- 禁言统计（独立一行） -->
     <el-row :gutter="20" class="mb-4">
       <el-col :span="6">
-        <el-card shadow="hover" class="stat-mini-card stat-clickable danger" role="button" tabindex="0" @click="handleStatFilter('silenced')" @keyup.enter="handleStatFilter('silenced')" @keyup.space="handleStatFilter('silenced')">
+        <el-card
+          shadow="hover"
+          class="stat-mini-card stat-clickable danger"
+          role="button"
+          tabindex="0"
+          @click="handleStatFilter('silenced')"
+          @keyup.enter="handleStatFilter('silenced')"
+          @keyup.space="handleStatFilter('silenced')"
+        >
           <div class="stat-mini">
             <span class="label">被禁言企业</span>
             <span class="value danger">{{ statistics.silencedCount || 0 }}</span>
@@ -80,16 +120,44 @@
           </el-select>
         </el-form-item>
         <el-form-item v-show="showMoreQuery" label="职位数" prop="jobCount">
-          <el-input-number v-model="queryParams.jobCount" :min="0" :precision="0" controls-position="right" placeholder="职位数" style="width: 130px" />
+          <el-input-number
+            v-model="queryParams.jobCount"
+            :min="0"
+            :precision="0"
+            controls-position="right"
+            placeholder="职位数"
+            style="width: 130px"
+          />
         </el-form-item>
         <el-form-item v-show="showMoreQuery" label="投递数" prop="applyCount">
-          <el-input-number v-model="queryParams.applyCount" :min="0" :precision="0" controls-position="right" placeholder="投递数" style="width: 130px" />
+          <el-input-number
+            v-model="queryParams.applyCount"
+            :min="0"
+            :precision="0"
+            controls-position="right"
+            placeholder="投递数"
+            style="width: 130px"
+          />
         </el-form-item>
         <el-form-item v-show="showMoreQuery" label="已反馈" prop="feedbackCount">
-          <el-input-number v-model="queryParams.feedbackCount" :min="0" :precision="0" controls-position="right" placeholder="已反馈" style="width: 130px" />
+          <el-input-number
+            v-model="queryParams.feedbackCount"
+            :min="0"
+            :precision="0"
+            controls-position="right"
+            placeholder="已反馈"
+            style="width: 130px"
+          />
         </el-form-item>
         <el-form-item v-show="showMoreQuery" label="未反馈" prop="noFeedbackCount">
-          <el-input-number v-model="queryParams.noFeedbackCount" :min="0" :precision="0" controls-position="right" placeholder="未反馈" style="width: 130px" />
+          <el-input-number
+            v-model="queryParams.noFeedbackCount"
+            :min="0"
+            :precision="0"
+            controls-position="right"
+            placeholder="未反馈"
+            style="width: 130px"
+          />
         </el-form-item>
         <el-form-item v-show="showMoreQuery" label="注册时间">
           <el-date-picker
@@ -137,7 +205,7 @@
           <template #default="{ row }">
             <div class="company-info">
               <el-avatar v-if="row.logoUrl" :src="row.logoUrl" :size="40" />
-              <el-avatar v-else :size="40" style="background: #409EFF">
+              <el-avatar v-else :size="40" style="background: #409eff">
                 {{ row.companyName?.charAt(0) }}
               </el-avatar>
               <div class="company-detail">
@@ -191,12 +259,14 @@
         <el-table-column label="注册时间" prop="createTime" width="160" align="center" />
         <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 8px">
               <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
               <el-button link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
               <el-dropdown trigger="click">
                 <span class="el-dropdown-link">
-                  <el-button link type="primary">管理<el-icon class="el-icon--right"><arrow-down /></el-icon></el-button>
+                  <el-button link type="primary"
+                    >管理<el-icon class="el-icon--right"><arrow-down /></el-icon
+                  ></el-button>
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
@@ -220,13 +290,7 @@
         </el-table-column>
       </el-table>
 
-      <pagination
-        v-show="total > 0"
-        v-model:page="queryParams.pageNum"
-        v-model:limit="queryParams.pageSize"
-        :total="total"
-        @pagination="loadData"
-      />
+      <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="loadData" />
     </el-card>
 
     <!-- 企业详情对话框：主体信息 + 资质图片 + 历史审核记录 -->
@@ -261,7 +325,7 @@
           <el-descriptions-item label="备注/审核意见" :span="2">{{ currentCompany.remark || '无' }}</el-descriptions-item>
         </el-descriptions>
 
-        <!-- 资质材料：图片材料可预览，招聘授权书为 .docx 文档，仅提供打开/下载。 -->
+        <!-- 资质材料：图片可预览；招聘授权书支持图片预览或 PDF 打开。 -->
         <div class="section-title">资质材料</div>
         <div v-loading="certLoading" class="cert-images">
           <div v-for="group in certGroups" :key="group.label" class="cert-item">
@@ -279,7 +343,7 @@
                 />
                 <div v-else class="cert-doc-card">
                   <el-icon><Document /></el-icon>
-                  <span>{{ file.name || '招聘授权书.docx' }}</span>
+                  <span>{{ file.name || '招聘授权书.pdf' }}</span>
                   <el-button link type="primary" @click="openUrl(file.url)">打开</el-button>
                 </div>
               </template>
@@ -333,7 +397,7 @@
                 <el-descriptions-item label="办公地址" :span="2">{{ cert.officeAddress || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="审核意见" :span="2">{{ cert.auditRemark || '-' }}</el-descriptions-item>
               </el-descriptions>
-              <!-- 认证材料：图片材料可预览；招聘授权书按 .docx 文档下载查看。 -->
+              <!-- 认证材料：图片可预览；招聘授权书支持图片预览或 PDF 打开。 -->
               <div class="cert-images cert-images-wrap">
                 <div v-for="group in certImageList(cert)" :key="group.label" class="cert-item">
                   <div class="cert-label">{{ group.label }}</div>
@@ -353,16 +417,28 @@
                 <div v-if="certAuthLetterFiles(cert).length" class="cert-item">
                   <div class="cert-label">招聘授权书</div>
                   <div class="cert-img-row">
-                    <div v-for="file in certAuthLetterFiles(cert)" :key="file.ossId || file.url" class="cert-doc-card cert-doc-card-sm">
-                      <el-icon><Document /></el-icon>
-                      <span>{{ file.name || '招聘授权书.docx' }}</span>
-                      <el-button link type="primary" @click="openUrl(file.url)">打开</el-button>
-                    </div>
+                    <template v-for="file in certAuthLetterFiles(cert)" :key="file.ossId || file.url">
+                      <el-image
+                        v-if="file.kind === 'image'"
+                        :src="file.url"
+                        :preview-src-list="
+                          certAuthLetterFiles(cert)
+                            .filter((f) => f.kind === 'image')
+                            .map((f) => f.url)
+                        "
+                        :preview-teleported="true"
+                        fit="cover"
+                        class="cert-img cert-img-sm"
+                      />
+                      <div v-else class="cert-doc-card cert-doc-card-sm">
+                        <el-icon><Document /></el-icon>
+                        <span>{{ file.name || '招聘授权书.pdf' }}</span>
+                        <el-button link type="primary" @click="openUrl(file.url)">打开</el-button>
+                      </div>
+                    </template>
                   </div>
                 </div>
-                <div v-if="certImageList(cert).length === 0 && certAuthLetterFiles(cert).length === 0" class="cert-empty">
-                  未上传认证材料
-                </div>
+                <div v-if="certImageList(cert).length === 0 && certAuthLetterFiles(cert).length === 0" class="cert-empty">未上传认证材料</div>
               </div>
             </el-card>
           </el-tab-pane>
@@ -383,7 +459,7 @@
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="公司全称" prop="companyName">
-                <el-input v-model="form.companyName" placeholder="与营业执照一致" maxlength="20" ></el-input>
+                <el-input v-model="form.companyName" placeholder="与营业执照一致" maxlength="20"></el-input>
               </el-form-item>
             </el-col>
             <el-col :span="12">
@@ -400,8 +476,12 @@
             </el-col>
             <el-col :span="12">
               <el-form-item label="法人电话" prop="contactPhone">
-                <el-input v-model="form.contactPhone" placeholder="法定代表人电话"  maxlength="11"
-                          @input="form.contactPhone = form.contactPhone.replace(/[^\d]/g, '')"></el-input>
+                <el-input
+                  v-model="form.contactPhone"
+                  placeholder="法定代表人电话"
+                  maxlength="11"
+                  @input="form.contactPhone = form.contactPhone.replace(/[^\d]/g, '')"
+                ></el-input>
               </el-form-item>
             </el-col>
           </el-row>
@@ -409,28 +489,46 @@
             <el-col :span="12">
               <!-- 超管手机号：企业超级管理员账号的登录手机号；不填时后端回退用法人电话开通账号 -->
               <el-form-item label="超管手机号" prop="adminPhone">
-                <el-input v-model="form.adminPhone" placeholder="企业超级管理员手机号，空则用法人电话" maxlength="11"
-                          @input="form.adminPhone = (form.adminPhone || '').replace(/[^\d]/g, '')"></el-input>
+                <el-input
+                  v-model="form.adminPhone"
+                  placeholder="企业超级管理员手机号，空则用法人电话"
+                  maxlength="11"
+                  @input="form.adminPhone = (form.adminPhone || '').replace(/[^\d]/g, '')"
+                ></el-input>
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="24">
               <el-form-item label="注册地址" prop="registeredAddress">
-                <el-input type="textarea" show-word-limit  :autosize="{ minRows: 3, maxRows: 6 }" v-model="form.registeredAddress" placeholder="企业注册登记地址" maxlength="150"></el-input>
+                <el-input
+                  type="textarea"
+                  show-word-limit
+                  :autosize="{ minRows: 3, maxRows: 6 }"
+                  v-model="form.registeredAddress"
+                  placeholder="企业注册登记地址"
+                  maxlength="150"
+                ></el-input>
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="24">
               <el-form-item label="办公地址" prop="creditCode">
-                <el-input type="textarea" show-word-limit  :autosize="{ minRows: 3, maxRows: 6 }" v-model="form.companyAddress" placeholder="与注册地址不符时填写" maxlength="150"></el-input>
+                <el-input
+                  type="textarea"
+                  show-word-limit
+                  :autosize="{ minRows: 3, maxRows: 6 }"
+                  v-model="form.companyAddress"
+                  placeholder="与注册地址不符时填写"
+                  maxlength="150"
+                ></el-input>
               </el-form-item>
             </el-col>
           </el-row>
         </div>
 
-        <!-- 资质材料：图片用 imageUpload，招聘授权书必须用 .docx 文件上传。 -->
+        <!-- 资质材料：普通材料用 imageUpload；招聘授权书允许 PDF 或图片单文件。 -->
         <div class="section-title">资质材料</div>
         <div class="edit-block">
           <el-row :gutter="20">
@@ -441,19 +539,19 @@
             </el-col>
             <el-col :span="12">
               <el-form-item label="法人身份证附件">
-                <imageUpload v-model="form.idCardPhotoIds" :limit="2" @update:modelValue="handleOssIdCarPhotoChange"/>
+                <imageUpload v-model="form.idCardPhotoIds" :limit="2" @update:modelValue="handleOssIdCarPhotoChange" />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="对公账户凭证">
-                <imageUpload v-model="form.bankAccountIds" :limit="1" @update:modelValue="handleOssBankAccountIdsChange"/>
+                <imageUpload v-model="form.bankAccountIds" :limit="1" @update:modelValue="handleOssBankAccountIdsChange" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="办公场地实景">
-                <imageUpload v-model="form.companyAddressIds" @update:modelValue="handleOssCompanyAddressIdsChange"/>
+                <imageUpload v-model="form.companyAddressIds" @update:modelValue="handleOssCompanyAddressIdsChange" />
               </el-form-item>
             </el-col>
           </el-row>
@@ -469,7 +567,7 @@
                   v-model="form.recruitmentAuthorizationIds"
                   :limit="1"
                   :file-size="10"
-                  :file-type="['docx']"
+                  :file-type="['pdf', 'jpg', 'jpeg', 'png', 'bmp', 'webp', 'gif']"
                   upload-url="/api/company/upload"
                   @update:modelValue="handleOssRecruitmentAuthorizationIdsChange"
                 />
@@ -486,7 +584,8 @@
           :loading="editSubmitting === 'save'"
           :disabled="!!editSubmitting && editSubmitting !== 'save'"
           @click="handleSave"
-        >保存</el-button>
+          >保存</el-button
+        >
         <!-- 存草稿仅限"新增（尚无状态）/ 草稿(4)"：已进入审核流（待审核/已认证/驳回）的企业不允许再回退为草稿 -->
         <el-button
           v-if="!form.status || form.status === '4'"
@@ -494,27 +593,19 @@
           :loading="editSubmitting === 'draft'"
           :disabled="!!editSubmitting && editSubmitting !== 'draft'"
           @click="handleDraft"
-        >存草稿</el-button>
+          >存草稿</el-button
+        >
         <el-button
           v-if="form.status !== '1'"
           type="primary"
           :loading="editSubmitting === 'submit'"
           :disabled="!!editSubmitting && editSubmitting !== 'submit'"
           @click="submit"
-        >提交</el-button>
+          >提交</el-button
+        >
         <!-- 待审核(0)：运营可在编辑弹窗内直接发起审核，复用「企业审核」对话框（通过/驳回），不改保存/提交逻辑 -->
-        <el-button
-          v-if="form.status === '0'"
-          type="success"
-          :disabled="!!editSubmitting"
-          @click="handleAuditFromEdit('1')"
-        >审核通过</el-button>
-        <el-button
-          v-if="form.status === '0'"
-          type="danger"
-          :disabled="!!editSubmitting"
-          @click="handleAuditFromEdit('2')"
-        >审核拒绝</el-button>
+        <el-button v-if="form.status === '0'" type="success" :disabled="!!editSubmitting" @click="handleAuditFromEdit('1')">审核通过</el-button>
+        <el-button v-if="form.status === '0'" type="danger" :disabled="!!editSubmitting" @click="handleAuditFromEdit('2')">审核拒绝</el-button>
         <el-button :disabled="!!editSubmitting" @click="editVisible = false">取消</el-button>
       </template>
     </el-dialog>
@@ -736,7 +827,7 @@ const jobList = ref<JobVO[]>([]);
 const jobTotal = ref(0);
 const jobQuery = reactive({ pageNum: 1, pageSize: 10, companyId: undefined as number | undefined });
 
-// 详情弹窗「资质材料」：company 表存 OSS id；图片可预览，授权书按 .docx 文档打开。
+// 详情弹窗「资质材料」：company 表存 OSS id；授权书按后缀区分图片预览或 PDF 文档打开。
 const certLoading = ref(false);
 const certGroups = ref<{ label: string; files: CertMaterialFile[] }[]>([]);
 
@@ -760,10 +851,8 @@ const showMoreQuery = ref(false);
 const form = ref<Partial<UserForm>>({});
 
 const rules = reactive({
-  companyName: [
-    { required: true, message: '请输入公司全称', trigger: 'blur' }
-  ],
-  socialCreditCode:[
+  companyName: [{ required: true, message: '请输入公司全称', trigger: 'blur' }],
+  socialCreditCode: [
     { required: true, message: '请输入信用代码', trigger: 'blur' },
     { pattern: /^[0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10}$/, message: '请输入正确的18位统一社会信用代码', trigger: 'blur' }
   ],
@@ -771,12 +860,8 @@ const rules = reactive({
     { required: true, message: '请输入法定代表人电话', trigger: 'blur' },
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的11位手机号', trigger: 'blur' }
   ],
-  contactPerson:[
-    { required: true, message: '请输入法人姓名', trigger: 'blur' },
-  ],
-  registeredAddress:[
-    { required: true, message: '请输入注册地址', trigger: 'blur' }
-  ],
+  contactPerson: [{ required: true, message: '请输入法人姓名', trigger: 'blur' }],
+  registeredAddress: [{ required: true, message: '请输入注册地址', trigger: 'blur' }],
   // 超管手机号：选填；填了必须是 11 位手机号（空值放行，不能直接用 pattern——async-validator 对空串也会跑 pattern）
   adminPhone: [
     {
@@ -790,7 +875,7 @@ const rules = reactive({
       trigger: 'blur'
     }
   ]
-})
+});
 
 // 审核提交中标志，防止重复提交（通过/驳回均复用）
 const auditSubmitting = ref(false);
@@ -818,7 +903,7 @@ const queryParams = reactive({
   jobCount: undefined as number | undefined,
   applyCount: undefined as number | undefined,
   feedbackCount: undefined as number | undefined,
-  noFeedbackCount: undefined as number | undefined,
+  noFeedbackCount: undefined as number | undefined
 });
 
 const statistics = reactive({
@@ -826,14 +911,14 @@ const statistics = reactive({
   pendingCount: 0,
   approvedCount: 0,
   disabledCount: 0,
-  silencedCount: 0,
+  silencedCount: 0
 });
 
 const auditForm = reactive({
   companyId: 0,
   companyName: '',
   status: '1',
-  remark: '',
+  remark: ''
 });
 
 // 审核校验：驳回时原因必填（status==='2' 才校验 remark），通过时备注选填。
@@ -848,15 +933,15 @@ const auditRules = reactive<FormRules>({
           callback();
         }
       },
-      trigger: 'blur',
-    },
-  ],
+      trigger: 'blur'
+    }
+  ]
 });
 
 const silenceForm = reactive({
   companyId: 0,
   companyName: '',
-  reason: '',
+  reason: ''
 });
 
 async function loadData() {
@@ -927,7 +1012,26 @@ function resetQuery() {
 }
 
 // 解析企业资质材料：company 表各字段存 OSS id（个别历史数据可能直接是 URL）。
-// 授权书是 .docx 文档，必须保留文件元数据供下载卡片展示。
+const AUTH_LETTER_IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'bmp', 'webp', 'gif'];
+
+function fileExt(source?: string) {
+  const raw = (
+    String(source || '')
+      .split('?')[0]
+      .split('#')[0]
+      .split('/')
+      .pop() || ''
+  ).replace(/^\./, '');
+  const parts = raw.split('.');
+  return (parts.length > 1 ? parts.pop() : raw).toLowerCase();
+}
+
+function authLetterKind(oss: any, url?: string): 'image' | 'doc' {
+  const ext = fileExt(oss?.fileSuffix || oss?.originalName || url || '');
+  return AUTH_LETTER_IMAGE_EXTS.includes(ext) ? 'image' : 'doc';
+}
+
+// 授权书允许 PDF 或图片，必须保留文件元数据供下载卡片/图片预览判断。
 async function loadCompanyCertImages(company: any) {
   const isOssId = (t: string) => /^\d+$/.test(t); // 纯数字视为 OSS id，其余（含 http/相对路径）按 URL 直用
   const fields = [
@@ -943,32 +1047,45 @@ async function loadCompanyCertImages(company: any) {
   try {
     // 收集所有需要解析的 OSS id（去重），一次性查回 URL
     const idSet = new Set<string>();
-    fields.forEach((f) => splitToArray(f.value).forEach((t) => { if (isOssId(t)) idSet.add(t); }));
+    fields.forEach((f) =>
+      splitToArray(f.value).forEach((t) => {
+        if (isOssId(t)) idSet.add(t);
+      })
+    );
     const fileMap: Record<string, any> = {};
     if (idSet.size > 0) {
       const res = await listByIds(Array.from(idSet).join(','));
-      (res.data || []).forEach((o: any) => { fileMap[String(o.ossId)] = o; });
+      (res.data || []).forEach((o: any) => {
+        fileMap[String(o.ossId)] = o;
+      });
     }
     certGroups.value = fields.map((f) => ({
       label: f.label,
-      files: splitToArray(f.value).map((t) => {
-        const oss = isOssId(t) ? fileMap[t] : null;
-        const url = oss ? oss.url : t;
-        if (!url) return null;
-        return {
-          kind: f.kind,
-          url,
-          name: oss?.originalName,
-          ossId: oss ? String(oss.ossId) : undefined,
-          suffix: oss?.fileSuffix
-        } as CertMaterialFile;
-      }).filter(Boolean) as CertMaterialFile[]
+      files: splitToArray(f.value)
+        .map((t) => {
+          const oss = isOssId(t) ? fileMap[t] : null;
+          const url = oss ? oss.url : t;
+          if (!url) return null;
+          return {
+            kind: f.label === '招聘授权书' ? authLetterKind(oss, url) : f.kind,
+            url,
+            name: oss?.originalName,
+            ossId: oss ? String(oss.ossId) : undefined,
+            suffix: oss?.fileSuffix
+          } as CertMaterialFile;
+        })
+        .filter(Boolean) as CertMaterialFile[]
     }));
   } catch (e) {
     // 解析失败时退化为按原始值展示，避免整块空白
     certGroups.value = fields.map((f) => ({
       label: f.label,
-      files: splitToArray(f.value).filter(Boolean).map((url) => ({ kind: f.kind, url }))
+      files: splitToArray(f.value)
+        .filter(Boolean)
+        .map((url) => ({
+          kind: f.label === '招聘授权书' ? authLetterKind(null, url) : f.kind,
+          url
+        }))
     }));
   } finally {
     certLoading.value = false;
@@ -1021,29 +1138,37 @@ async function hydrateCertHistoryFiles() {
   const materialFields = ['businessLicense', 'legalPersonIdFront', 'legalPersonIdBack', 'bankAccountProof', 'authLetter', 'officePhotos'];
   const idSet = new Set<string>();
   certs.forEach((cert: any) => {
-    materialFields.forEach((field) => splitToArray(cert[field]).forEach((t) => { if (isOssId(t)) idSet.add(t); }));
+    materialFields.forEach((field) =>
+      splitToArray(cert[field]).forEach((t) => {
+        if (isOssId(t)) idSet.add(t);
+      })
+    );
   });
   if (idSet.size === 0) return;
   const res = await listByIds(Array.from(idSet).join(','));
   const fileMap: Record<string, any> = {};
-  (res.data || []).forEach((file: any) => { fileMap[String(file.ossId)] = file; });
+  (res.data || []).forEach((file: any) => {
+    fileMap[String(file.ossId)] = file;
+  });
   certs.forEach((cert: any) => {
     const rawAuthLetter = cert.authLetter;
     materialFields.forEach((field) => {
-      cert[field] = splitToArray(cert[field]).map((t) => (isOssId(t) ? fileMap[t]?.url : t)).filter(Boolean).join(',');
+      cert[field] = splitToArray(cert[field])
+        .map((t) => (isOssId(t) ? fileMap[t]?.url : t))
+        .filter(Boolean)
+        .join(',');
     });
-    cert.authLetterFiles = splitToArray(cert.authLetter)
-      .map((url, index) => {
-        const raw = splitToArray(rawAuthLetter).at(index);
-        const oss = raw && isOssId(raw) ? fileMap[raw] : null;
-        return {
-          kind: 'doc',
-          url,
-          name: oss?.originalName || '招聘授权书.docx',
-          ossId: oss ? String(oss.ossId) : undefined,
-          suffix: oss?.fileSuffix
-        } as CertMaterialFile;
-      });
+    cert.authLetterFiles = splitToArray(cert.authLetter).map((url, index) => {
+      const raw = splitToArray(rawAuthLetter).at(index);
+      const oss = raw && isOssId(raw) ? fileMap[raw] : null;
+      return {
+        kind: authLetterKind(oss, url),
+        url,
+        name: oss?.originalName || '招聘授权书.pdf',
+        ossId: oss ? String(oss.ossId) : undefined,
+        suffix: oss?.fileSuffix
+      } as CertMaterialFile;
+    });
   });
 }
 
@@ -1082,9 +1207,9 @@ function certAuthLetterFiles(cert: CompanyCertVO): CertMaterialFile[] {
   const files = (cert as any).authLetterFiles as CertMaterialFile[] | undefined;
   if (files?.length) return files;
   return splitToArray(cert.authLetter).map((url) => ({
-    kind: 'doc',
+    kind: authLetterKind(null, url),
     url,
-    name: '招聘授权书.docx'
+    name: '招聘授权书.pdf'
   }));
 }
 
@@ -1148,7 +1273,7 @@ async function handleStatusChange(row: any, status: string) {
     await ElMessageBox.confirm(`确定要${action}该企业吗？`, '提示', {
       confirmButtonText: '确认',
       cancelButtonText: '取消',
-      type: 'warning',
+      type: 'warning'
     });
     await changeCompanyStatus({ companyId: row.companyId, status });
     ElMessage.success(`${action}成功`);
@@ -1268,7 +1393,7 @@ async function handleUnsilence(row: any) {
     await ElMessageBox.confirm('确定要取消该企业的禁言状态吗？取消后该企业可正常发布职位。', '提示', {
       confirmButtonText: '确认',
       cancelButtonText: '取消',
-      type: 'warning',
+      type: 'warning'
     });
     await unsilenceCompany({ companyId: row.companyId });
     ElMessage.success('已取消禁言');
@@ -1306,7 +1431,7 @@ async function handleBatchDelete() {
     await ElMessageBox.confirm(`是否删除选中企业？`, '提示', {
       confirmButtonText: '确认',
       cancelButtonText: '取消',
-      type: 'warning',
+      type: 'warning'
     });
     await delCompany(selectedIds.value);
     ElMessage.success('删除成功');
@@ -1322,7 +1447,7 @@ async function handleBatchDelete() {
 
 //新增
 
-function add(){
+function add() {
   editVisible.value = true;
   form.value = {
     companyName: '',
@@ -1337,7 +1462,7 @@ function add(){
     bankAccountIds: '',
     companyAddressIds: '',
     recruitmentAuthorizationIds: '',
-    logoUrl:''
+    logoUrl: ''
   };
 }
 /** 提交按钮：完整校验通过后置为「待审核」(status=0)，进入运营审核队列。 */
@@ -1362,7 +1487,7 @@ const submit = async () => {
       editSubmitting.value = '';
     }
   });
-}
+};
 
 /**
  * 存草稿按钮：把当前填写的内容以「草稿」(status=4)落库，允许信息不完整 —— 不做必填校验，
@@ -1381,7 +1506,7 @@ const handleDraft = async () => {
   } finally {
     editSubmitting.value = '';
   }
-}
+};
 
 /**
  * 保存按钮：企业编辑(修改)场景。
@@ -1410,33 +1535,31 @@ const handleSave = async () => {
       editSubmitting.value = '';
     }
   });
-}
+};
 
 const handleOssChange = (ossIds) => {
-  form.businessLicense = ossIds;
+  form.value.businessLicense = ossIds;
 };
 
 const handleOssIdCarPhotoChange = (ossIds) => {
-  form.idCardPhotoIds = ossIds;
+  form.value.idCardPhotoIds = ossIds;
 };
 
 const handleOssBankAccountIdsChange = (ossIds) => {
-  form.bankAccountIds = ossIds;
+  form.value.bankAccountIds = ossIds;
 };
 
-const handleOssCompanyAddressIdsChange= (ossIds) => {
-  form.companyAddressIds = ossIds;
+const handleOssCompanyAddressIdsChange = (ossIds) => {
+  form.value.companyAddressIds = ossIds;
 };
 
-const handleOssRecruitmentAuthorizationIdsChange= (ossIds) => {
-  form.recruitmentAuthorizationIds = ossIds;
+const handleOssRecruitmentAuthorizationIdsChange = (ossIds) => {
+  form.value.recruitmentAuthorizationIds = ossIds;
 };
 
-const handleOsslogoUrlChange= (ossIds) => {
-  form.logoUrl = ossIds;
+const handleOsslogoUrlChange = (ossIds) => {
+  form.value.logoUrl = ossIds;
 };
-
-
 </script>
 
 <style scoped>
@@ -1466,9 +1589,15 @@ const handleOsslogoUrlChange= (ossIds) => {
   color: #303133;
 }
 
-.stat-mini .value.warning { color: #E6A23C; }
-.stat-mini .value.success { color: #67C23A; }
-.stat-mini .value.danger  { color: #F56C6C; }
+.stat-mini .value.warning {
+  color: #e6a23c;
+}
+.stat-mini .value.success {
+  color: #67c23a;
+}
+.stat-mini .value.danger {
+  color: #f56c6c;
+}
 
 .company-query-form {
   display: flex;
@@ -1478,7 +1607,9 @@ const handleOsslogoUrlChange= (ossIds) => {
 
 .stat-clickable {
   cursor: pointer;
-  transition: transform 0.16s ease, box-shadow 0.16s ease;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
 .stat-clickable:hover,

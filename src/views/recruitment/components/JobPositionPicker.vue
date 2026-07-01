@@ -24,12 +24,7 @@
     @hide="visible = false"
   >
     <template #reference>
-      <div
-        ref="referenceRef"
-        class="jp-reference"
-        :class="{ 'is-invalid': showInvalid, 'is-active': visible }"
-        @click="toggle"
-      >
+      <div ref="referenceRef" class="jp-reference" :class="{ 'is-invalid': showInvalid, 'is-active': visible }" @click="toggle">
         <el-tag v-if="modelValue" closable type="primary" disable-transitions @close.stop="clearSelection">{{ modelValue }}</el-tag>
         <span v-else class="jp-placeholder">{{ placeholder }}</span>
         <el-icon class="jp-arrow" :class="{ 'is-open': visible }"><ArrowDown /></el-icon>
@@ -270,10 +265,7 @@ function highlight(name: string): string {
   return safe.replace(re, '<span class="jp-hl">$1</span>');
 }
 function escapeHtml(s: string): string {
-  return String(s).replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string
-  );
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 }
 function onSearchInput() {
   activeIndex.value = 0;

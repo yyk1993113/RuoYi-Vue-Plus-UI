@@ -22,14 +22,16 @@
         <el-card shadow="hover" class="kpi-card" @click="navigateTo('/recruitment/company')">
           <div class="kpi-header">
             <span class="kpi-label">企业总数</span>
-            <el-tag type="warning" size="small" effect="plain" v-if="overview.pendingCompanies > 0">
-              {{ overview.pendingCompanies }} 待审核
-            </el-tag>
+            <el-tag type="warning" size="small" effect="plain" v-if="overview.pendingCompanies > 0"> {{ overview.pendingCompanies }} 待审核 </el-tag>
           </div>
           <div class="kpi-value primary">{{ overview.totalCompanies || 0 }}</div>
           <div class="kpi-footer">
-            <span class="kpi-sub"><el-icon><CircleCheckFilled /></el-icon> 已认证 {{ overview.approvedCompanies || 0 }}</span>
-            <span class="kpi-sub"><el-icon><UserFilled /></el-icon> 活跃 {{ overview.activeCompanies || 0 }}</span>
+            <span class="kpi-sub"
+              ><el-icon><CircleCheckFilled /></el-icon> 已认证 {{ overview.approvedCompanies || 0 }}</span
+            >
+            <span class="kpi-sub"
+              ><el-icon><UserFilled /></el-icon> 活跃 {{ overview.activeCompanies || 0 }}</span
+            >
           </div>
           <div class="kpi-trend up">
             <el-icon><TrendCharts /></el-icon>
@@ -42,14 +44,16 @@
         <el-card shadow="hover" class="kpi-card" @click="navigateTo('/recruitment/job')">
           <div class="kpi-header">
             <span class="kpi-label">职位总数</span>
-            <el-tag type="warning" size="small" effect="plain" v-if="overview.pendingJobs > 0">
-              {{ overview.pendingJobs }} 待审核
-            </el-tag>
+            <el-tag type="warning" size="small" effect="plain" v-if="overview.pendingJobs > 0"> {{ overview.pendingJobs }} 待审核 </el-tag>
           </div>
           <div class="kpi-value success">{{ overview.totalJobs || 0 }}</div>
           <div class="kpi-footer">
-            <span class="kpi-sub"><el-icon><CircleCheckFilled /></el-icon> 已上线 {{ overview.onlineJobs || 0 }}</span>
-            <span class="kpi-sub"><el-icon><Top /></el-icon> 新增 {{ overview.newJobsDelta || 0 }}</span>
+            <span class="kpi-sub"
+              ><el-icon><CircleCheckFilled /></el-icon> 已上线 {{ overview.onlineJobs || 0 }}</span
+            >
+            <span class="kpi-sub"
+              ><el-icon><Top /></el-icon> 新增 {{ overview.newJobsDelta || 0 }}</span
+            >
           </div>
           <div class="kpi-trend neutral">
             <el-icon><DataLine /></el-icon>
@@ -66,8 +70,12 @@
           </div>
           <div class="kpi-value warning">{{ overview.totalApplies || 0 }}</div>
           <div class="kpi-footer">
-            <span class="kpi-sub"><el-icon><Clock /></el-icon> 待处理 {{ overview.pendingApplies || 0 }}</span>
-            <span class="kpi-sub"><el-icon><CircleCheckFilled /></el-icon> 已处理 {{ overview.processedApplies || 0 }}</span>
+            <span class="kpi-sub"
+              ><el-icon><Clock /></el-icon> 待处理 {{ overview.pendingApplies || 0 }}</span
+            >
+            <span class="kpi-sub"
+              ><el-icon><CircleCheckFilled /></el-icon> 已处理 {{ overview.processedApplies || 0 }}</span
+            >
           </div>
           <div class="kpi-trend up">
             <el-icon><TrendCharts /></el-icon>
@@ -83,8 +91,12 @@
           </div>
           <div class="kpi-value danger">{{ overview.totalTasks || 0 }}</div>
           <div class="kpi-footer">
-            <span class="kpi-sub"><el-icon><Clock /></el-icon> 进行中 {{ overview.inProgressTasks || 0 }}</span>
-            <span class="kpi-sub"><el-icon><Warning /></el-icon> 异常 {{ exceptionCount || 0 }}</span>
+            <span class="kpi-sub"
+              ><el-icon><Clock /></el-icon> 进行中 {{ overview.inProgressTasks || 0 }}</span
+            >
+            <span class="kpi-sub"
+              ><el-icon><Warning /></el-icon> 异常 {{ exceptionCount || 0 }}</span
+            >
           </div>
           <div class="kpi-trend neutral">
             <el-icon><InfoFilled /></el-icon>
@@ -135,21 +147,27 @@
             <el-col :span="8">
               <div class="todo-cell" @click="navigateTo('/recruitment/company?status=0')">
                 <div class="todo-value primary">{{ worklist.pendingCompanies || 0 }}</div>
-                <div class="todo-label"><el-icon><OfficeBuilding /></el-icon> 待审核企业</div>
+                <div class="todo-label">
+                  <el-icon><OfficeBuilding /></el-icon> 待审核企业
+                </div>
               </div>
             </el-col>
             <!-- 待审核岗位 → 岗位管理（默认筛待审核 status=0） -->
             <el-col :span="8">
               <div class="todo-cell" @click="navigateTo('/recruitment/job?status=0')">
                 <div class="todo-value warning">{{ worklist.pendingJobs || 0 }}</div>
-                <div class="todo-label"><el-icon><Briefcase /></el-icon> 待审核岗位</div>
+                <div class="todo-label">
+                  <el-icon><Briefcase /></el-icon> 待审核岗位
+                </div>
               </div>
             </el-col>
             <!-- 待上传发票 → 发票管理 -->
             <el-col :span="8">
               <div class="todo-cell" @click="navigateTo('/recruitment/invoice')">
                 <div class="todo-value danger">{{ worklist.pendingInvoices || 0 }}</div>
-                <div class="todo-label"><el-icon><Tickets /></el-icon> 待上传发票</div>
+                <div class="todo-label">
+                  <el-icon><Tickets /></el-icon> 待上传发票
+                </div>
               </div>
             </el-col>
           </el-row>
@@ -165,13 +183,7 @@
               <el-badge :value="worklist.riskAlerts.length" type="danger" :hidden="worklist.riskAlerts.length === 0" />
             </div>
           </template>
-          <el-table
-            v-if="worklist.riskAlerts.length > 0"
-            :data="worklist.riskAlerts"
-            stripe
-            size="small"
-            max-height="220"
-          >
+          <el-table v-if="worklist.riskAlerts.length > 0" :data="worklist.riskAlerts" stripe size="small" max-height="220">
             <el-table-column prop="action" label="动作" min-width="90" show-overflow-tooltip>
               <template #default="{ row }">
                 <el-tag type="danger" size="small" effect="plain">{{ row.action || '-' }}</el-tag>
@@ -319,13 +331,7 @@
               </el-badge>
             </div>
           </template>
-          <el-table
-            v-if="exceptionApplies.length > 0"
-            :data="exceptionApplies"
-            stripe
-            size="small"
-            row-class-name="exception-row"
-          >
+          <el-table v-if="exceptionApplies.length > 0" :data="exceptionApplies" stripe size="small" row-class-name="exception-row">
             <el-table-column prop="jobName" label="职位" min-width="100" show-overflow-tooltip />
             <el-table-column prop="exceptionTypeName" label="异常类型" width="80" align="center">
               <template #default="{ row }">
@@ -363,7 +369,7 @@ import {
   InfoFilled,
   OfficeBuilding,
   Briefcase,
-  Tickets,
+  Tickets
 } from '@element-plus/icons-vue';
 import {
   getOverview,
@@ -377,9 +383,17 @@ import {
   getRecentApplies,
   getCompanyTrend,
   getUserTrend,
-  getApplyStatusDistribution,
+  getApplyStatusDistribution
 } from '@/api/recruitment';
-import type { RecruitmentOverview, ApplyTrend, JobTypeDistribution, HotJobVO, ExceptionApplyVO, DashboardWorklistVO, WorklistRiskAlert } from '@/api/recruitment';
+import type {
+  RecruitmentOverview,
+  ApplyTrend,
+  JobTypeDistribution,
+  HotJobVO,
+  ExceptionApplyVO,
+  DashboardWorklistVO,
+  WorklistRiskAlert
+} from '@/api/recruitment';
 import { ElMessage } from 'element-plus';
 import { formatDate as formatDateUtil } from '@/utils';
 import { unwrapList } from './helpers';
@@ -418,7 +432,7 @@ const worklist = reactive<DashboardWorklistVO>({
   pendingCompanies: 0,
   pendingJobs: 0,
   pendingInvoices: 0,
-  riskAlerts: [],
+  riskAlerts: []
 });
 const applyTrendData = ref<ApplyTrend[]>([]);
 const companyTrendData = ref<ApplyTrend[]>([]);
@@ -456,53 +470,63 @@ const CHART_PALETTE = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#
 function initTrendChart(data: ApplyTrend[], label: string, color: string) {
   if (!trendChartRef.value) return;
   if (!trendChart) trendChart = echarts.init(trendChartRef.value);
-  trendChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'line' } },
-    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: {
-      type: 'category',
-      data: data.map(d => d.date),
-      axisLabel: { fontSize: 11 },
-    },
-    yAxis: { type: 'value', minInterval: 1, axisLabel: { fontSize: 11 } },
-    series: [{
-      name: label,
-      type: 'line',
-      data: data.map(d => d.count),
-      smooth: true,
-      lineStyle: { color, width: 2 },
-      areaStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: color + '99' },
-          { offset: 1, color: color + '11' },
-        ]),
+  trendChart.setOption(
+    {
+      tooltip: { trigger: 'axis', axisPointer: { type: 'line' } },
+      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: data.map((d) => d.date),
+        axisLabel: { fontSize: 11 }
       },
-      itemStyle: { color, borderRadius: [4, 4, 0, 0] },
-      barWidth: '40%',
-    }],
-  }, true);
+      yAxis: { type: 'value', minInterval: 1, axisLabel: { fontSize: 11 } },
+      series: [
+        {
+          name: label,
+          type: 'line',
+          data: data.map((d) => d.count),
+          smooth: true,
+          lineStyle: { color, width: 2 },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: color + '99' },
+              { offset: 1, color: color + '11' }
+            ])
+          },
+          itemStyle: { color, borderRadius: [4, 4, 0, 0] },
+          barWidth: '40%'
+        }
+      ]
+    },
+    true
+  );
 }
 
 function initJobTypeChart() {
   if (!jobTypeChartRef.value) return;
   if (!jobTypeChart) jobTypeChart = echarts.init(jobTypeChartRef.value);
   const colors = CHART_PALETTE;
-  jobTypeChart.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-    legend: { orient: 'vertical', right: '5%', top: 'center', textStyle: { fontSize: 11 } },
-    color: colors,
-    series: [{
-      name: '职位类型',
-      type: 'pie',
-      radius: ['40%', '70%'],
-      center: ['35%', '50%'],
-      itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
-      label: { show: false, position: 'center' },
-      emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
-      labelLine: { show: false },
-      data: jobTypeDist.value.map((d, i) => ({ name: d.typeName, value: d.count, itemStyle: { color: colors[i % colors.length] } })),
-    }],
-  }, true);
+  jobTypeChart.setOption(
+    {
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      legend: { orient: 'vertical', right: '5%', top: 'center', textStyle: { fontSize: 11 } },
+      color: colors,
+      series: [
+        {
+          name: '职位类型',
+          type: 'pie',
+          radius: ['40%', '70%'],
+          center: ['35%', '50%'],
+          itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false, position: 'center' },
+          emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+          labelLine: { show: false },
+          data: jobTypeDist.value.map((d, i) => ({ name: d.typeName, value: d.count, itemStyle: { color: colors[i % colors.length] } }))
+        }
+      ]
+    },
+    true
+  );
 }
 
 // 后端为避免 SQL 字符集问题返回英文安全键，这里只负责前端展示翻译。
@@ -515,7 +539,7 @@ const APPLY_STATUS_NAME_MAP: Record<string, string> = {
   '0': '已投递',
   '1': '面试邀请',
   '2': '已录用',
-  '3': '已拒绝',
+  '3': '已拒绝'
 };
 
 function applyStatusDisplayName(name?: string | null) {
@@ -534,27 +558,32 @@ function initApplyStatusChart() {
     '已投递': '#409EFF',
     '面试邀请': '#E6A23C',
     '已录用': '#67C23A',
-    '已拒绝': '#F56C6C',
+    '已拒绝': '#F56C6C'
   };
-  applyStatusChart.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-    legend: { orient: 'vertical', right: '5%', top: 'center', textStyle: { fontSize: 11 } },
-    series: [{
-      name: '投递状态',
-      type: 'pie',
-      radius: ['45%', '72%'],
-      center: ['35%', '50%'],
-      itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-      label: { show: false },
-      emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold' } },
-      labelLine: { show: false },
-      data: applyStatusDist.value.map(d => ({
-        name: applyStatusDisplayName(d.name),
-        value: d.value,
-        itemStyle: { color: statusColors[d.name] || '#909399' },
-      })),
-    }],
-  }, true);
+  applyStatusChart.setOption(
+    {
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      legend: { orient: 'vertical', right: '5%', top: 'center', textStyle: { fontSize: 11 } },
+      series: [
+        {
+          name: '投递状态',
+          type: 'pie',
+          radius: ['45%', '72%'],
+          center: ['35%', '50%'],
+          itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false },
+          emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold' } },
+          labelLine: { show: false },
+          data: applyStatusDist.value.map((d) => ({
+            name: applyStatusDisplayName(d.name),
+            value: d.value,
+            itemStyle: { color: statusColors[d.name] || '#909399' }
+          }))
+        }
+      ]
+    },
+    true
+  );
 }
 
 function initHotJobChart() {
@@ -562,27 +591,32 @@ function initHotJobChart() {
   if (!hotJobChart) hotJobChart = echarts.init(hotJobChartRef.value);
   const sorted = [...hotJobs.value].sort((a, b) => (b.applyCount || 0) - (a.applyCount || 0)).slice(0, 10);
   const colors = [...CHART_PALETTE, '#34495E', '#2C3E50'];
-  hotJobChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: '3%', right: '4%', bottom: '3%', top: '3%', containLabel: true },
-    xAxis: { type: 'value', axisLabel: { fontSize: 10 } },
-    yAxis: {
-      type: 'category',
-      data: sorted.map(d => d.jobName).reverse(),
-      axisLabel: { fontSize: 10, width: 80, overflow: 'truncate' },
-    },
-    series: [{
-      name: '投递量',
-      type: 'bar',
-      data: sorted.map(d => d.applyCount || 0).reverse(),
-      itemStyle: {
-        color: (params: any) => colors[params.dataIndex % colors.length],
-        borderRadius: [0, 4, 4, 0],
+  hotJobChart.setOption(
+    {
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: '3%', right: '4%', bottom: '3%', top: '3%', containLabel: true },
+      xAxis: { type: 'value', axisLabel: { fontSize: 10 } },
+      yAxis: {
+        type: 'category',
+        data: sorted.map((d) => d.jobName).reverse(),
+        axisLabel: { fontSize: 10, width: 80, overflow: 'truncate' }
       },
-      barWidth: '60%',
-      label: { show: true, position: 'right', fontSize: 10 },
-    }],
-  }, true);
+      series: [
+        {
+          name: '投递量',
+          type: 'bar',
+          data: sorted.map((d) => d.applyCount || 0).reverse(),
+          itemStyle: {
+            color: (params: any) => colors[params.dataIndex % colors.length],
+            borderRadius: [0, 4, 4, 0]
+          },
+          barWidth: '60%',
+          label: { show: true, position: 'right', fontSize: 10 }
+        }
+      ]
+    },
+    true
+  );
 }
 
 function handleResize() {
@@ -597,9 +631,20 @@ async function loadAllData() {
   loading.value = true;
   try {
     const days = Number(timeRange.value);
-    const [overviewRes, worklistRes, applyTrendRes, jobTypeRes, hotJobsRes,
-           exchangeRes, exceptionRes, recentJobsRes, recentAppliesRes,
-           companyTrendRes, userTrendRes, applyStatusRes] = await Promise.all([
+    const [
+      overviewRes,
+      worklistRes,
+      applyTrendRes,
+      jobTypeRes,
+      hotJobsRes,
+      exchangeRes,
+      exceptionRes,
+      recentJobsRes,
+      recentAppliesRes,
+      companyTrendRes,
+      userTrendRes,
+      applyStatusRes
+    ] = await Promise.all([
       getOverview(),
       getWorklist(),
       getApplyTrend(days),
@@ -611,7 +656,7 @@ async function loadAllData() {
       getRecentApplies({ pageNum: 1, pageSize: 5 }),
       getCompanyTrend({ days }),
       getUserTrend({ days }),
-      getApplyStatusDistribution(),
+      getApplyStatusDistribution()
     ]);
 
     Object.assign(overview, overviewRes.data || {});
@@ -621,7 +666,7 @@ async function loadAllData() {
       pendingCompanies: wl.pendingCompanies || 0,
       pendingJobs: wl.pendingJobs || 0,
       pendingInvoices: wl.pendingInvoices || 0,
-      riskAlerts: wl.riskAlerts || [],
+      riskAlerts: wl.riskAlerts || []
     });
     applyTrendData.value = applyTrendRes.data || [];
     companyTrendData.value = companyTrendRes.data || [];
@@ -675,7 +720,7 @@ function handleTrendTypeChange() {
 }
 
 function loadHotJobs() {
-  getHotJobs({ limit: 10, type: hotJobType.value }).then(res => {
+  getHotJobs({ limit: 10, type: hotJobType.value }).then((res) => {
     hotJobs.value = res.data || [];
     initHotJobChart();
   });
@@ -690,7 +735,7 @@ async function handleExport() {
       求职者: item.userName || '-',
       异常类型: item.exceptionTypeName || '-',
       状态: item.statusName || '-',
-      投递时间: formatDate(item.createTime || ''),
+      投递时间: formatDate(item.createTime || '')
     }));
 
     ElMessage.info('正在生成 Excel 文件...');
@@ -717,9 +762,12 @@ async function handleExport() {
 onMounted(() => {
   loadAllData();
   window.addEventListener('resize', handleResize);
-  refreshTimer = setInterval(() => {
-    loadAllData();
-  }, 5 * 60 * 1000); // 每5分钟自动刷新
+  refreshTimer = setInterval(
+    () => {
+      loadAllData();
+    },
+    5 * 60 * 1000
+  ); // 每5分钟自动刷新
 });
 
 onUnmounted(() => {
@@ -746,11 +794,21 @@ onUnmounted(() => {
   padding: 0 4px;
 }
 
-.toolbar-left { display: flex; align-items: center; gap: 8px; }
-.toolbar-right { display: flex; align-items: center; gap: 8px; }
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 /* ---------- KPI 卡片 ---------- */
-.mb-4 { margin-bottom: 16px; }
+.mb-4 {
+  margin-bottom: 16px;
+}
 
 .kpi-card {
   cursor: pointer;
@@ -782,10 +840,18 @@ onUnmounted(() => {
   margin-bottom: 10px;
 }
 
-.kpi-value.primary { color: #409EFF; }
-.kpi-value.success { color: #67C23A; }
-.kpi-value.warning { color: #E6A23C; }
-.kpi-value.danger  { color: #F56C6C; }
+.kpi-value.primary {
+  color: #409eff;
+}
+.kpi-value.success {
+  color: #67c23a;
+}
+.kpi-value.warning {
+  color: #e6a23c;
+}
+.kpi-value.danger {
+  color: #f56c6c;
+}
 
 .kpi-footer {
   display: flex;
@@ -803,7 +869,9 @@ onUnmounted(() => {
   gap: 3px;
 }
 
-.kpi-sub .el-icon { font-size: 12px; }
+.kpi-sub .el-icon {
+  font-size: 12px;
+}
 
 .kpi-trend {
   font-size: 11px;
@@ -814,9 +882,15 @@ onUnmounted(() => {
   border-top: 1px solid #f0f0f0;
 }
 
-.kpi-trend.up    { color: #67C23A; }
-.kpi-trend.down { color: #F56C6C; }
-.kpi-trend.neutral { color: #909399; }
+.kpi-trend.up {
+  color: #67c23a;
+}
+.kpi-trend.down {
+  color: #f56c6c;
+}
+.kpi-trend.neutral {
+  color: #909399;
+}
 
 /* ---------- 今日待办 / 风险提醒 ---------- */
 /* 待办单元格：可点击跳转对应审核/发票页，悬停轻微抬升提示可交互 */
@@ -837,9 +911,15 @@ onUnmounted(() => {
   line-height: 1.2;
   margin-bottom: 4px;
 }
-.todo-value.primary { color: #409EFF; }
-.todo-value.warning { color: #E6A23C; }
-.todo-value.danger  { color: #F56C6C; }
+.todo-value.primary {
+  color: #409eff;
+}
+.todo-value.warning {
+  color: #e6a23c;
+}
+.todo-value.danger {
+  color: #f56c6c;
+}
 .todo-label {
   font-size: 12px;
   color: #606266;
@@ -848,7 +928,9 @@ onUnmounted(() => {
   justify-content: center;
   gap: 4px;
 }
-.todo-label .el-icon { font-size: 13px; }
+.todo-label .el-icon {
+  font-size: 13px;
+}
 
 /* ---------- 卡片头部 ---------- */
 .card-header {
@@ -871,8 +953,17 @@ onUnmounted(() => {
 
 /* ---------- 响应式调整 ---------- */
 @media (max-width: 768px) {
-  .kpi-value { font-size: 24px; }
-  .kpi-footer { flex-direction: column; gap: 2px; }
-  .toolbar { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .kpi-value {
+    font-size: 24px;
+  }
+  .kpi-footer {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
 }
 </style>

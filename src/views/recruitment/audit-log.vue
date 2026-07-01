@@ -95,7 +95,7 @@
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right" align="center">
           <template #default="{ row }">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 8px">
               <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
               <el-button link type="primary" icon="Tickets" @click="handleHistory(row)">历史</el-button>
             </div>
@@ -103,13 +103,7 @@
         </el-table-column>
       </el-table>
 
-      <pagination
-        v-show="total > 0"
-        v-model:page="queryParams.pageNum"
-        v-model:limit="queryParams.pageSize"
-        :total="total"
-        @pagination="loadData"
-      />
+      <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="loadData" />
     </el-card>
 
     <!-- ========== 日志详情对话框 ========== -->

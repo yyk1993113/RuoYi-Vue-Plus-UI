@@ -4,7 +4,7 @@
 
 - [ ] 每个请求点有 loading(`v-loading`)、error(统一拦截器 + 必要的 catch)、empty(空表占位)三态。
 - [ ] 列表分页 `pageNum`/`pageSize` 对齐后端 `PageQuery`;响应按 `{ rows, total }` / `{ code, msg, data }` 解包。
-- [ ] 后端可能为 null 的字段渲染前兜底;疑似后端缺字段(前端要展示但 VO 没有)→ **转 api-contract 技能核对**,别默默兜底。
+- [ ] 后端可能为 null 的字段渲染前兜底;疑似后端缺字段(前端要展示但 VO 没有)→ 按工作区根 `.agents/references/api-contract.md` 核对,别默默兜底。
 - [ ] 审核/状态流转页:操作成功后刷新列表与统计,状态码→文案映射集中在 enums/constants。
 
 ## 2. Element Plus 用法
@@ -15,7 +15,7 @@
 
 ## 3. 路径口径与权限(运营台特例)
 
-- [ ] 运营台**不补 /api**:业务接口直写 `/admin/recruitment/*`、`/admin/content/*`,框架接口直写 `/system/*` 等(契约权威源 = 工作区根 `api-contract` 技能)。
+- [ ] 运营台**不补 /api**:业务接口直写 `/admin/recruitment/*`、`/admin/content/*`,框架接口直写 `/system/*` 等(契约权威源 = 工作区根 `.agents/references/api-contract.md`)。
 - [ ] 不硬编码 host 或 `/prod-api`;基址由 `VITE_APP_BASE_API` + 代理/nginx 处理。
 - [ ] 新增运营页面:路由/菜单走后端 `sys_menu`(配套 SQL 在后端仓 `script/sql/v1_complete/menu.sql` 范式),按钮级权限用 `v-hasPermi`;**按钮隐藏≠权限**,真正的拦截在后端 `@SaCheckRole("admin")`。
 - [ ] 不向后端传 `userId`/`role`/租户参数让其"代为生效"。

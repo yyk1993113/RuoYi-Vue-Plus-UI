@@ -238,7 +238,12 @@
                 </el-descriptions-item>
                 <el-descriptions-item label="结算状态">
                   <el-tag :type="ledgerStatusMeta(currentTask.ledgerStatus).type">{{ ledgerStatusMeta(currentTask.ledgerStatus).label }}</el-tag>
-                  <el-button v-if="String(currentTask.ledgerStatus) === '0'" class="ml-2" link type="success" @click="goPendingLedger(currentTask.orderNo)"
+                  <el-button
+                    v-if="String(currentTask.ledgerStatus) === '0'"
+                    class="ml-2"
+                    link
+                    type="success"
+                    @click="goPendingLedger(currentTask.orderNo)"
                     >去结算</el-button
                   >
                 </el-descriptions-item>
