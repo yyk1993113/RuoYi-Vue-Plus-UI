@@ -261,24 +261,28 @@
           <el-descriptions-item label="备注/审核意见" :span="2">{{ currentCompany.remark || '无' }}</el-descriptions-item>
         </el-descriptions>
 
-        <!-- 资质图片：营业执照/身份证/对公凭证/办公实景/授权书/Logo（来自 company 表）。
-             这些字段存的是 OSS 文件 id(逗号分隔)，已在 handleDetail 中通过 listByIds 解析为可预览 URL。
-             每组支持多图，点击可放大轮播预览。 -->
-        <div class="section-title">资质图片</div>
+        <!-- 资质材料：图片材料可预览，招聘授权书为 .docx 文档，仅提供打开/下载。 -->
+        <div class="section-title">资质材料</div>
         <div v-loading="certLoading" class="cert-images">
           <div v-for="group in certGroups" :key="group.label" class="cert-item">
             <div class="cert-label">{{ group.label }}</div>
-            <div v-if="group.urls.length" class="cert-img-row">
-              <el-image
-                v-for="(url, idx) in group.urls"
-                :key="url"
-                :src="url"
-                :preview-src-list="group.urls"
-                :initial-index="idx"
-                :preview-teleported="true"
-                fit="cover"
-                class="cert-img"
-              />
+            <div v-if="group.files.length" class="cert-img-row">
+              <template v-for="(file, idx) in group.files" :key="file.ossId || file.url || idx">
+                <el-image
+                  v-if="file.kind === 'image'"
+                  :src="file.url"
+                  :preview-src-list="group.files.filter((f) => f.kind === 'image').map((f) => f.url)"
+                  :initial-index="idx"
+                  :preview-teleported="true"
+                  fit="cover"
+                  class="cert-img"
+                />
+                <div v-else class="cert-doc-card">
+                  <el-icon><Document /></el-icon>
+                  <span>{{ file.name || '招聘授权书.docx' }}</span>
+                  <el-button link type="primary" @click="openUrl(file.url)">打开</el-button>
+                </div>
+              </template>
             </div>
             <div v-else class="cert-empty">未上传</div>
           </div>
@@ -329,7 +333,7 @@
                 <el-descriptions-item label="办公地址" :span="2">{{ cert.officeAddress || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="审核意见" :span="2">{{ cert.auditRemark || '-' }}</el-descriptions-item>
               </el-descriptions>
-              <!-- 认证材料图片：营业执照 / 法人身份证附件 / 对公账户凭证 / 授权书 / 办公实景（可多图） -->
+              <!-- 认证材料：图片材料可预览；招聘授权书按 .docx 文档下载查看。 -->
               <div class="cert-images cert-images-wrap">
                 <div v-for="group in certImageList(cert)" :key="group.label" class="cert-item">
                   <div class="cert-label">{{ group.label }}</div>
@@ -346,7 +350,19 @@
                     />
                   </div>
                 </div>
-                <div v-if="certImageList(cert).length === 0" class="cert-empty">未上传认证材料</div>
+                <div v-if="certAuthLetterFiles(cert).length" class="cert-item">
+                  <div class="cert-label">招聘授权书</div>
+                  <div class="cert-img-row">
+                    <div v-for="file in certAuthLetterFiles(cert)" :key="file.ossId || file.url" class="cert-doc-card cert-doc-card-sm">
+                      <el-icon><Document /></el-icon>
+                      <span>{{ file.name || '招聘授权书.docx' }}</span>
+                      <el-button link type="primary" @click="openUrl(file.url)">打开</el-button>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="certImageList(cert).length === 0 && certAuthLetterFiles(cert).length === 0" class="cert-empty">
+                  未上传认证材料
+                </div>
               </div>
             </el-card>
           </el-tab-pane>
@@ -414,8 +430,8 @@
           </el-row>
         </div>
 
-        <!-- 资质图片：与详情弹窗"资质图片"分区一致，按网格平铺各类上传项 -->
-        <div class="section-title">资质图片</div>
+        <!-- 资质材料：图片用 imageUpload，招聘授权书必须用 .docx 文件上传。 -->
+        <div class="section-title">资质材料</div>
         <div class="edit-block">
           <el-row :gutter="20">
             <el-col :span="12">
@@ -449,7 +465,14 @@
             </el-col>
             <el-col :span="12">
               <el-form-item label="招聘授权书">
-                <imageUpload v-model="form.recruitmentAuthorizationIds" :limit="1" @update:modelValue="handleOssRecruitmentAuthorizationIdsChange"/>
+                <file-upload
+                  v-model="form.recruitmentAuthorizationIds"
+                  :limit="1"
+                  :file-size="10"
+                  :file-type="['docx']"
+                  upload-url="/api/company/upload"
+                  @update:modelValue="handleOssRecruitmentAuthorizationIdsChange"
+                />
               </el-form-item>
             </el-col>
           </el-row>
@@ -497,7 +520,7 @@
     </el-dialog>
 
     <!-- 审核对话框：通过走 /company/audit（置已认证并生成企业编号、回写资质=已通过）；
-         驳回走 /company/rejectCert（资质=已驳回+原因，账号仍可登录，企业可整改重交） -->
+         驳回走 /company/rejectCert（资质=已驳回+原因，企业回到待重新提交态） -->
     <el-dialog v-model="auditVisible" title="企业审核" width="500px" append-to-body>
       <el-form ref="auditFormRef" :model="auditForm" :rules="auditRules" label-width="80px">
         <el-form-item label="企业名称">
@@ -652,6 +675,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus';
+import { Document } from '@element-plus/icons-vue';
 import {
   listCompany,
   getCompanyStatistics,
@@ -681,6 +705,14 @@ import { RoleVO } from '@/api/system/role/types';
 
 const router = useRouter();
 
+interface CertMaterialFile {
+  kind: 'image' | 'doc';
+  url: string;
+  name?: string;
+  ossId?: string;
+  suffix?: string;
+}
+
 const loading = ref(false);
 const total = ref(0);
 const tableData = ref<any[]>([]);
@@ -704,9 +736,9 @@ const jobList = ref<JobVO[]>([]);
 const jobTotal = ref(0);
 const jobQuery = reactive({ pageNum: 1, pageSize: 10, companyId: undefined as number | undefined });
 
-// 详情弹窗「资质图片」：company 表各资质字段存的是 OSS id，需解析为 URL 后分组展示
+// 详情弹窗「资质材料」：company 表存 OSS id；图片可预览，授权书按 .docx 文档打开。
 const certLoading = ref(false);
-const certGroups = ref<{ label: string; urls: string[] }[]>([]);
+const certGroups = ref<{ label: string; files: CertMaterialFile[] }[]>([]);
 
 // 投递人员弹窗：点击「已反馈/未反馈」按企业 + 反馈口径分页查看
 const applyVisible = ref(false);
@@ -894,17 +926,17 @@ function resetQuery() {
   loadData();
 }
 
-// 解析企业资质图片：company 表各字段存的是逗号分隔的 OSS id（个别历史数据可能直接是 URL）。
-// 统一收集 id 批量 listByIds 换成可预览 URL，按资质类型分组（每组可多图），失败不阻断详情。
+// 解析企业资质材料：company 表各字段存 OSS id（个别历史数据可能直接是 URL）。
+// 授权书是 .docx 文档，必须保留文件元数据供下载卡片展示。
 async function loadCompanyCertImages(company: any) {
   const isOssId = (t: string) => /^\d+$/.test(t); // 纯数字视为 OSS id，其余（含 http/相对路径）按 URL 直用
   const fields = [
-    { label: '营业执照正负本', value: company?.businessLicense },
-    { label: '法人身份证附件', value: company?.idCardPhotoIds },
-    { label: '对公账户凭证', value: company?.bankAccountIds },
-    { label: '办公场地实景', value: company?.companyAddressIds },
-    { label: '招聘授权书', value: company?.recruitmentAuthorizationIds },
-    { label: '企业 Logo', value: company?.logoUrl }
+    { label: '营业执照正负本', value: company?.businessLicense, kind: 'image' as const },
+    { label: '法人身份证附件', value: company?.idCardPhotoIds, kind: 'image' as const },
+    { label: '对公账户凭证', value: company?.bankAccountIds, kind: 'image' as const },
+    { label: '办公场地实景', value: company?.companyAddressIds, kind: 'image' as const },
+    { label: '招聘授权书', value: company?.recruitmentAuthorizationIds, kind: 'doc' as const },
+    { label: '企业 Logo', value: company?.logoUrl, kind: 'image' as const }
   ];
   certLoading.value = true;
   certGroups.value = [];
@@ -912,18 +944,32 @@ async function loadCompanyCertImages(company: any) {
     // 收集所有需要解析的 OSS id（去重），一次性查回 URL
     const idSet = new Set<string>();
     fields.forEach((f) => splitToArray(f.value).forEach((t) => { if (isOssId(t)) idSet.add(t); }));
-    const urlMap: Record<string, string> = {};
+    const fileMap: Record<string, any> = {};
     if (idSet.size > 0) {
       const res = await listByIds(Array.from(idSet).join(','));
-      (res.data || []).forEach((o: any) => { urlMap[String(o.ossId)] = o.url; });
+      (res.data || []).forEach((o: any) => { fileMap[String(o.ossId)] = o; });
     }
     certGroups.value = fields.map((f) => ({
       label: f.label,
-      urls: splitToArray(f.value).map((t) => (isOssId(t) ? urlMap[t] : t)).filter(Boolean) as string[]
+      files: splitToArray(f.value).map((t) => {
+        const oss = isOssId(t) ? fileMap[t] : null;
+        const url = oss ? oss.url : t;
+        if (!url) return null;
+        return {
+          kind: f.kind,
+          url,
+          name: oss?.originalName,
+          ossId: oss ? String(oss.ossId) : undefined,
+          suffix: oss?.fileSuffix
+        } as CertMaterialFile;
+      }).filter(Boolean) as CertMaterialFile[]
     }));
   } catch (e) {
     // 解析失败时退化为按原始值展示，避免整块空白
-    certGroups.value = fields.map((f) => ({ label: f.label, urls: splitToArray(f.value).filter(Boolean) }));
+    certGroups.value = fields.map((f) => ({
+      label: f.label,
+      files: splitToArray(f.value).filter(Boolean).map((url) => ({ kind: f.kind, url }))
+    }));
   } finally {
     certLoading.value = false;
   }
@@ -960,11 +1006,45 @@ async function loadAuditHistory(companyId: number) {
   try {
     const res = await getCompanyAuditHistory(companyId);
     auditHistory.value = res.data || { auditLogs: [], certHistory: [] };
+    await hydrateCertHistoryFiles();
   } catch (error) {
     console.error('审核历史加载失败:', error);
   } finally {
     historyLoading.value = false;
   }
+}
+
+// 认证历史从后端取到的材料字段可能仍是 OSS id；这里统一解析，避免文档/图片展示拿到不可访问的裸 id。
+async function hydrateCertHistoryFiles() {
+  const certs = auditHistory.value.certHistory || [];
+  const isOssId = (t: string) => /^\d+$/.test(t);
+  const materialFields = ['businessLicense', 'legalPersonIdFront', 'legalPersonIdBack', 'bankAccountProof', 'authLetter', 'officePhotos'];
+  const idSet = new Set<string>();
+  certs.forEach((cert: any) => {
+    materialFields.forEach((field) => splitToArray(cert[field]).forEach((t) => { if (isOssId(t)) idSet.add(t); }));
+  });
+  if (idSet.size === 0) return;
+  const res = await listByIds(Array.from(idSet).join(','));
+  const fileMap: Record<string, any> = {};
+  (res.data || []).forEach((file: any) => { fileMap[String(file.ossId)] = file; });
+  certs.forEach((cert: any) => {
+    const rawAuthLetter = cert.authLetter;
+    materialFields.forEach((field) => {
+      cert[field] = splitToArray(cert[field]).map((t) => (isOssId(t) ? fileMap[t]?.url : t)).filter(Boolean).join(',');
+    });
+    cert.authLetterFiles = splitToArray(cert.authLetter)
+      .map((url, index) => {
+        const raw = splitToArray(rawAuthLetter).at(index);
+        const oss = raw && isOssId(raw) ? fileMap[raw] : null;
+        return {
+          kind: 'doc',
+          url,
+          name: oss?.originalName || '招聘授权书.docx',
+          ossId: oss ? String(oss.ossId) : undefined,
+          suffix: oss?.fileSuffix
+        } as CertMaterialFile;
+      });
+  });
 }
 
 // 按操作动作给时间线节点上色：审核/通过=绿，驳回/拒绝/禁言/禁用=红，其余=主色蓝。
@@ -982,7 +1062,6 @@ function certImageList(cert: CompanyCertVO): { label: string; urls: string[]; st
     { label: '营业执照', urls: splitToArray(cert.businessLicense) },
     { label: '法人身份证附件', urls: [cert.legalPersonIdFront, cert.legalPersonIdBack].flatMap((url) => splitToArray(url)) },
     { label: '对公账户凭证', urls: splitToArray(cert.bankAccountProof) },
-    { label: '招聘授权书', urls: splitToArray(cert.authLetter) },
     { label: '办公实景', urls: splitToArray(cert.officePhotos) }
   ].filter((group) => group.urls.length > 0);
 
@@ -997,6 +1076,24 @@ function certImageList(cert: CompanyCertVO): { label: string; urls: string[]; st
 // 单条认证记录的预览图地址列表（与 certImageList 顺序一致，供 el-image 放大轮播）。
 function certPreviewList(cert: CompanyCertVO): string[] {
   return certImageList(cert).flatMap((i) => i.urls);
+}
+
+function certAuthLetterFiles(cert: CompanyCertVO): CertMaterialFile[] {
+  const files = (cert as any).authLetterFiles as CertMaterialFile[] | undefined;
+  if (files?.length) return files;
+  return splitToArray(cert.authLetter).map((url) => ({
+    kind: 'doc',
+    url,
+    name: '招聘授权书.docx'
+  }));
+}
+
+function openUrl(url?: string) {
+  if (!url) {
+    ElMessage.warning('文件地址不可用');
+    return;
+  }
+  window.open(url, '_blank');
 }
 
 function handleAudit(row: any, status: string) {
@@ -1026,8 +1123,8 @@ async function submitAudit() {
   auditSubmitting.value = true;
   try {
     if (auditForm.status === '2') {
-      // 驳回(方案A：账号/资质分离)：改走 /company/rejectCert——只把资质态置为已驳回+原因，账号仍保持「已认证」可登录，
-      // 让企业能登录看到驳回原因并整改重交。不再走 changeStatus 置 DISABLED(那会挡登录、企业进不来看原因)。
+      // 驳回：走 /company/rejectCert，把资质态置为已驳回并让企业回到待重新提交态；
+      // 不走 changeStatus 禁用账号，避免企业无法看到驳回原因和重新提交入口。
       await rejectCompanyCert({ companyId: auditForm.companyId, remark: auditForm.remark });
       ElMessage.success('已驳回该企业认证');
     } else {
@@ -1504,6 +1601,39 @@ const handleOsslogoUrlChange= (ossIds) => {
 .cert-img-sm {
   width: 110px;
   height: 80px;
+}
+
+.cert-doc-card {
+  width: 160px;
+  min-height: 100px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.cert-doc-card-sm {
+  width: 130px;
+  min-height: 80px;
+}
+
+.cert-doc-card .el-icon {
+  font-size: 28px;
+  color: #2b7fff;
+}
+
+.cert-doc-card span {
+  max-width: 130px;
+  overflow: hidden;
+  font-size: 12px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cert-empty {

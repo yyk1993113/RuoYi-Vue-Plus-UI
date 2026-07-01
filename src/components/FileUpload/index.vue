@@ -63,7 +63,9 @@ const props = defineProps({
   // 是否显示提示
   isShowTip: propTypes.bool.def(true),
   // 禁用组件（仅查看文件）
-  disabled: propTypes.bool.def(false)
+  disabled: propTypes.bool.def(false),
+  // 上传接口路径：默认走系统 OSS；业务材料可指定为 /api/company/upload 以复用业务侧登录上传能力。
+  uploadUrl: propTypes.string.def('')
 });
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
@@ -72,7 +74,7 @@ const number = ref(0);
 const uploadList = ref<any[]>([]);
 
 const baseUrl = import.meta.env.VITE_APP_BASE_API;
-const uploadFileUrl = ref(baseUrl + '/resource/oss/upload'); // 上传文件服务器地址
+const uploadFileUrl = computed(() => baseUrl + (props.uploadUrl || '/resource/oss/upload')); // 上传文件服务器地址
 const headers = ref(globalHeaders());
 
 const fileList = ref<any[]>([]);

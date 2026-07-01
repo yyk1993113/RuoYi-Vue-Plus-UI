@@ -1503,6 +1503,22 @@ export function updateRecConfig(data: RecConfigVO) {
   return request.post<RecConfigVO>(`${configBaseUrl}/update`, data);
 }
 
+export interface AuthLetterTemplateFile {
+  ossId?: string | number;
+  url?: string;
+  originalName?: string;
+  fileName?: string;
+  fileSuffix?: string;
+  uploadedAt?: string;
+}
+
+// 当前招聘授权书模板：由运营上传 .docx 后保存为 rec_config JSON。
+export function getAuthLetterTemplate() {
+  return request.get<AuthLetterTemplateFile>(`${configBaseUrl}/auth-letter-template`);
+}
+
+export const authLetterTemplateUploadUrl = `${configBaseUrl}/auth-letter-template/upload`;
+
 // 配置列表（分页，支持 configKey 模糊 / configGroup 过滤）：GET /admin/config/list，返回 TableDataInfo（rows/total）
 export function listRecConfig(query: { pageNum?: number; pageSize?: number; configKey?: string; configGroup?: string }) {
   return request.get<RecConfigVO[]>(`${configBaseUrl}/list`, { params: query });

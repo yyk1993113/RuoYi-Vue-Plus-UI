@@ -2,7 +2,7 @@
   <!--
     运营台·配置项页
     职责：维护站点级单例 / KV 配置（C/B 底部导航名称、新人弹窗、消息提醒前/中/后文案、
-          兼职三选一文案、招聘授权书模板 URL），并只读查看复用 sys_dict 的字典
+          兼职三选一文案、招聘授权书模板文件），并只读查看复用 sys_dict 的字典
           （行业 / 职位类目 / 福利标签）。
     数据来源：后端 AdminConfigController（/admin/config，@SaCheckRole("admin")）。
       - GET  /admin/config/get?key=xxx           单 key 读取（R<RecConfig>）
@@ -111,23 +111,35 @@
           </el-form>
         </el-card>
 
-        <!-- 5) 招聘授权书模板 URL -->
+        <!-- 5) 招聘授权书模板文件 -->
         <el-card v-loading="loading" shadow="hover" class="mb-4 cfg-card">
           <template #header>
             <div class="cfg-card-header">
               <span class="cfg-title">招聘授权书模板</span>
-              <el-button type="primary" :loading="saving.template" @click="saveGroup('template')">保存模板</el-button>
             </div>
           </template>
-          <el-form label-width="130px" label-position="right">
-            <el-form-item v-for="item in templateFields" :key="item.key" :label="item.label">
-              <el-input v-model="model[item.key]" :placeholder="item.placeholder" clearable>
-                <template v-if="model[item.key]" #append>
-                  <el-button @click="openUrl(model[item.key])">预览</el-button>
-                </template>
-              </el-input>
-            </el-form-item>
-          </el-form>
+          <div class="template-upload">
+            <div v-if="authLetterTemplate?.ossId" class="template-file-card">
+              <el-icon><Document /></el-icon>
+              <div class="template-file-main">
+                <div class="template-file-name">{{ authLetterTemplate.originalName || '招聘授权书模板.docx' }}</div>
+                <div class="template-file-meta">当前生效模板，仅支持 .docx</div>
+              </div>
+              <el-button link type="primary" @click="openUrl(authLetterTemplate.url)">打开</el-button>
+            </div>
+            <el-upload
+              :action="templateUploadUrl"
+              :headers="uploadHeaders"
+              :show-file-list="false"
+              accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              :before-upload="beforeTemplateUpload"
+              :on-success="handleTemplateUploadSuccess"
+              :on-error="handleTemplateUploadError"
+            >
+              <el-button type="primary" :loading="templateUploading">上传 .docx 模板</el-button>
+            </el-upload>
+            <div class="template-tip">上传后立即作为企业端下载模板生效，旧企业已提交材料不会被覆盖。</div>
+          </div>
         </el-card>
       </el-col>
 
@@ -175,10 +187,15 @@
 <script setup name="RecruitmentConfig" lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
+import { Document } from '@element-plus/icons-vue';
+import { globalHeaders } from '@/utils/request';
 import {
   getRecConfig,
   updateRecConfig,
+  getAuthLetterTemplate,
+  authLetterTemplateUploadUrl,
   listConfigDictData,
+  type AuthLetterTemplateFile,
   type RecConfigVO,
   type ConfigDictDataVO
 } from '@/api/recruitment';
@@ -227,19 +244,13 @@ const parttimeFields: CfgField[] = [
   { key: 'parttime.option2', label: '选项二文案', group: 'parttime', placeholder: '兼职三选一·选项二' },
   { key: 'parttime.option3', label: '选项三文案', group: 'parttime', placeholder: '兼职三选一·选项三' }
 ];
-// 招聘授权书模板 URL
-const templateFields: CfgField[] = [
-  { key: 'template.authLetter.url', label: '授权书模板URL', group: 'template', placeholder: '招聘授权书模板文件 URL' }
-];
-
 // 所有字段汇总（按分组取，便于初始化与保存）
 const allFields: CfgField[] = [
   ...navCFields,
   ...navBFields,
   ...popupFields,
   ...messageFields,
-  ...parttimeFields,
-  ...templateFields
+  ...parttimeFields
 ];
 
 // 响应式 KV 值模型：configKey -> configValue（字符串）
@@ -252,9 +263,12 @@ const saving = reactive<Record<string, boolean>>({
   nav: false,
   popup: false,
   message: false,
-  parttime: false,
-  template: false
+  parttime: false
 });
+const authLetterTemplate = ref<AuthLetterTemplateFile | null>(null);
+const templateUploading = ref(false);
+const templateUploadUrl = `${import.meta.env.VITE_APP_BASE_API}${authLetterTemplateUploadUrl}`;
+const uploadHeaders = ref(globalHeaders());
 
 // 拉取全部已配置项：逐 key GET /admin/config/get，命中则回填 model
 async function loadAllConfigs() {
@@ -299,9 +313,49 @@ async function saveGroup(group: string) {
 }
 
 // 预览/打开授权书模板等 URL
-function openUrl(url: string) {
+function openUrl(url?: string) {
   if (!url) return;
   window.open(url, '_blank');
+}
+
+// 当前模板由后端按 OSS id 重新签名返回，避免私有桶原始 URL 过期或不可访问。
+async function loadAuthLetterTemplate() {
+  try {
+    const res = await getAuthLetterTemplate();
+    authLetterTemplate.value = res.data || null;
+  } catch (e) {
+    authLetterTemplate.value = null;
+  }
+}
+
+function beforeTemplateUpload(file: File) {
+  const isDocx = file.name.toLowerCase().endsWith('.docx');
+  const isLt10M = file.size / 1024 / 1024 < 10;
+  if (!isDocx) {
+    ElMessage.error('招聘授权书模板只支持 .docx 文件');
+    return false;
+  }
+  if (!isLt10M) {
+    ElMessage.error('模板文件大小不能超过 10MB');
+    return false;
+  }
+  templateUploading.value = true;
+  return true;
+}
+
+function handleTemplateUploadSuccess(res: any) {
+  templateUploading.value = false;
+  if (res.code === 200) {
+    authLetterTemplate.value = res.data || null;
+    ElMessage.success('模板已上传并生效');
+  } else {
+    ElMessage.error(res.msg || '模板上传失败');
+  }
+}
+
+function handleTemplateUploadError() {
+  templateUploading.value = false;
+  ElMessage.error('模板上传失败');
 }
 
 // ---------- 字典（透传 sys_dict，只读） ----------
@@ -344,6 +398,7 @@ function loadAllDicts() {
 
 onMounted(() => {
   loadAllConfigs();
+  loadAuthLetterTemplate();
   loadAllDicts();
 });
 </script>
@@ -400,6 +455,48 @@ onMounted(() => {
 
 .dict-type-input {
   flex: 1;
+}
+
+.template-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.template-file-card {
+  min-height: 64px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.template-file-card .el-icon {
+  font-size: 28px;
+  color: #2b7fff;
+}
+
+.template-file-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.template-file-name {
+  overflow: hidden;
+  color: #303133;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.template-file-meta,
+.template-tip {
+  color: #909399;
+  font-size: 12px;
+  line-height: 20px;
 }
 
 .text-secondary {
