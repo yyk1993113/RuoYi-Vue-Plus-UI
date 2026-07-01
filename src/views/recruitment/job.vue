@@ -366,16 +366,22 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="岗位名称" prop="jobName">
-              <job-position-picker
-                v-model="editForm.jobName"
-                @valid-change="onEditJobNameValidChange"
-                @pick="onEditJobNamePick"
-              />
+              <!-- 岗位名称是招聘展示标题，可自由填写；职位类目独立选择并作为分类合同提交。 -->
+              <el-input v-model="editForm.jobName" placeholder="请输入岗位名称，如 全职前端开发工程师" maxlength="50" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="职位类目" prop="category">
-              <el-input v-model="editForm.category" placeholder="选择岗位名称后自动带出" readonly />
+              <el-cascader
+                v-model="editForm.categoryPath"
+                :options="categoryOptions"
+                :props="{ checkStrictly: true, emitPath: true }"
+                filterable
+                clearable
+                placeholder="请选择职位类目"
+                style="width: 100%"
+                @change="syncEditCategoryFromPath"
+              />
             </el-form-item>
           </el-col>
         </el-row>
@@ -737,7 +743,7 @@ import { download } from '@/utils/request';
 import { REGIONS } from '@/utils/region-data';
 import { unwrapList, splitToArray, formatSalary } from './helpers';
 import { jobStatusMeta, jobTypeMeta } from './constants';
-import JobPositionPicker from './components/JobPositionPicker.vue';
+import { getJobPositionTree } from '@/api/recruitment/jobCategory';
 
 const router = useRouter();
 const loading = ref(false);
@@ -847,11 +853,11 @@ const editFormRef = ref();
 
 const editForm = reactive({
   jobId: undefined as number | string | undefined,
-  positionId: '' as number | string | '',
   jobName: '',
   jobType: '0',
   categoryId: '' as number | string | '',
   category: '',
+  categoryPath: [] as string[],
   regionPath: [] as string[],
   province: '',
   city: '',
@@ -1078,19 +1084,70 @@ const regionOptions = REGIONS.map((province: any) => ({
   }))
 }));
 
+// 职位类目树：编辑弹窗只选择类目节点，不再用标准职位覆盖岗位名称。
+interface CategoryOption {
+  value: string;
+  label: string;
+  children?: CategoryOption[];
+}
+
+const categoryOptions = ref<CategoryOption[]>([]);
+
+async function loadCategoryTree() {
+  const res = await getJobPositionTree();
+  const list: any[] = (res as any)?.data || [];
+  categoryOptions.value = list.map(mapCategoryOption);
+  syncEditCategoryPathFromId();
+}
+
+function mapCategoryOption(node: any): CategoryOption {
+  return {
+    value: String(node.id ?? ''),
+    label: String(node.name || ''),
+    children: (node.children || []).map(mapCategoryOption)
+  };
+}
+
+function syncEditCategoryFromPath() {
+  const path = editForm.categoryPath || [];
+  const selectedId = path[path.length - 1] || '';
+  const selected = findCategoryOptionById(selectedId);
+  editForm.categoryId = selectedId;
+  editForm.category = selected?.label || '';
+  editFormRef.value?.validateField?.('category');
+}
+
+function syncEditCategoryPathFromId() {
+  const id = editForm.categoryId ? String(editForm.categoryId) : '';
+  editForm.categoryPath = id ? findCategoryPath(id) : [];
+}
+
+function findCategoryOptionById(id: string): CategoryOption | undefined {
+  if (!id) return undefined;
+  const stack = [...categoryOptions.value];
+  while (stack.length) {
+    const node = stack.shift();
+    if (!node) continue;
+    if (node.value === id) return node;
+    stack.push(...(node.children || []));
+  }
+  return undefined;
+}
+
+function findCategoryPath(id: string, nodes: CategoryOption[] = categoryOptions.value, parents: string[] = []): string[] {
+  for (const node of nodes) {
+    const path = [...parents, node.value];
+    if (node.value === id) return path;
+    const childPath = findCategoryPath(id, node.children || [], path);
+    if (childPath.length) return childPath;
+  }
+  return [];
+}
+
 const editRules = {
-  jobName: [
-    { required: true, message: '请选择岗位名称', trigger: 'change' },
-    {
-      validator: (_rule: any, value: string, callback: (e?: Error) => void) => {
-        if (value && !editJobNameStandard.value) callback(new Error('请选择下拉内标准职位类目'));
-        else callback();
-      },
-      trigger: 'change'
-    }
-  ],
+  jobName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
   jobType: [{ required: true, message: '请选择用工性质', trigger: 'change' }],
-  category: [{ required: true, message: '请选择岗位名称自动带出职位类目', trigger: 'change' }],
+  category: [{ required: true, message: '请选择职位类目', trigger: 'change' }],
   // 至少选到省即可（min:1）：配合 checkStrictly 支持「全省/全市」类部分路径岗位的回显与保存，不强制必须到区县
   regionPath: [{ required: true, type: 'array', min: 1, message: '请至少选择省份', trigger: 'change' }],
   workAddress: [{ required: true, message: '请输入工作地点', trigger: 'blur' }],
@@ -1146,36 +1203,22 @@ function normalizeSalaryUnit(u?: string): string {
   return codeMap[unit] || '1';
 }
 
-// 编辑弹窗同样以标准职位库为数据源，positionId/categoryId 是提交给后端的权威字段。
-const editJobNameStandard = ref(true);
-function onEditJobNameValidChange(v: boolean) {
-  editJobNameStandard.value = v;
-  editFormRef.value?.validateField?.('jobName');
-}
-
-function onEditJobNamePick(payload: { positionId: number | string; positionName: string; categoryId: number | string; categoryName: string; name: string; category: string }) {
-  editForm.positionId = payload.positionId || '';
-  editForm.jobName = payload.positionName || payload.name || '';
-  editForm.categoryId = payload.categoryId || '';
-  editForm.category = payload.categoryName || payload.category || '';
-  editFormRef.value?.validateField?.('jobName');
-  editFormRef.value?.validateField?.('category');
-}
-
 // 打开编辑：拉全量详情回显（列表行字段不全，缺 salaryMin/Max/recruitNumber/description 等）
 async function handleEdit(row: any) {
   editVisible.value = true;
   editLoading.value = true;
-  editJobNameStandard.value = true;
   try {
+    if (!categoryOptions.value.length) {
+      await loadCategoryTree();
+    }
     const res = await getJobFullDetail(row.jobId);
     const d: any = res.data || {};
     editForm.jobId = d.jobId ?? row.jobId;
-    editForm.positionId = d.positionId != null ? String(d.positionId) : '';
-    editForm.jobName = d.positionName || d.jobName || '';
+    editForm.jobName = d.jobName || d.positionName || '';
     editForm.jobType = d.jobType != null ? String(d.jobType) : '0';
     editForm.categoryId = d.categoryId != null ? String(d.categoryId) : '';
     editForm.category = String(d.categoryName || d.category || '');
+    syncEditCategoryPathFromId();
     editForm.province = d.province ?? '';
     editForm.city = d.city ?? '';
     editForm.district = d.district ?? '';
@@ -1212,8 +1255,6 @@ function buildEditPayload() {
   syncEditRegionFromPath();
   const payload: any = {
     jobId: editForm.jobId,
-    positionId: editForm.positionId || undefined,
-    positionName: editForm.jobName,
     jobName: editForm.jobName,
     jobType: editForm.jobType,
     categoryId: editForm.categoryId || undefined,
@@ -1523,6 +1564,7 @@ function handleCopyPublish(row: any) {
 }
 
 onMounted(() => {
+  loadCategoryTree();
   loadData();
   loadStatistics();
 });

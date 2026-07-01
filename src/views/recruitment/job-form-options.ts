@@ -4,7 +4,7 @@
  *  - jobType 0全职/1兼职/2临时工/3项目制
  *  - salaryUnit 0元/天 1元/月 2元/次 3元/小时（无「面议」——面议=不填薪资，由读取方渲染）
  *  - experience 0-4 / education 0-7
- *  - category 由标准职位库随 positionId 自动带出，不再维护本地硬编码类目。
+ *  - category/categoryId 来自职位类目选择器，不再维护本地硬编码类目。
  */
 import { REGIONS } from '@/utils/region-data';
 
