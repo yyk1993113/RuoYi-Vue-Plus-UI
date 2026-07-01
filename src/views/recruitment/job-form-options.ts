@@ -4,7 +4,7 @@
  *  - jobType 0全职/1兼职/2临时工/3项目制
  *  - salaryUnit 0元/天 1元/月 2元/次 3元/小时（无「面议」——面议=不填薪资，由读取方渲染）
  *  - experience 0-4 / education 0-7
- * category 为本地常量（value 字典值、label 展示名），两端落库口径一致。
+ *  - category 由标准职位库随 positionId 自动带出，不再维护本地硬编码类目。
  */
 import { REGIONS } from '@/utils/region-data';
 
@@ -14,25 +14,6 @@ export const jobTypeOptions = [
   { value: '1', label: '兼职' },
   { value: '2', label: '临时工' },
   { value: '3', label: '项目制' }
-];
-
-// 职位类目
-export const categoryOptions = [
-  { value: 'tech', label: '技术研发' },
-  { value: 'product', label: '产品' },
-  { value: 'design', label: '设计' },
-  { value: 'operation', label: '运营' },
-  { value: 'marketing', label: '市场营销' },
-  { value: 'sales', label: '销售' },
-  { value: 'service', label: '客服' },
-  { value: 'finance', label: '财务/会计' },
-  { value: 'hr', label: '人力资源/行政' },
-  { value: 'logistics', label: '物流/仓储' },
-  { value: 'catering', label: '餐饮/服务业' },
-  { value: 'retail', label: '零售/导购' },
-  { value: 'manufacture', label: '生产/制造' },
-  { value: 'education', label: '教育/培训' },
-  { value: 'other', label: '其他' }
 ];
 
 // 经验要求 0-4

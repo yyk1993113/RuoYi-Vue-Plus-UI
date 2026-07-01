@@ -48,9 +48,13 @@ export interface JobVO {
   jobId?: number;
   companyId?: number;
   companyName?: string;
+  positionId?: number | string;
+  positionName?: string;
   jobName?: string;
   salary?: string;
   location?: string;
+  categoryId?: number | string;
+  categoryName?: string;
   jobType?: string;
   jobTypeName?: string;
   experience?: string;
@@ -76,6 +80,8 @@ export interface JobFullVO {
   jobId?: number;
   companyId?: number;
   companyName?: string;
+  positionId?: number | string;
+  positionName?: string;
   jobName?: string;
   // 用工性质 0:全职 1:兼职 2:临时工 3:项目制
   jobType?: string;
@@ -91,6 +97,8 @@ export interface JobFullVO {
   salaryUnitName?: string;
   location?: string;
   // 职位所属类目
+  categoryId?: number | string;
+  categoryName?: string;
   category?: string;
   // 岗位实际工作地点
   workAddress?: string;

@@ -261,7 +261,7 @@
           <el-descriptions-item label="用工性质">
             <el-tag :type="jobTypeMeta(currentJob.jobType).type">{{ jobTypeMeta(currentJob.jobType).label }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="职位类目">{{ currentJob.category || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="职位类目">{{ currentJob.categoryName || currentJob.category || '-' }}</el-descriptions-item>
           <el-descriptions-item label="薪资范围">{{
             formatSalary(currentJob.salaryMin, currentJob.salaryMax, currentJob.salaryUnit)
           }}</el-descriptions-item>
@@ -366,14 +366,16 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="岗位名称" prop="jobName">
-              <el-input v-model="editForm.jobName" placeholder="请输入岗位名称" maxlength="50" show-word-limit />
+              <job-position-picker
+                v-model="editForm.jobName"
+                @valid-change="onEditJobNameValidChange"
+                @pick="onEditJobNamePick"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="职位类目" prop="category">
-              <el-select v-model="editForm.category" placeholder="请选择职位类目" clearable filterable style="width: 100%">
-                <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-              </el-select>
+              <el-input v-model="editForm.category" placeholder="选择岗位名称后自动带出" readonly />
             </el-form-item>
           </el-col>
         </el-row>
@@ -735,6 +737,7 @@ import { download } from '@/utils/request';
 import { REGIONS } from '@/utils/region-data';
 import { unwrapList, splitToArray, formatSalary } from './helpers';
 import { jobStatusMeta, jobTypeMeta } from './constants';
+import JobPositionPicker from './components/JobPositionPicker.vue';
 
 const router = useRouter();
 const loading = ref(false);
@@ -844,8 +847,10 @@ const editFormRef = ref();
 
 const editForm = reactive({
   jobId: undefined as number | string | undefined,
+  positionId: '' as number | string | '',
   jobName: '',
   jobType: '0',
+  categoryId: '' as number | string | '',
   category: '',
   regionPath: [] as string[],
   province: '',
@@ -883,25 +888,6 @@ const workTimeTypeOptions = [
   { value: '1', label: '排班/轮班' },
   { value: '2', label: '弹性时间' },
   { value: '3', label: '按需/临时' }
-];
-
-// 职位类目：与 B 端发布表单同一套本地常量（value 为字典值、label 为展示名），保证两端落库口径一致
-const categoryOptions = [
-  { value: 'tech', label: '技术研发' },
-  { value: 'product', label: '产品' },
-  { value: 'design', label: '设计' },
-  { value: 'operation', label: '运营' },
-  { value: 'marketing', label: '市场营销' },
-  { value: 'sales', label: '销售' },
-  { value: 'service', label: '客服' },
-  { value: 'finance', label: '财务/会计' },
-  { value: 'hr', label: '人力资源/行政' },
-  { value: 'logistics', label: '物流/仓储' },
-  { value: 'catering', label: '餐饮/服务业' },
-  { value: 'retail', label: '零售/导购' },
-  { value: 'manufacture', label: '生产/制造' },
-  { value: 'education', label: '教育/培训' },
-  { value: 'other', label: '其他' }
 ];
 
 // 经验要求 0-4 / 学历要求 0-7：口径与 B 端发布表单一致
@@ -1093,9 +1079,18 @@ const regionOptions = REGIONS.map((province: any) => ({
 }));
 
 const editRules = {
-  jobName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
+  jobName: [
+    { required: true, message: '请选择岗位名称', trigger: 'change' },
+    {
+      validator: (_rule: any, value: string, callback: (e?: Error) => void) => {
+        if (value && !editJobNameStandard.value) callback(new Error('请选择下拉内标准职位类目'));
+        else callback();
+      },
+      trigger: 'change'
+    }
+  ],
   jobType: [{ required: true, message: '请选择用工性质', trigger: 'change' }],
-  category: [{ required: true, message: '请选择职位类目', trigger: 'change' }],
+  category: [{ required: true, message: '请选择岗位名称自动带出职位类目', trigger: 'change' }],
   // 至少选到省即可（min:1）：配合 checkStrictly 支持「全省/全市」类部分路径岗位的回显与保存，不强制必须到区县
   regionPath: [{ required: true, type: 'array', min: 1, message: '请至少选择省份', trigger: 'change' }],
   workAddress: [{ required: true, message: '请输入工作地点', trigger: 'blur' }],
@@ -1151,17 +1146,36 @@ function normalizeSalaryUnit(u?: string): string {
   return codeMap[unit] || '1';
 }
 
+// 编辑弹窗同样以标准职位库为数据源，positionId/categoryId 是提交给后端的权威字段。
+const editJobNameStandard = ref(true);
+function onEditJobNameValidChange(v: boolean) {
+  editJobNameStandard.value = v;
+  editFormRef.value?.validateField?.('jobName');
+}
+
+function onEditJobNamePick(payload: { positionId: number | string; positionName: string; categoryId: number | string; categoryName: string; name: string; category: string }) {
+  editForm.positionId = payload.positionId || '';
+  editForm.jobName = payload.positionName || payload.name || '';
+  editForm.categoryId = payload.categoryId || '';
+  editForm.category = payload.categoryName || payload.category || '';
+  editFormRef.value?.validateField?.('jobName');
+  editFormRef.value?.validateField?.('category');
+}
+
 // 打开编辑：拉全量详情回显（列表行字段不全，缺 salaryMin/Max/recruitNumber/description 等）
 async function handleEdit(row: any) {
   editVisible.value = true;
   editLoading.value = true;
+  editJobNameStandard.value = true;
   try {
     const res = await getJobFullDetail(row.jobId);
     const d: any = res.data || {};
     editForm.jobId = d.jobId ?? row.jobId;
-    editForm.jobName = d.jobName ?? '';
+    editForm.positionId = d.positionId != null ? String(d.positionId) : '';
+    editForm.jobName = d.positionName || d.jobName || '';
     editForm.jobType = d.jobType != null ? String(d.jobType) : '0';
-    editForm.category = d.category != null ? String(d.category) : '';
+    editForm.categoryId = d.categoryId != null ? String(d.categoryId) : '';
+    editForm.category = String(d.categoryName || d.category || '');
     editForm.province = d.province ?? '';
     editForm.city = d.city ?? '';
     editForm.district = d.district ?? '';
@@ -1198,8 +1212,12 @@ function buildEditPayload() {
   syncEditRegionFromPath();
   const payload: any = {
     jobId: editForm.jobId,
+    positionId: editForm.positionId || undefined,
+    positionName: editForm.jobName,
     jobName: editForm.jobName,
     jobType: editForm.jobType,
+    categoryId: editForm.categoryId || undefined,
+    categoryName: editForm.category,
     category: editForm.category,
     province: editForm.province,
     city: editForm.city,

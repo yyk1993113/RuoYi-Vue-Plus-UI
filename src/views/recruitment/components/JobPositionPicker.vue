@@ -1,13 +1,13 @@
 <!--
   岗位名称选择器（BOSS 直聘式职位类目级联选择）—— 自 findwordmanager 同名组件移植到运营总后台「代发岗位」。
   - 数据源：GET /api/app/jobCategory/tree（@SaIgnore 公开），结构 JobCategoryTreeVO[]：
-      顶级类别 → children 子类别 → positions 职位标签{id,name}；positions 也可直接挂在类别上。
+      顶级类别 → children 子类别 → positions 职位标签{id,name,categoryId,categoryName}；positions 也可直接挂在类别上。
       数据由运营台「岗位类别管理」(job_category/job_position) 维护，仅返回启用态。
   - 交互：
       · 点击输入框弹浮窗，左=一级分类、右=该分类下职位（子分类可折叠，默认展开），不跳转页面。
       · 浮窗顶部搜索框：实时过滤匹配职位（大小写不敏感子串；真·中文拼音需引入 pinyin-pro，见 matchKeyword 注释）。
       · 「热门」分组固定置顶，与普通分组隔离。
-      · 双向联动：选中职位回填岗位名称；当前值在职位库中则有效，否则失焦标红「请选择下拉内标准职位类目」(经 valid-change 透传父级校验)。
+      · 双向联动：选中职位回填岗位名称，并把该职位直接所属类目带回父表单。
       · 键盘：↑↓ 切换、Enter 选中、ESC 关闭；点击浮窗外自动收起（el-popover trigger=click）。
       · 选中后输入框内以可关闭标签展示（× 职位名）。
   - v-model 绑定「职位名称字符串」(与后端 Job.jobName 同口径)。
@@ -54,7 +54,7 @@
             class="jp-option"
             :class="{ 'is-active': idx === activeIndex, 'is-selected': p.name === modelValue }"
             @mouseenter="activeIndex = idx"
-            @click="choose(p.name)"
+            @click="choose(p)"
           >
             <span v-html="highlight(p.name)" />
             <span class="jp-option-path">{{ p.categoryName }}</span>
@@ -88,7 +88,7 @@
                   class="jp-option"
                   :class="{ 'is-active': isNavActive(p), 'is-selected': p.name === modelValue }"
                   @mouseenter="setNavActive(p)"
-                  @click="choose(p.name)"
+                  @click="choose(p)"
                 >
                   {{ p.name }}
                 </div>
@@ -107,7 +107,7 @@
                     class="jp-option"
                     :class="{ 'is-active': isNavActive(p), 'is-selected': p.name === modelValue }"
                     @mouseenter="setNavActive(p)"
-                    @click="choose(p.name)"
+                    @click="choose(p)"
                   >
                     {{ p.name }}
                   </div>
@@ -130,6 +130,7 @@ import { getJobPositionTree } from '@/api/recruitment/jobCategory';
 interface Pos {
   id: number | string;
   name: string;
+  categoryId?: number | string;
   categoryName?: string;
 }
 interface SubGroup {
@@ -154,8 +155,8 @@ const emit = defineEmits<{
   (e: 'change', v: string): void;
   // 当前值是否为「职位库内标准职位」，供父级 el-form 自定义校验联动
   (e: 'valid-change', v: boolean): void;
-  // 选中职位时抛出其「一级类目」，供父级把职位类目与岗位名称联动带入
-  (e: 'pick', payload: { name: string; category: string }): void;
+  // 选中职位时抛出标准职位与直接类目，父级据此提交 positionId/categoryId。
+  (e: 'pick', payload: { positionId: number | string; positionName: string; categoryId: number | string; categoryName: string; name: string; category: string }): void;
   // 职位类目树加载完成后抛出「一级类目列表」，供父级作为职位类目下拉数据源（与岗位名称同源）
   (e: 'categories-loaded', cats: { id: number | string; name: string }[]): void;
 }>();
@@ -194,10 +195,10 @@ async function loadTree() {
     cats.sort((a, b) => Number(b.isHot) - Number(a.isHot));
     topCategories.value = cats;
     allPositionNames.value = names;
-    // 抛出一级类目列表给父级（职位类目下拉与岗位名称同源）
+    // 兼容旧父组件事件：输出职位直接类目集合，新表单不再单独选择类目。
     emit(
       'categories-loaded',
-      cats.map((c) => ({ id: c.id, name: c.name }))
+      collectDirectCategories(cats)
     );
     emitValid();
   } catch (e) {
@@ -208,12 +209,12 @@ async function loadTree() {
 }
 
 function buildTopCat(node: any, names: Set<string>): TopCat {
-  const directPositions: Pos[] = (node.positions || []).map((p: any) => collectPos(p, node.name, names));
+  const directPositions: Pos[] = (node.positions || []).map((p: any) => collectPos(p, node.id, node.name, names));
   const children: SubGroup[] = (node.children || []).map((sub: any) => ({
     id: sub.id,
     name: sub.name,
-    // 子分类的职位 = 直接职位 + 其更深子分类的职位拍平（容错多级），category 路径记到顶/子名
-    positions: flattenPositions(sub, node.name + ' / ' + sub.name, names)
+    // 子分类职位按其直接类目回填 categoryId/categoryName；更深层级继续使用所属叶子类目。
+    positions: flattenPositions(sub, names)
   }));
   return {
     id: node.id,
@@ -223,16 +224,30 @@ function buildTopCat(node: any, names: Set<string>): TopCat {
     children
   };
 }
-function collectPos(p: any, categoryName: string, names: Set<string>): Pos {
+function collectPos(p: any, categoryId: number | string, categoryName: string, names: Set<string>): Pos {
   if (p?.name) names.add(p.name);
-  return { id: p.id, name: p.name, categoryName };
+  return {
+    id: p.id,
+    name: p.name,
+    categoryId: p.categoryId ?? categoryId,
+    categoryName: p.categoryName || categoryName
+  };
 }
-function flattenPositions(node: any, path: string, names: Set<string>): Pos[] {
-  const out: Pos[] = (node.positions || []).map((p: any) => collectPos(p, path, names));
+function flattenPositions(node: any, names: Set<string>): Pos[] {
+  const out: Pos[] = (node.positions || []).map((p: any) => collectPos(p, node.id, node.name, names));
   for (const sub of node.children || []) {
-    out.push(...flattenPositions(sub, path + ' / ' + sub.name, names));
+    out.push(...flattenPositions(sub, names));
   }
   return out;
+}
+function collectDirectCategories(cats: TopCat[]) {
+  const map = new Map<number | string, string>();
+  for (const cat of cats) {
+    for (const p of [...cat.positions, ...cat.children.flatMap((s) => s.positions)]) {
+      if (p.categoryId != null && p.categoryName) map.set(p.categoryId, p.categoryName);
+    }
+  }
+  return [...map.entries()].map(([id, name]) => ({ id, name }));
 }
 
 // ===== 搜索 =====
@@ -294,25 +309,26 @@ function toggleCollapse(id: string | number) {
 }
 
 // ===== 选择 / 清除 =====
-function choose(name: string) {
+function choose(position: Pos) {
+  const name = position.name || '';
+  const categoryName = position.categoryName || '';
   emit('update:modelValue', name);
   emit('change', name);
-  // 同步抛出该职位的一级类目，供父级把「职位类目」自动带入
-  emit('pick', { name, category: topCategoryOf(name) });
+  emit('pick', {
+    positionId: position.id,
+    positionName: name,
+    categoryId: position.categoryId ?? '',
+    categoryName,
+    name,
+    category: categoryName
+  });
   visible.value = false;
   keyword.value = '';
-}
-
-// 按职位名定位其所属「一级类目」名称（直接挂类别下或挂在子分类下都能命中）
-function topCategoryOf(name: string): string {
-  const cat = topCategories.value.find(
-    (c) => c.positions.some((p) => p.name === name) || c.children.some((s) => s.positions.some((p) => p.name === name))
-  );
-  return cat?.name || '';
 }
 function clearSelection() {
   emit('update:modelValue', '');
   emit('change', '');
+  emit('pick', { positionId: '', positionName: '', categoryId: '', categoryName: '', name: '', category: '' });
 }
 function toggle() {
   visible.value = !visible.value;
@@ -346,7 +362,7 @@ function onKeydown(e: KeyboardEvent) {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const p = searchResults.value[activeIndex.value];
-      if (p) choose(p.name);
+      if (p) choose(p);
     }
     return;
   }
@@ -365,7 +381,7 @@ function onKeydown(e: KeyboardEvent) {
   } else if (e.key === 'Enter') {
     e.preventDefault();
     const p = list[cur >= 0 ? cur : 0];
-    if (p) choose(p.name);
+    if (p) choose(p);
   }
 }
 
