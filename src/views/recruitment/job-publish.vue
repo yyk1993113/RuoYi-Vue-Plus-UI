@@ -44,13 +44,8 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="岗位名称" prop="jobName">
-              <!-- 岗位名称：BOSS 直聘式职位类目级联选择器（左类目/右职位+搜索）；选中后自动把一级类目带入职位类目（@pick），下拉数据源亦由其透传（@categories-loaded） -->
-              <job-position-picker
-                v-model="form.jobName"
-                @valid-change="onJobNameValidChange"
-                @pick="onJobNamePick"
-                @categories-loaded="onCategoriesLoaded"
-              />
+              <!-- 岗位名称是招聘展示标题，可自由填写；职位类目在下方单独选择。 -->
+              <el-input v-model="form.jobName" placeholder="请输入岗位名称，如 全职前端开发工程师" maxlength="50" show-word-limit />
             </el-form-item>
           </el-col>
         </el-row>
@@ -77,10 +72,16 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="职位类目" prop="category">
-              <!-- 职位类目：与岗位名称同源（一级类目来自职位类目库，经 @categories-loaded 透传）；选岗位名称会自动带入 -->
-              <el-select v-model="form.category" placeholder="请选择职位类目" clearable filterable style="width: 100%">
-                <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-              </el-select>
+              <el-cascader
+                v-model="form.categoryPath"
+                :options="categoryOptions"
+                :props="{ checkStrictly: true, emitPath: true }"
+                filterable
+                clearable
+                placeholder="请选择职位类目"
+                style="width: 100%"
+                @change="syncCategoryFromPath"
+              />
             </el-form-item>
           </el-col>
         </el-row>
@@ -329,8 +330,7 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { addJob, saveJobDraft, listCompany, getJobFullDetail } from '@/api/recruitment';
-// 岗位名称：BOSS 直聘式职位类目级联选择器（数据源=职位类目库 /api/app/jobCategory/tree）；职位类目与其同源
-import JobPositionPicker from './components/JobPositionPicker.vue';
+import { getJobPositionTree } from '@/api/recruitment/jobCategory';
 import { unwrapList, formatSalary } from './helpers';
 import {
   jobTypeOptions,
@@ -364,7 +364,9 @@ function emptyForm() {
     companyId: undefined as number | string | undefined,
     jobName: '',
     jobType: '0',
+    categoryId: '' as number | string | '',
     category: '',
+    categoryPath: [] as string[],
     regionPath: [] as string[],
     province: '',
     city: '',
@@ -404,53 +406,99 @@ async function searchCompany(keyword: string) {
   }
 }
 
-// ===== 岗位名称 / 职位类目：来源职位类目库（与 manager 一致，JobPositionPicker 驱动） =====
-// 职位类目一级目录与「岗位名称」同源：由 JobPositionPicker 经 @categories-loaded 透传；value/label 均用一级类目名。
-const taxonomyCategories = ref<{ id: number | string; name: string }[]>([]);
-const categoryOptions = computed(() => {
-  const opts = taxonomyCategories.value.map((c) => ({ value: c.name, label: c.name }));
-  // 复制发布回显兜底：旧 category 值（如历史占位码 tech）不在一级目录里时补一项，避免下拉显示空白
-  if (form.category && !opts.some((o) => o.value === form.category)) {
-    opts.unshift({ value: form.category, label: form.category });
-  }
-  return opts;
-});
-
-// 职位类目树加载完成：作为职位类目下拉数据源
-function onCategoriesLoaded(cats: { id: number | string; name: string }[]) {
-  taxonomyCategories.value = cats;
+// ===== 职位类目：从职位类目树选择，categoryId/category 是提交给后端的权威类目快照 =====
+interface CategoryOption {
+  value: string;
+  label: string;
+  children?: CategoryOption[];
 }
 
-// 选定岗位名称：自动带入其一级类目并触发该字段校验
-function onJobNamePick(payload: { name: string; category: string }) {
-  if (payload.category) {
-    form.category = payload.category;
-    formRef.value?.validateField?.('category');
+const categoryOptions = ref<CategoryOption[]>([]);
+
+async function loadCategoryTree() {
+  const res = await getJobPositionTree();
+  const list: any[] = (res as any)?.data || [];
+  categoryOptions.value = list.map(mapCategoryOption);
+  syncCategoryPathFromId();
+}
+
+function mapCategoryOption(node: any): CategoryOption {
+  return {
+    value: String(node.id ?? ''),
+    label: String(node.name || ''),
+    children: (node.children || []).map(mapCategoryOption)
+  };
+}
+
+function syncCategoryFromPath() {
+  const path = form.categoryPath || [];
+  const selectedId = path[path.length - 1] || '';
+  const selected = findCategoryOptionById(selectedId);
+  form.categoryId = selectedId;
+  form.category = selected?.label || '';
+  formRef.value?.validateField?.('category');
+}
+
+function syncCategoryPathFromId() {
+  const id = form.categoryId ? String(form.categoryId) : '';
+  form.categoryPath = id ? findCategoryPath(id) : [];
+}
+
+function applyCategorySnapshot(categoryId: unknown, categoryText: unknown) {
+  form.categoryId = categoryId != null ? String(categoryId) : '';
+  form.category = String(categoryText || '');
+  if (form.categoryId) {
+    syncCategoryPathFromId();
+    return;
+  }
+  // 兼容复制发布时历史详情只返回类目名称、没有 categoryId 的记录。
+  const path = findCategoryPathByLabel(form.category);
+  form.categoryPath = path;
+  const selected = path.length ? findCategoryOptionById(path[path.length - 1]) : undefined;
+  if (selected) {
+    form.categoryId = selected.value;
+    form.category = selected.label;
   }
 }
 
-// 岗位名称是否为「职位库内标准职位」：由 JobPositionPicker 经 valid-change 透传，参与提交校验。
-const jobNameStandard = ref(true);
-function onJobNameValidChange(v: boolean) {
-  jobNameStandard.value = v;
-  // 值变更后重新触发该字段校验，及时清除/显示「标准职位」错误
-  formRef.value?.validateField?.('jobName');
+function findCategoryOptionById(id: string): CategoryOption | undefined {
+  if (!id) return undefined;
+  const stack = [...categoryOptions.value];
+  while (stack.length) {
+    const node = stack.shift();
+    if (!node) continue;
+    if (node.value === id) return node;
+    stack.push(...(node.children || []));
+  }
+  return undefined;
+}
+
+function findCategoryPath(id: string, nodes: CategoryOption[] = categoryOptions.value, parents: string[] = []): string[] {
+  for (const node of nodes) {
+    const path = [...parents, node.value];
+    if (node.value === id) return path;
+    const childPath = findCategoryPath(id, node.children || [], path);
+    if (childPath.length) return childPath;
+  }
+  return [];
+}
+
+function findCategoryPathByLabel(label: string, nodes: CategoryOption[] = categoryOptions.value, parents: string[] = []): string[] {
+  const text = String(label || '').trim();
+  if (!text) return [];
+  for (const node of nodes) {
+    const path = [...parents, node.value];
+    if (node.label === text) return path;
+    const childPath = findCategoryPathByLabel(text, node.children || [], path);
+    if (childPath.length) return childPath;
+  }
+  return [];
 }
 
 // ===== 校验规则 =====
 const rules = {
   companyId: [{ required: true, message: '请选择所属企业', trigger: 'change' }],
-  jobName: [
-    { required: true, message: '请选择岗位名称', trigger: 'change' },
-    // 必须是职位类目库内的标准职位（jobNameStandard 由 JobPositionPicker 透传）
-    {
-      validator: (_rule: any, value: string, callback: (e?: Error) => void) => {
-        if (value && !jobNameStandard.value) callback(new Error('请选择下拉内标准职位类目'));
-        else callback();
-      },
-      trigger: 'change'
-    }
-  ],
+  jobName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
   jobType: [{ required: true, message: '请选择用工性质', trigger: 'change' }],
   category: [{ required: true, message: '请选择职位类目', trigger: 'change' }],
   regionPath: [{ required: true, type: 'array', min: 3, message: '请选择省市区', trigger: 'change' }],
@@ -594,6 +642,8 @@ function buildPayload(status: string) {
     companyId: form.companyId,
     jobName: form.jobName?.trim(),
     jobType: form.jobType,
+    categoryId: form.categoryId || undefined,
+    categoryName: form.category,
     category: form.category,
     province: form.province,
     city: form.city,
@@ -673,6 +723,7 @@ function afterSuccess(msg: string) {
     .catch((action) => {
       if (action === 'cancel') {
         Object.assign(form, emptyForm());
+        syncCategoryPathFromId();
         formRef.value?.clearValidate?.();
       }
     });
@@ -686,6 +737,7 @@ function handleReset() {
   })
     .then(() => {
       Object.assign(form, emptyForm());
+      syncCategoryPathFromId();
       formRef.value?.clearValidate?.();
       clearLocalDraft();
     })
@@ -733,6 +785,7 @@ function restoreLocalDraft() {
     if (!raw) return;
     const saved = JSON.parse(raw);
     Object.assign(form, saved);
+    syncCategoryPathFromId();
     lastAutoSavedText.value = '已恢复上次未提交的草稿';
     // 恢复企业名以便选择器回显
     if (form.companyId) {
@@ -761,9 +814,9 @@ async function loadCopyFrom(jobId: string) {
     const d: any = res.data || {};
     form.companyId = d.companyId ?? undefined;
     if (d.companyId) companyOptions.value = [{ companyId: d.companyId, companyName: d.companyName || `企业#${d.companyId}` }];
-    form.jobName = d.jobName ? `${d.jobName}（副本）` : '';
+    form.jobName = d.jobName || d.positionName || '';
     form.jobType = d.jobType != null ? String(d.jobType) : '0';
-    form.category = d.category != null ? String(d.category) : '';
+    applyCategorySnapshot(d.categoryId, d.categoryName || d.category);
     form.province = d.province ?? '';
     form.city = d.city ?? '';
     form.district = d.district ?? '';
@@ -787,11 +840,11 @@ async function loadCopyFrom(jobId: string) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('keydown', onKeydown);
-  // 职位类目树由 JobPositionPicker 内部自行加载，这里无需预拉
+  await loadCategoryTree();
   if (isCopy.value) {
-    loadCopyFrom(String(route.query.copyFrom));
+    await loadCopyFrom(String(route.query.copyFrom));
   } else {
     restoreLocalDraft();
   }

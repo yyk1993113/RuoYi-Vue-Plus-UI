@@ -261,7 +261,7 @@
           <el-descriptions-item label="用工性质">
             <el-tag :type="jobTypeMeta(currentJob.jobType).type">{{ jobTypeMeta(currentJob.jobType).label }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="职位类目">{{ currentJob.category || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="职位类目">{{ currentJob.categoryName || currentJob.category || '-' }}</el-descriptions-item>
           <el-descriptions-item label="薪资范围">{{
             formatSalary(currentJob.salaryMin, currentJob.salaryMax, currentJob.salaryUnit)
           }}</el-descriptions-item>
@@ -366,14 +366,22 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="岗位名称" prop="jobName">
-              <el-input v-model="editForm.jobName" placeholder="请输入岗位名称" maxlength="50" show-word-limit />
+              <!-- 岗位名称是招聘展示标题，可自由填写；职位类目独立选择并作为分类合同提交。 -->
+              <el-input v-model="editForm.jobName" placeholder="请输入岗位名称，如 全职前端开发工程师" maxlength="50" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="职位类目" prop="category">
-              <el-select v-model="editForm.category" placeholder="请选择职位类目" clearable filterable style="width: 100%">
-                <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-              </el-select>
+              <el-cascader
+                v-model="editForm.categoryPath"
+                :options="categoryOptions"
+                :props="{ checkStrictly: true, emitPath: true }"
+                filterable
+                clearable
+                placeholder="请选择职位类目"
+                style="width: 100%"
+                @change="syncEditCategoryFromPath"
+              />
             </el-form-item>
           </el-col>
         </el-row>
@@ -735,6 +743,7 @@ import { download } from '@/utils/request';
 import { REGIONS } from '@/utils/region-data';
 import { unwrapList, splitToArray, formatSalary } from './helpers';
 import { jobStatusMeta, jobTypeMeta } from './constants';
+import { getJobPositionTree } from '@/api/recruitment/jobCategory';
 
 const router = useRouter();
 const loading = ref(false);
@@ -846,7 +855,9 @@ const editForm = reactive({
   jobId: undefined as number | string | undefined,
   jobName: '',
   jobType: '0',
+  categoryId: '' as number | string | '',
   category: '',
+  categoryPath: [] as string[],
   regionPath: [] as string[],
   province: '',
   city: '',
@@ -883,25 +894,6 @@ const workTimeTypeOptions = [
   { value: '1', label: '排班/轮班' },
   { value: '2', label: '弹性时间' },
   { value: '3', label: '按需/临时' }
-];
-
-// 职位类目：与 B 端发布表单同一套本地常量（value 为字典值、label 为展示名），保证两端落库口径一致
-const categoryOptions = [
-  { value: 'tech', label: '技术研发' },
-  { value: 'product', label: '产品' },
-  { value: 'design', label: '设计' },
-  { value: 'operation', label: '运营' },
-  { value: 'marketing', label: '市场营销' },
-  { value: 'sales', label: '销售' },
-  { value: 'service', label: '客服' },
-  { value: 'finance', label: '财务/会计' },
-  { value: 'hr', label: '人力资源/行政' },
-  { value: 'logistics', label: '物流/仓储' },
-  { value: 'catering', label: '餐饮/服务业' },
-  { value: 'retail', label: '零售/导购' },
-  { value: 'manufacture', label: '生产/制造' },
-  { value: 'education', label: '教育/培训' },
-  { value: 'other', label: '其他' }
 ];
 
 // 经验要求 0-4 / 学历要求 0-7：口径与 B 端发布表单一致
@@ -1092,6 +1084,95 @@ const regionOptions = REGIONS.map((province: any) => ({
   }))
 }));
 
+// 职位类目树：编辑弹窗只选择类目节点，不再用标准职位覆盖岗位名称。
+interface CategoryOption {
+  value: string;
+  label: string;
+  children?: CategoryOption[];
+}
+
+const categoryOptions = ref<CategoryOption[]>([]);
+
+async function loadCategoryTree() {
+  const res = await getJobPositionTree();
+  const list: any[] = (res as any)?.data || [];
+  categoryOptions.value = list.map(mapCategoryOption);
+  syncEditCategoryPathFromId();
+}
+
+function mapCategoryOption(node: any): CategoryOption {
+  return {
+    value: String(node.id ?? ''),
+    label: String(node.name || ''),
+    children: (node.children || []).map(mapCategoryOption)
+  };
+}
+
+function syncEditCategoryFromPath() {
+  const path = editForm.categoryPath || [];
+  const selectedId = path[path.length - 1] || '';
+  const selected = findCategoryOptionById(selectedId);
+  editForm.categoryId = selectedId;
+  editForm.category = selected?.label || '';
+  editFormRef.value?.validateField?.('category');
+}
+
+function syncEditCategoryPathFromId() {
+  const id = editForm.categoryId ? String(editForm.categoryId) : '';
+  editForm.categoryPath = id ? findCategoryPath(id) : [];
+}
+
+function applyEditCategorySnapshot(categoryId: unknown, categoryText: unknown) {
+  editForm.categoryId = categoryId != null ? String(categoryId) : '';
+  editForm.category = String(categoryText || '');
+  if (editForm.categoryId) {
+    syncEditCategoryPathFromId();
+    return;
+  }
+  // 兼容历史详情只返回类目名称、没有 categoryId 的记录。
+  const path = findCategoryPathByLabel(editForm.category);
+  editForm.categoryPath = path;
+  const selected = path.length ? findCategoryOptionById(path[path.length - 1]) : undefined;
+  if (selected) {
+    editForm.categoryId = selected.value;
+    editForm.category = selected.label;
+  }
+}
+
+function findCategoryOptionById(id: string): CategoryOption | undefined {
+  if (!id) return undefined;
+  const stack = [...categoryOptions.value];
+  while (stack.length) {
+    const node = stack.shift();
+    if (!node) continue;
+    if (node.value === id) return node;
+    stack.push(...(node.children || []));
+  }
+  return undefined;
+}
+
+function findCategoryPath(id: string, nodes: CategoryOption[] = categoryOptions.value, parents: string[] = []): string[] {
+  for (const node of nodes) {
+    const path = [...parents, node.value];
+    if (node.value === id) return path;
+    const childPath = findCategoryPath(id, node.children || [], path);
+    if (childPath.length) return childPath;
+  }
+  return [];
+}
+
+function findCategoryPathByLabel(label: string, nodes: CategoryOption[] = categoryOptions.value, parents: string[] = []): string[] {
+  const text = String(label || '').trim();
+  if (!text) return [];
+  for (const node of nodes) {
+    const path = [...parents, node.value];
+    if (node.label === text) return path;
+    const childPath = findCategoryPathByLabel(text, node.children || [], path);
+    if (childPath.length) return childPath;
+  }
+  return [];
+}
+
 const editRules = {
   jobName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
   jobType: [{ required: true, message: '请选择用工性质', trigger: 'change' }],
@@ -1156,12 +1237,15 @@ async function handleEdit(row: any) {
   editVisible.value = true;
   editLoading.value = true;
   try {
+    if (!categoryOptions.value.length) {
+      await loadCategoryTree();
+    }
     const res = await getJobFullDetail(row.jobId);
     const d: any = res.data || {};
     editForm.jobId = d.jobId ?? row.jobId;
-    editForm.jobName = d.jobName ?? '';
+    editForm.jobName = d.jobName || d.positionName || '';
     editForm.jobType = d.jobType != null ? String(d.jobType) : '0';
-    editForm.category = d.category != null ? String(d.category) : '';
+    applyEditCategorySnapshot(d.categoryId, d.categoryName || d.category);
     editForm.province = d.province ?? '';
     editForm.city = d.city ?? '';
     editForm.district = d.district ?? '';
@@ -1200,6 +1284,8 @@ function buildEditPayload() {
     jobId: editForm.jobId,
     jobName: editForm.jobName,
     jobType: editForm.jobType,
+    categoryId: editForm.categoryId || undefined,
+    categoryName: editForm.category,
     category: editForm.category,
     province: editForm.province,
     city: editForm.city,
@@ -1505,6 +1591,7 @@ function handleCopyPublish(row: any) {
 }
 
 onMounted(() => {
+  loadCategoryTree();
   loadData();
   loadStatistics();
 });

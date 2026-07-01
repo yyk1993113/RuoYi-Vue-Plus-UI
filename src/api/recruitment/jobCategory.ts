@@ -41,9 +41,9 @@ export interface JobPositionQuery {
   status?: number | string;
 }
 
-// App 端只读：选职位级联树（类别树 + 各类别下职位标签，仅启用态）。
+// App 端只读：职位类目级联树（类别树 + 各类别下职位标签，仅启用态）。
 // 后端 AppJobCategoryController 整类 @SaIgnore 公开，基路径含 /api（/api/app/jobCategory/tree）；
-// 本仓 request 不自动补前缀，故此处 url 直写后端全路径。运营台「代发岗位」复用它作岗位名称选择器数据源。
+// 本仓 request 不自动补前缀，故此处 url 直写后端全路径。发岗页只取类别节点作为职位类目选择器数据源。
 export function getJobPositionTree() {
   return request.get<any>(`/api/app/jobCategory/tree`);
 }
