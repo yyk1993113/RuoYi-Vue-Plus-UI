@@ -123,12 +123,18 @@
               <el-icon><Document /></el-icon>
               <div class="template-file-main">
                 <div class="template-file-name">
-                  {{ authLetterTemplate[item.type]?.originalName || item.emptyName }}
+                  {{ authLetterTemplate[item.type]?.url ? item.displayName : item.emptyName }}
                 </div>
                 <div class="template-file-meta">{{ item.label }}，仅支持 PDF</div>
               </div>
-              <el-button link type="primary" :disabled="!authLetterTemplate[item.type]?.url" @click="openUrl(authLetterTemplate[item.type]?.url)">
-                打开
+              <el-button
+                link
+                type="primary"
+                :disabled="!authLetterTemplate[item.type]?.url"
+                :loading="templateDownloading[item.type]"
+                @click="downloadAuthLetterTemplate(item)"
+              >
+                下载
               </el-button>
               <el-upload
                 :action="templateUploadUrl(item.type)"
@@ -193,10 +199,12 @@ import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Document } from '@element-plus/icons-vue';
 import { globalHeaders } from '@/utils/request';
+import { blobValidate } from '@/utils/ruoyi';
 import {
   getRecConfig,
   updateRecConfig,
   getAuthLetterTemplate,
+  downloadAuthLetterTemplateFile,
   authLetterTemplateUploadUrl,
   listConfigDictData,
   type AuthLetterTemplateSet,
@@ -264,15 +272,25 @@ const saving = reactive<Record<string, boolean>>({
   parttime: false
 });
 type AuthLetterTemplateType = keyof AuthLetterTemplateSet;
+type AuthLetterTemplateOption = {
+  type: AuthLetterTemplateType;
+  label: string;
+  displayName: string;
+  emptyName: string;
+};
 
-const templateTypes: { type: AuthLetterTemplateType; label: string; emptyName: string }[] = [
-  { type: 'legalRepresentative', label: '法人版确认书', emptyName: '未上传法人版确认书.pdf' },
-  { type: 'operator', label: '经办人授权书', emptyName: '未上传经办人授权书.pdf' }
+const templateTypes: AuthLetterTemplateOption[] = [
+  { type: 'legalRepresentative', label: '法人版确认书', displayName: '法人版确认书.pdf', emptyName: '未上传法人版确认书.pdf' },
+  { type: 'operator', label: '经办人授权书', displayName: '经办人授权书.pdf', emptyName: '未上传经办人授权书.pdf' }
 ];
 
-// 招聘授权书模板按操作者身份拆成两个 PDF，避免企业下载错版本后被审核驳回。
+// 招聘授权书模板按操作者身份拆成两个 PDF；运营台展示业务文件名，不暴露 OSS 原始上传名或对象 key。
 const authLetterTemplate = ref<AuthLetterTemplateSet>({});
 const templateUploading = reactive<Record<AuthLetterTemplateType, boolean>>({
+  legalRepresentative: false,
+  operator: false
+});
+const templateDownloading = reactive<Record<AuthLetterTemplateType, boolean>>({
   legalRepresentative: false,
   operator: false
 });
@@ -280,6 +298,14 @@ const uploadHeaders = ref(globalHeaders());
 
 function templateUploadUrl(type: AuthLetterTemplateType) {
   return `${import.meta.env.VITE_APP_BASE_API}${authLetterTemplateUploadUrl(type)}`;
+}
+
+function unwrapBlob(res: unknown): Blob | null {
+  if (res instanceof Blob) {
+    return res;
+  }
+  const data = (res as { data?: unknown })?.data;
+  return data instanceof Blob ? data : null;
 }
 
 // 拉取全部已配置项：逐 key GET /admin/config/get，命中则回填 model
@@ -324,10 +350,38 @@ async function saveGroup(group: string) {
   }
 }
 
-// 预览/打开授权书模板等 URL
-function openUrl(url?: string) {
-  if (!url) return;
-  window.open(url, '_blank');
+// 运营台经后端同源接口流式下载，避免前端直接 fetch 私有 OSS 预签名地址触发跨域限制。
+async function downloadAuthLetterTemplate(item: AuthLetterTemplateOption) {
+  const url = authLetterTemplate.value[item.type]?.url;
+  if (!url) {
+    ElMessage.warning('请先上传模板');
+    return;
+  }
+  templateDownloading[item.type] = true;
+  try {
+    const blob = unwrapBlob(await downloadAuthLetterTemplateFile(item.type));
+    if (!blob || blob.size <= 0) {
+      throw new Error('模板返回内容为空');
+    }
+    if (!blobValidate(blob)) {
+      const text = await blob.text();
+      const data = text ? JSON.parse(text) : {};
+      throw new Error(data?.msg || data?.message || '模板下载失败');
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = item.displayName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+  } catch (e) {
+    console.error(e);
+    ElMessage.error('模板下载失败，请稍后重试');
+  } finally {
+    templateDownloading[item.type] = false;
+  }
 }
 
 // 当前模板由后端按 OSS id 重新签名返回，避免私有桶原始 URL 过期或不可访问。

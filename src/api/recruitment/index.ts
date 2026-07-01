@@ -1526,6 +1526,14 @@ export function authLetterTemplateUploadUrl(type: keyof AuthLetterTemplateSet) {
   return `${configBaseUrl}/auth-letter-template/upload?type=${type}`;
 }
 
+// 运营台模板下载走同源后端流式接口，避免前端 fetch 私有 OSS 预签名地址时受跨域策略影响。
+export function downloadAuthLetterTemplateFile(type: keyof AuthLetterTemplateSet) {
+  return request.get<Blob>(`${configBaseUrl}/auth-letter-template/download`, {
+    params: { type },
+    responseType: 'blob'
+  });
+}
+
 // 配置列表（分页，支持 configKey 模糊 / configGroup 过滤）：GET /admin/config/list，返回 TableDataInfo（rows/total）
 export function listRecConfig(query: { pageNum?: number; pageSize?: number; configKey?: string; configGroup?: string }) {
   return request.get<RecConfigVO[]>(`${configBaseUrl}/list`, { params: query });
