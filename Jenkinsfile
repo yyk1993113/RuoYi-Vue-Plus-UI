@@ -1,7 +1,6 @@
 // ============================================================
-// RuoYi-Vue-Plus-UI 管理后台前端 Jenkinsfile
-// Vue3 + Vite + pnpm + Element Plus (RuoYi-Vue-Plus 5.x)
-// 需要 Node >= 20.19.0
+// RuoYi-Vue-Plus-UI 前端 Jenkinsfile
+// Vue3 + Vite + pnpm + Element Plus
 // ============================================================
 
 pipeline {
@@ -10,6 +9,7 @@ pipeline {
     environment {
         PROJECT_NAME = 'ruoyi-vue-plus-ui'
         DEPLOY_DIR = 'D:\\deploy\\ruoyi-vue-plus-ui'
+        PATH = "D:\\maven\\apache-maven-3.9.9\\bin;C:\\Program Files\\nodejs;C:\\Program Files\\Git\\cmd;${env.PATH}"
     }
 
     options {
@@ -33,16 +33,16 @@ pipeline {
 
         stage('安装依赖') {
             steps {
-                echo '安装pnpm依赖 (使用国内镜像)...'
+                echo '安装pnpm依赖...'
                 bat 'pnpm install --registry=https://registry.npmmirror.com'
             }
         }
 
         stage('构建') {
             steps {
-                echo '构建前端项目 (build:prod)...'
+                echo '构建前端项目...'
                 bat 'pnpm run build:prod'
-                echo '前端构建完成！'
+                echo '构建完成'
             }
         }
 
@@ -58,22 +58,19 @@ pipeline {
                     mkdir "%BACKUP_DIR%"
                     xcopy /E /Y /I "%DEPLOY_DIR%" "%BACKUP_DIR%\\" 2>nul
                 )
-                REM 清理旧文件（保留backup）
                 for /d %%i in ("%DEPLOY_DIR%\\*") do (
                     if /i not "%%~nxi"=="backup" rd /s /q "%%i"
                 )
                 del /q "%DEPLOY_DIR%\\*.*" 2>nul
-                REM 复制构建产物（RuoYi-UI build输出到dist目录）
                 xcopy /E /Y /I "dist" "%DEPLOY_DIR%"
-                echo 部署完成!
+                echo 部署完成
                 '''
             }
         }
 
         stage('Nginx重载') {
             steps {
-                echo '提示：如需Nginx重载请取消下一行注释'
-                bat 'echo 如需Nginx reload, 请配置: nginx -s reload'
+                echo '提示: 如使用Nginx请配置reload命令'
                 // bat 'nginx -s reload'
             }
         }
