@@ -204,7 +204,7 @@
         </el-table-column>
 
         <!-- 禁言状态 -->
-        <el-table-column label="禁言状态" width="96" align="center">
+        <el-table-column label="禁言状态" width="112" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.isRecruitmentSilenced === '1'" type="danger" size="small" class="silence-status-tag">
               <el-icon><WarnTriangleFilled /></el-icon>
@@ -1154,6 +1154,8 @@ function submitFileForm() {
 .silence-status-tag {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: 58px;
   gap: 2px;
   white-space: nowrap;
 }
