@@ -159,6 +159,11 @@
             style="width: 130px"
           />
         </el-form-item>
+        <el-form-item v-show="showMoreQuery" label="结算意向" prop="settlementFollowStatus">
+          <el-select v-model="queryParams.settlementFollowStatus" placeholder="全部" clearable style="width: 150px">
+            <el-option label="待联系" value="0" />
+          </el-select>
+        </el-form-item>
         <el-form-item v-show="showMoreQuery" label="注册时间">
           <el-date-picker
             v-model="dateRange"
@@ -243,6 +248,22 @@
             <el-tag type="info" class="count-clickable" @click="openApplyDialog(row, '0')">{{ row.noFeedbackCount || 0 }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="结算意向" width="190" align="center">
+          <template #default="{ row }">
+            <el-tooltip
+              v-if="hasPendingSettlementIntent(row)"
+              placement="top"
+              :content="`岗位：${row.settlementJobName || '-'}；时间：${row.settlementCreateTime || '-'}`"
+            >
+              <div class="settlement-intent-cell">
+                <el-tag type="danger" effect="plain">待联系</el-tag>
+                <div class="settlement-intent-main">{{ settlementIntentLabel(row.settlementIntentType) }}</div>
+                <div class="text-secondary">{{ row.settlementOperatorName || '企业用户' }} {{ row.settlementOperatorPhone || row.settlementContactPhone || '' }}</div>
+              </div>
+            </el-tooltip>
+            <span v-else class="text-secondary">-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="认证状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="companyStatusMeta(row.status).type">{{ companyStatusMeta(row.status).label }}</el-tag>
@@ -274,6 +295,9 @@
                     <el-dropdown-item v-if="row.status === '1'" icon="User" @click="handleStaff(row)">人员</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '0'" icon="CircleCheck" @click="handleAudit(row, '1')">审核通过</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '2')">审核拒绝</el-dropdown-item>
+                    <el-dropdown-item v-if="hasPendingSettlementIntent(row)" icon="Phone" @click="handleSettlementContacted(row)">
+                      标记已联系
+                    </el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '1'" icon="Lock" @click="handleStatusChange(row, '2')">禁用企业</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '2'" icon="Unlock" @click="handleStatusChange(row, '1')">启用企业</el-dropdown-item>
                     <el-dropdown-item divided icon="MuteNotification" @click="handleSilence(row)" v-if="row.isSilenced !== '1'">
@@ -777,6 +801,7 @@ import {
   rejectCompanyCert,
   silenceCompany,
   unsilenceCompany,
+  markSettlementIntentContacted,
   listJob,
   type CompanyAuditHistoryVO,
   type CompanyCertVO,
@@ -903,7 +928,8 @@ const queryParams = reactive({
   jobCount: undefined as number | undefined,
   applyCount: undefined as number | undefined,
   feedbackCount: undefined as number | undefined,
-  noFeedbackCount: undefined as number | undefined
+  noFeedbackCount: undefined as number | undefined,
+  settlementFollowStatus: ''
 });
 
 const statistics = reactive({
@@ -943,6 +969,21 @@ const silenceForm = reactive({
   companyName: '',
   reason: ''
 });
+
+// 结算意向来自岗位发布弹窗，仅展示后端聚合出的待联系线索。
+const settlementIntentLabelMap: Record<string, string> = {
+  '1': '自主线下结算',
+  '2': '需方案参考',
+  '3': '平台合规结算'
+};
+
+function settlementIntentLabel(type?: string) {
+  return settlementIntentLabelMap[String(type || '')] || '结算意向';
+}
+
+function hasPendingSettlementIntent(row: any) {
+  return !!row?.settlementIntentId && String(row?.settlementFollowStatus || '') === '0';
+}
 
 async function loadData() {
   loading.value = true;
@@ -984,6 +1025,7 @@ function clearQueryFilters() {
   queryParams.applyCount = undefined;
   queryParams.feedbackCount = undefined;
   queryParams.noFeedbackCount = undefined;
+  queryParams.settlementFollowStatus = '';
   dateRange.value = [];
 }
 
@@ -1282,6 +1324,25 @@ async function handleStatusChange(row: any, status: string) {
   } catch (error: any) {
     if (error !== 'cancel') {
       ElMessage.error(`${action}失败`);
+    }
+  }
+}
+
+async function handleSettlementContacted(row: any) {
+  if (!hasPendingSettlementIntent(row)) return;
+  try {
+    const { value } = await ElMessageBox.prompt('可填写本次联系备注，留空也可直接确认。', '标记结算意向已联系', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      inputPlaceholder: '例如：已电话沟通，后续发送合规结算方案',
+      inputType: 'textarea'
+    });
+    await markSettlementIntentContacted({ intentId: row.settlementIntentId, remark: value || '' });
+    ElMessage.success('已标记联系');
+    loadData();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('标记联系失败');
     }
   }
 }
@@ -1637,6 +1698,24 @@ const handleOsslogoUrlChange = (ossIds) => {
   font-size: 12px;
   max-width: 200px;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settlement-intent-cell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.settlement-intent-main {
+  max-width: 160px;
+  overflow: hidden;
+  color: #303133;
+  font-size: 12px;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

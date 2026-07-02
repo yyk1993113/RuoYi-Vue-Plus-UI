@@ -2,8 +2,8 @@ import request from '@/utils/request';
 
 // ========== 运营台·内容配置（首页内容位） ==========
 // 对接后端 AdminContentController（基路径 /admin/content，@SaCheckRole(superadmin/operator)，仅运营角色）。
-// 含五类首页内容位：轮播图 banner / 金刚区 kingkong / 技能课程 course / 求职干货 article / 求职服务 jobService。
-// 五类接口风格完全一致：list(GET 分页) / get(GET 详情) / add(POST) / update(PUT) / del(DELETE 批量) / changeStatus(POST 切上下架/显隐)。
+// 含六类首页内容位：轮播图 banner / 金刚区 kingkong / 平台公告 notice / 技能课程 course / 求职干货 article / 求职服务 jobService。
+// 六类接口风格完全一致：list(GET 分页) / get(GET 详情) / add(POST) / update(PUT) / del(DELETE 批量) / changeStatus(POST 切上下架/显隐)。
 //
 // 说明：本模块刻意与同目录 index.ts 分文件维护——
 //   1) index.ts 正由其它运营台任务并行扩写，分文件可规避写冲突；
@@ -35,6 +35,23 @@ export interface KingkongVO {
   description?: string; // 释义（详细说明）
   iconUrl?: string; // 图标URL
   linkUrl?: string; // 跳转链接/路由
+  sort?: number;
+  status?: string; // 状态 0:隐藏 1:显示
+  createTime?: string;
+  remark?: string;
+}
+
+// 平台公告 rec_home_notice（首页公告列表数据源）
+export interface HomeNoticeVO {
+  noticeId?: number;
+  noticeType?: 'notice' | 'activity' | 'reminder' | string; // notice:公告 activity:活动 reminder:提醒
+  title?: string; // 公告标题
+  summary?: string; // 首页/列表摘要
+  content?: string; // 公告正文
+  targetType?: 'detail' | 'none' | string; // detail:查看详情 none:不跳转
+  homeVisible?: string; // 是否首页展示 0:否 1:是
+  beginTime?: string; // 生效时间
+  endTime?: string; // 失效时间
   sort?: number;
   status?: string; // 状态 0:隐藏 1:显示
   createTime?: string;
@@ -144,6 +161,36 @@ export function delKingkong(kingkongIds: number | number[]) {
 
 export function changeKingkongStatus(data: { kingkongId: number; status: string }) {
   return request.post(`${contentUrl}/kingkong/changeStatus`, data);
+}
+
+// ---------- 平台公告 Notice ----------
+
+export function listHomeNotice(query: ContentQuery & { noticeType?: string }) {
+  return request.get<any>(`${contentUrl}/notice/list`, { params: query });
+}
+
+export function getHomeNotice(noticeId: number) {
+  return request.get<any>(`${contentUrl}/notice/${noticeId}`);
+}
+
+export function addHomeNotice(data: HomeNoticeVO) {
+  return request.post(`${contentUrl}/notice`, data);
+}
+
+export function updateHomeNotice(data: HomeNoticeVO) {
+  return request.put(`${contentUrl}/notice`, data);
+}
+
+export function delHomeNotice(noticeIds: number | number[]) {
+  return request.delete(`${contentUrl}/notice/${noticeIds}`);
+}
+
+export function changeHomeNoticeStatus(data: { noticeId: number; status: string }) {
+  return request.post(`${contentUrl}/notice/changeStatus`, data);
+}
+
+export function changeHomeNoticeHomeVisible(data: { noticeId: number; homeVisible: string }) {
+  return request.post(`${contentUrl}/notice/changeHomeVisible`, data);
 }
 
 // ---------- 技能课程 Course ----------
