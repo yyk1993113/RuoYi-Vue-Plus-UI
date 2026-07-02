@@ -110,7 +110,17 @@
         <div class="card-header">
           <span class="header-title">求职者列表</span>
           <div style="display: flex; gap: 8px">
-            <el-button plain icon="Download" @click="importTemplate">下载模板</el-button>
+            <el-dropdown>
+              <el-button plain icon="Download">
+                下载模板<el-icon class="el-icon--right"><i-ep-arrow-down /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item icon="Document" @click="downloadExcelTemplate">下载 Excel 模板</el-dropdown-item>
+                  <el-dropdown-item icon="Document" @click="downloadWordTemplate">下载 Word 模板</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <el-button type="success" plain icon="Upload" @click="handleImport">导入</el-button>
             <el-button type="success" plain icon="Download" @click="handleExport">导出</el-button>
             <el-button type="primary" plain icon="Refresh" @click="loadData" :loading="loading">刷新</el-button>
@@ -119,8 +129,12 @@
       </template>
 
       <el-table v-loading="loading" :data="tableData" border stripe>
-        <!-- 用户ID：19位雪花ID需 ~170px 才能单行展示，避免折行成多行 -->
-        <el-table-column label="用户ID" prop="userId" width="180" align="center" />
+        <!-- 求职者编码来自最新简历；历史无简历用户兜底展示用户ID，避免老数据空白。 -->
+        <el-table-column label="求职者编码" prop="jobSeekerNo" width="180" align="center" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.jobSeekerNo || row.userId || '-' }}
+          </template>
+        </el-table-column>
 
         <el-table-column label="用户信息" min-width="190">
           <template #default="{ row }">
@@ -411,7 +425,11 @@
       </el-form>
 
       <el-table v-loading="applyDialogLoading" :data="applyDialogData" border stripe max-height="460">
-        <el-table-column label="投递ID" prop="applyId" width="120" align="center" />
+        <el-table-column label="投递编码" prop="applyNo" width="150" align="center" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.applyNo || row.applyId || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column label="岗位名称" prop="jobName" min-width="170" show-overflow-tooltip />
         <el-table-column label="企业名称" prop="companyName" min-width="170" show-overflow-tooltip />
         <el-table-column label="手机号" prop="phone" width="130" align="center" />
@@ -443,17 +461,19 @@
       />
     </el-dialog>
 
-    <!-- 求职者导入：沿用 RuoYi Excel 导入形态，上传到运营台 /admin/recruitment/user/importData。 -->
+    <!-- 求职者导入：支持 Excel、Word、PDF 或 zip 包；zip 内可混放 PDF/Word 简历附件。 -->
     <el-dialog v-model="upload.open" :title="upload.title" width="420px" append-to-body>
       <el-upload
         ref="uploadRef"
         :limit="1"
-        accept=".xlsx, .xls"
+        accept=".zip,.xlsx,.xls,.doc,.docx,.pdf"
         :headers="upload.headers"
-        :action="upload.url + '?updateSupport=' + upload.updateSupport"
+        :action="upload.url"
         :disabled="upload.isUploading"
+        :before-upload="beforeImportUpload"
         :on-progress="handleFileUploadProgress"
         :on-success="handleFileSuccess"
+        :on-error="handleFileError"
         :auto-upload="false"
         drag
       >
@@ -463,14 +483,27 @@
         <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
         <template #tip>
           <div class="text-center el-upload__tip">
-            <div class="el-upload__tip"><el-checkbox v-model="upload.updateSupport" />更新已存在手机号的求职者</div>
-            <span>仅允许导入 xls、xlsx 格式文件。</span>
-            <el-link type="primary" :underline="false" style="font-size: 12px; vertical-align: baseline" @click="importTemplate">下载模板</el-link>
+            <span>支持 xls、xlsx、doc、docx、pdf 或 zip；zip 内可混放 Excel、PDF、Word 简历附件。</span>
+            <el-link type="primary" :underline="false" style="font-size: 12px; vertical-align: baseline" @click="downloadExcelTemplate"
+              >下载 Excel 模板</el-link
+            >
+            <el-link
+              type="primary"
+              :underline="false"
+              style="font-size: 12px; vertical-align: baseline; margin-left: 8px"
+              @click="downloadWordTemplate"
+            >
+              下载 Word 模板
+            </el-link>
           </div>
         </template>
       </el-upload>
+      <div v-if="upload.isUploading || upload.taskId || upload.resultMsg" class="import-progress">
+        <el-progress :percentage="upload.progress" :status="upload.progressStatus" />
+        <div class="import-progress-text">{{ upload.statusText }}</div>
+      </div>
       <template #footer>
-        <el-button @click="upload.open = false">取消</el-button>
+        <el-button :disabled="upload.isUploading" @click="closeImportDialog">取消</el-button>
         <el-button type="primary" :loading="upload.isUploading" @click="submitFileForm">确定</el-button>
       </template>
     </el-dialog>
@@ -478,7 +511,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
+import { useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox, type UploadFile, type UploadInstance } from 'element-plus';
 import {
   statisticsUser,
@@ -490,10 +524,11 @@ import {
   type ApplyVO,
   type RecruitmentUserVO
 } from '@/api/recruitment';
-import { download, globalHeaders } from '@/utils/request';
+import request, { download, globalHeaders } from '@/utils/request';
 import { unwrapList } from './helpers';
 import { applyStatusMeta } from './constants';
 
+const route = useRoute();
 const loading = ref(false);
 const total = ref(0);
 const tableData = ref<RecruitmentUserVO[]>([]);
@@ -510,6 +545,7 @@ const applyDateRange = ref<[string, string] | []>([]);
 const queryFormRef = ref();
 const silenceFormRef = ref();
 const uploadRef = ref<UploadInstance>();
+const importPollTimer = ref<ReturnType<typeof setInterval> | null>(null);
 type StatFilter = 'total' | 'normal' | 'applied' | 'pending' | 'silenced';
 const activeStat = ref<StatFilter>('total');
 
@@ -517,7 +553,11 @@ const upload = reactive({
   open: false,
   title: '',
   isUploading: false,
-  updateSupport: 0,
+  taskId: '',
+  progress: 0,
+  progressStatus: undefined as 'success' | 'exception' | undefined,
+  statusText: '',
+  resultMsg: '',
   headers: globalHeaders(),
   url: import.meta.env.VITE_APP_BASE_API + '/admin/recruitment/user/importData'
 });
@@ -855,9 +895,21 @@ function getApplyTagType(status?: string | null) {
   return (applyStatusMeta(status).type || 'info') as 'warning' | 'primary' | 'success' | 'info' | 'danger';
 }
 
+async function applyRouteFocus() {
+  const qUserId = route.query.userId;
+  if (typeof qUserId === 'string' && qUserId) {
+    await handleDetail({ userId: qUserId } as RecruitmentUserVO);
+  }
+}
+
 onMounted(() => {
+  applyRouteFocus();
   loadData();
   loadStatistics();
+});
+
+onBeforeUnmount(() => {
+  clearImportPolling();
 });
 
 function handleExport() {
@@ -874,35 +926,155 @@ function handleExport() {
 }
 
 function handleImport() {
+  resetUploadState();
   upload.title = '求职者导入';
   upload.open = true;
 }
 
-function importTemplate() {
-  download('/admin/recruitment/user/importTemplate', {}, `求职者导入模板_${new Date().getTime()}.xlsx`);
+function downloadExcelTemplate() {
+  downloadStaticTemplate('recruitment_user_import_template.xlsx', `求职者导入模板_${new Date().getTime()}.xlsx`);
 }
 
-function handleFileUploadProgress() {
+function downloadWordTemplate() {
+  downloadStaticTemplate('recruitment_user_import_template.docx', `求职者Word导入模板_${new Date().getTime()}.docx`);
+}
+
+function downloadStaticTemplate(filePath: string, fileName: string) {
+  const baseUrl = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+  const link = document.createElement('a');
+  link.href = `${baseUrl}templates/recruitment/${filePath}`;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function resetUploadState() {
+  clearImportPolling();
+  upload.isUploading = false;
+  upload.taskId = '';
+  upload.progress = 0;
+  upload.progressStatus = undefined;
+  upload.statusText = '';
+  upload.resultMsg = '';
+}
+
+function handleFileUploadProgress(event?: { percent?: number }) {
   upload.isUploading = true;
+  upload.progressStatus = undefined;
+  upload.statusText = '文件上传中';
+  upload.progress = Math.min(30, Math.round(event?.percent || 0));
+}
+
+function beforeImportUpload(file: UploadFile['raw']) {
+  const fileName = file?.name || '';
+  const allow = /\.(xls|xlsx|doc|docx|pdf|zip)$/i.test(fileName);
+  if (!allow) {
+    ElMessage.warning('仅支持上传 xls、xlsx、doc、docx、pdf 或 zip');
+    setTimeout(() => uploadRef.value?.clearFiles(), 0);
+    return false;
+  }
+  return true;
 }
 
 function handleFileSuccess(response: any, file: UploadFile) {
-  upload.open = false;
-  upload.isUploading = false;
-  uploadRef.value?.handleRemove(file);
-  ElMessageBox.alert(
-    "<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" + (response?.msg || '导入完成') + '</div>',
-    '导入结果',
-    {
-      dangerouslyUseHTMLString: true
+  const task = response?.data || response;
+  const taskId = task?.taskId;
+  if (!taskId) {
+    if (response?.code && response.code !== 200) {
+      upload.isUploading = false;
+      upload.progressStatus = 'exception';
+      upload.statusText = response?.msg || '导入失败';
+      ElMessage.error(upload.statusText);
+      return;
     }
-  );
-  loadData();
-  loadStatistics();
+    upload.isUploading = false;
+    upload.progress = 100;
+    upload.progressStatus = 'success';
+    upload.resultMsg = response?.msg || task?.message || task?.analysis || '导入完成';
+    upload.statusText = '导入完成';
+    uploadRef.value?.handleRemove(file);
+    upload.open = false;
+    showImportResult(upload.resultMsg);
+    loadData();
+    loadStatistics();
+    return;
+  }
+  upload.taskId = taskId;
+  upload.progress = Math.max(upload.progress, task?.percent || 30);
+  upload.statusText = '后台正在分段导入';
+  uploadRef.value?.handleRemove(file);
+  startImportPolling(taskId);
+}
+
+function handleFileError() {
+  upload.isUploading = false;
+  upload.progressStatus = 'exception';
+  upload.statusText = '文件上传失败';
+}
+
+function startImportPolling(taskId: string) {
+  clearImportPolling();
+  pollImportTask(taskId);
+  importPollTimer.value = setInterval(() => pollImportTask(taskId), 1000);
+}
+
+async function pollImportTask(taskId: string) {
+  try {
+    const res = await request({
+      url: `/admin/recruitment/user/importTask/${taskId}`,
+      method: 'get',
+      silent: true
+    } as any);
+    const task = (res as any)?.data || res;
+    upload.progress = Math.max(upload.progress, Number(task?.percent || 0));
+    upload.statusText = task?.message || '后台正在分段导入';
+    if (task?.status === 'SUCCESS' || task?.status === 'FAILED') {
+      clearImportPolling();
+      upload.isUploading = false;
+      upload.progress = task.status === 'SUCCESS' ? 100 : upload.progress;
+      upload.progressStatus = task.status === 'SUCCESS' ? 'success' : 'exception';
+      upload.resultMsg = task?.message || (task.status === 'SUCCESS' ? '导入完成' : '导入失败');
+      showImportResult(upload.resultMsg);
+      if (task.status === 'SUCCESS') {
+        upload.open = false;
+        loadData();
+        loadStatistics();
+      }
+    }
+  } catch {
+    clearImportPolling();
+    upload.isUploading = false;
+    upload.progressStatus = 'exception';
+    upload.statusText = '导入进度查询失败';
+  }
+}
+
+function clearImportPolling() {
+  if (importPollTimer.value) {
+    clearInterval(importPollTimer.value);
+    importPollTimer.value = null;
+  }
+}
+
+function showImportResult(message: string) {
+  ElMessageBox.alert("<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" + message + '</div>', '导入结果', {
+    dangerouslyUseHTMLString: true
+  });
 }
 
 function submitFileForm() {
+  upload.progress = 0;
+  upload.progressStatus = undefined;
+  upload.statusText = '';
+  upload.resultMsg = '';
   uploadRef.value?.submit();
+}
+
+function closeImportDialog() {
+  upload.open = false;
+  resetUploadState();
+  uploadRef.value?.clearFiles();
 }
 </script>
 
@@ -1166,6 +1338,15 @@ function submitFileForm() {
   background: #f8fafc;
   border: 1px solid #ebeef5;
   border-radius: 8px;
+}
+
+.import-progress {
+  margin-top: 14px;
+}
+.import-progress-text {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #606266;
 }
 
 /* 注册/最后登录合并列：上行注册时间、下行最近登录（灰色小字） */

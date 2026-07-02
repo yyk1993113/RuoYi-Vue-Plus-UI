@@ -91,7 +91,11 @@
     <!-- ========== 数据表格（只读：仅「详情」）========== -->
     <el-card shadow="hover">
       <el-table v-loading="loading" :data="tableData" border stripe>
-        <el-table-column label="任务ID" prop="taskId" width="190" align="center" show-overflow-tooltip />
+        <el-table-column label="履约编码" prop="taskNo" width="190" align="center" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.taskNo || row.taskId || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column label="求职者信息" min-width="150">
           <template #default="{ row }">
             <div class="user-cell">
@@ -315,7 +319,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, type FormRules } from 'element-plus';
 import { Refresh, Clock, Warning, Money } from '@element-plus/icons-vue';
 import { listTask, getTaskStatistics, getTaskAbnormalStatistics, getTask, verifyTask, taskExportUrl, listLedger } from '@/api/recruitment';
@@ -325,6 +329,7 @@ import { unwrapList, splitToArray, formatSalary, formatMoney, formatDateTime } f
 import { taskStatusMeta, taskAbnormalMeta, ledgerStatusMeta, ledgerInvoiceStatusMeta } from './constants';
 
 const router = useRouter();
+const route = useRoute();
 
 const loading = ref(false);
 const detailLoading = ref(false);
@@ -362,6 +367,7 @@ const dateRange = ref<[string, string] | []>([]);
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
+  taskId: undefined as string | number | undefined,
   companyId: undefined as number | undefined,
   jobId: undefined as number | undefined,
   companyName: '',
@@ -676,6 +682,7 @@ function resetQuery() {
   dateRange.value = [];
   Object.assign(queryParams, {
     pageNum: 1,
+    taskId: undefined,
     companyId: undefined,
     jobId: undefined,
     companyName: '',
@@ -747,7 +754,16 @@ function goInvoice() {
   router.push('/recruitment/invoice');
 }
 
+async function applyRouteFocus() {
+  const qTaskId = route.query.taskId;
+  if (typeof qTaskId === 'string' && qTaskId) {
+    queryParams.taskId = qTaskId;
+    await handleDetail({ taskId: qTaskId });
+  }
+}
+
 onMounted(() => {
+  applyRouteFocus();
   refresh();
 });
 </script>

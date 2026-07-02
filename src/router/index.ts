@@ -161,6 +161,13 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/recruitment/invoice.vue'),
         name: 'RecruitmentInvoice',
         meta: { title: '发票管理', icon: 'pdf' }
+      },
+      {
+        path: 'serialRule',
+        component: () => import('@/views/recruitment/serialRule/index.vue'),
+        name: 'RecruitmentSerialRule',
+        permissions: ['recruitment:serialRule:list'],
+        meta: { title: '流水编号规则', icon: 'dict' }
       }
     ]
   }

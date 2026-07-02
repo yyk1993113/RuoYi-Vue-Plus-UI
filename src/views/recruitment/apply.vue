@@ -142,7 +142,11 @@
     <!-- ========== 数据表格 ========== -->
     <el-card shadow="hover">
       <el-table v-loading="loading" :data="tableData" border stripe>
-        <el-table-column label="投递ID" prop="applyId" width="200" align="center" />
+        <el-table-column label="投递编码" prop="applyNo" width="190" align="center" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.applyNo || row.applyId || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column label="求职者信息" min-width="160">
           <template #default="{ row }">
             <div class="user-cell">
@@ -452,6 +456,7 @@
  * 副作用：详情按 applyId 拉取全景数据；导出复用既有 /apply/export。
  */
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import {
   Refresh,
@@ -474,6 +479,7 @@ import { download } from '@/utils/request';
 import { unwrapList, splitToArray, formatSalary } from './helpers';
 import { applyStatusMeta } from './constants';
 
+const route = useRoute();
 const loading = ref(false);
 const total = ref(0);
 const tableData = ref<any[]>([]);
@@ -604,7 +610,16 @@ async function handleDetail(row: any) {
   }
 }
 
+async function applyRouteFocus() {
+  const qApplyId = route.query.applyId;
+  if (typeof qApplyId === 'string' && qApplyId) {
+    queryParams.applyId = qApplyId;
+    await handleDetail({ applyId: qApplyId });
+  }
+}
+
 onMounted(() => {
+  applyRouteFocus();
   loadData();
   loadStatistics();
 });

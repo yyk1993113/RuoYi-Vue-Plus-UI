@@ -29,6 +29,28 @@ export interface SerialNoRuleQuery {
   status?: string;
 }
 
+// 全链路追溯结果来自 /admin/serial-rule/chain；code 用于展示，ID 用于跳到对应详情弹窗。
+export interface BizNoChainVO {
+  sourceNo?: string;
+  sourceType?: string;
+  companyNo?: string;
+  companyId?: number | string;
+  companyName?: string;
+  jobNo?: string;
+  jobId?: number | string;
+  jobName?: string;
+  jobSeekerNo?: string;
+  userId?: number | string;
+  jobSeekerName?: string;
+  applyNo?: string;
+  applyId?: number | string;
+  taskNo?: string;
+  taskId?: number | string;
+  orderNo?: string;
+  ledgerId?: number | string;
+  orderAmount?: number;
+}
+
 export function listSerialRule(query: SerialNoRuleQuery) {
   return request.get<any>(`${baseUrl}/list`, { params: query });
 }
@@ -60,4 +82,8 @@ export function previewSerialRule(data: SerialNoRuleVO) {
 
 export function nextSerialNo(businessCode: string) {
   return request.post<{ serialNo: string }>(`${baseUrl}/next/${businessCode}`);
+}
+
+export function getBizNoChain(no: string) {
+  return request.get<BizNoChainVO>(`${baseUrl}/chain`, { params: { no } });
 }

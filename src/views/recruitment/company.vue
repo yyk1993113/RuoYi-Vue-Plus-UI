@@ -91,8 +91,8 @@
     <!-- 查询表单 -->
     <el-card shadow="hover" class="mb-4">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true" class="company-query-form">
-        <el-form-item label="企业ID" prop="companyId">
-          <el-input v-model="queryParams.companyId" placeholder="请输入企业ID" clearable style="width: 180px" @keyup.enter="handleQuery" />
+        <el-form-item label="企业编码" prop="companyNo">
+          <el-input v-model="queryParams.companyNo" placeholder="请输入企业编码" clearable style="width: 180px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item label="企业名称" prop="companyName">
           <el-input v-model="queryParams.companyName" placeholder="请输入企业名称" clearable @keyup.enter="handleQuery" />
@@ -205,7 +205,9 @@
 
       <el-table v-loading="loading" :data="tableData" border stripe @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="50" align="center" />
-        <el-table-column label="企业ID" prop="companyId" width="200" align="center" />
+        <el-table-column label="企业编码" prop="companyNo" width="180" align="center" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.companyNo || '-' }}</template>
+        </el-table-column>
         <el-table-column label="企业信息" min-width="200">
           <template #default="{ row }">
             <div class="company-info">
@@ -258,7 +260,9 @@
               <div class="settlement-intent-cell">
                 <el-tag type="danger" effect="plain">待联系</el-tag>
                 <div class="settlement-intent-main">{{ settlementIntentLabel(row.settlementIntentType) }}</div>
-                <div class="text-secondary">{{ row.settlementOperatorName || '企业用户' }} {{ row.settlementOperatorPhone || row.settlementContactPhone || '' }}</div>
+                <div class="text-secondary">
+                  {{ row.settlementOperatorName || '企业用户' }} {{ row.settlementOperatorPhone || row.settlementContactPhone || '' }}
+                </div>
               </div>
             </el-tooltip>
             <span v-else class="text-secondary">-</span>
@@ -322,7 +326,7 @@
       <div v-if="currentCompany">
         <!-- 主体信息 -->
         <el-descriptions title="主体信息" :column="2" border>
-          <el-descriptions-item label="企业ID">{{ currentCompany.companyId }}</el-descriptions-item>
+          <el-descriptions-item label="企业编码">{{ currentCompany.companyNo || '-' }}</el-descriptions-item>
           <el-descriptions-item label="企业状态">
             <el-tag :type="companyStatusMeta(currentCompany.status).type">{{ companyStatusMeta(currentCompany.status).label }}</el-tag>
           </el-descriptions-item>
@@ -714,7 +718,9 @@
     <!-- 职位列表弹窗：点击企业行「职位数」，按 companyId 分页查询该企业岗位 -->
     <el-dialog v-model="jobVisible" :title="jobTitle" width="960px" append-to-body destroy-on-close>
       <el-table v-loading="jobLoading" :data="jobList" border stripe>
-        <el-table-column label="岗位ID" prop="jobId" width="110" align="center" />
+        <el-table-column label="岗位编码" prop="jobNo" width="160" align="center" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.jobNo || '-' }}</template>
+        </el-table-column>
         <el-table-column label="岗位名称" prop="jobName" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">{{ row.jobName || '-' }}</template>
         </el-table-column>
@@ -788,7 +794,7 @@
 
 <script setup name="CompanyManagement" lang="ts">
 import { ref, reactive, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus';
 import { Document } from '@element-plus/icons-vue';
 import {
@@ -820,6 +826,7 @@ import { updateUserProfile } from '@/api/system/user';
 import { RoleVO } from '@/api/system/role/types';
 
 const router = useRouter();
+const route = useRoute();
 
 interface CertMaterialFile {
   kind: 'image' | 'doc';
@@ -918,7 +925,7 @@ const auditHistory = ref<CompanyAuditHistoryVO>({ auditLogs: [], certHistory: []
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
-  companyId: '',
+  companyNo: '',
   companyName: '',
   description: '',
   contactPerson: '',
@@ -1014,7 +1021,7 @@ function handleQuery() {
 }
 
 function clearQueryFilters() {
-  queryParams.companyId = '';
+  queryParams.companyNo = '';
   queryParams.companyName = '';
   queryParams.description = '';
   queryParams.contactPerson = '';
@@ -1467,7 +1474,19 @@ async function handleUnsilence(row: any) {
   }
 }
 
+async function applyRouteFocus() {
+  const qCompanyNo = route.query.companyNo;
+  if (typeof qCompanyNo === 'string' && qCompanyNo) {
+    queryParams.companyNo = qCompanyNo;
+  }
+  const qCompanyId = route.query.companyId;
+  if (typeof qCompanyId === 'string' && qCompanyId) {
+    await handleDetail({ companyId: qCompanyId });
+  }
+}
+
 onMounted(() => {
+  applyRouteFocus();
   loadData();
   loadStatistics();
 });

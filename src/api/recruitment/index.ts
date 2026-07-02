@@ -13,6 +13,7 @@ export interface CompanyStatistics {
 
 export interface CompanyVO {
   companyId?: number;
+  companyNo?: string;
   companyName?: string;
   description?: string;
   contactPerson?: string;
@@ -55,6 +56,7 @@ export interface JobStatistics {
 
 export interface JobVO {
   jobId?: number;
+  jobNo?: string;
   companyId?: number;
   companyName?: string;
   positionId?: number | string;
@@ -87,6 +89,7 @@ export interface JobVO {
 export interface JobFullVO {
   tenantId?: string;
   jobId?: number;
+  jobNo?: string;
   companyId?: number;
   companyName?: string;
   positionId?: number | string;
@@ -158,6 +161,8 @@ export interface ApplyStatistics {
 
 export interface ApplyVO {
   applyId?: number;
+  /** 业务编码：来自 serialRule 的 APL 编码，列表展示优先使用。 */
+  applyNo?: string;
   jobId?: number;
   jobName?: string;
   salary?: string;
@@ -200,6 +205,8 @@ export interface TaskStatistics {
 
 export interface TaskVO {
   taskId?: number;
+  /** 业务编码：来自 serialRule 的 FUL 编码，列表展示优先使用。 */
+  taskNo?: string;
   jobId?: number;
   jobName?: string;
   applyId?: number;
@@ -447,6 +454,7 @@ export interface CompanyQuery {
   pageNum?: number;
   pageSize?: number;
   companyId?: number | string;
+  companyNo?: string;
   companyName?: string;
   description?: string;
   contactPerson?: string;
@@ -468,6 +476,7 @@ export interface JobQuery {
   pageSize?: number;
   jobName?: string;
   jobId?: number | string;
+  jobNo?: string;
   companyId?: number;
   companyName?: string;
   status?: string;
@@ -1055,6 +1064,8 @@ export interface UserStatistics {
 
 export interface RecruitmentUserVO {
   userId: number | string;
+  /** 业务编码：来自 serialRule 的 SKR 编码，列表展示优先使用。 */
+  jobSeekerNo?: string;
   userName: string;
   nickName: string;
   userType: string;

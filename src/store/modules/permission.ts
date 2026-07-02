@@ -176,11 +176,14 @@ export const filterDynamicRoutes = (routes: RouteRecordRaw[]) => {
 
 export const loadView = (view: any, name: string) => {
   let res;
+  // 后端菜单可能只传目录路径；同时尝试 index.vue，避免新增目录页被误判为资源不存在。
+  const normalizedView = String(view || '').replace(/^\/+|\/+$/g, '');
+  const candidates = [normalizedView, `${normalizedView}/index`].filter(Boolean);
   for (const path in modules) {
     const viewsIndex = path.indexOf('/views/');
     let dir = path.substring(viewsIndex + 7);
     dir = dir.substring(0, dir.lastIndexOf('.vue'));
-    if (dir === view) {
+    if (candidates.includes(dir)) {
       res = createCustomNameComponent(modules[path], { name });
       return res;
     }

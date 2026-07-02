@@ -71,8 +71,8 @@
     <!-- 搜索栏 -->
     <el-card shadow="hover" class="mb-4">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true" class="job-query-form">
-        <el-form-item label="岗位ID" prop="jobId">
-          <el-input v-model="queryParams.jobId" placeholder="请输入岗位ID" clearable style="width: 180px" @keyup.enter="handleQuery" />
+        <el-form-item label="岗位编码" prop="jobNo">
+          <el-input v-model="queryParams.jobNo" placeholder="请输入岗位编码" clearable style="width: 180px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item label="岗位名称" prop="jobName">
           <el-input v-model="queryParams.jobName" placeholder="请输入岗位名称" clearable @keyup.enter="handleQuery" />
@@ -164,7 +164,9 @@
       </template>
 
       <el-table v-loading="loading" :data="tableData" border stripe>
-        <el-table-column label="岗位ID" prop="jobId" width="200" align="center" />
+        <el-table-column label="岗位编码" prop="jobNo" width="180" align="center" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.jobNo || '-' }}</template>
+        </el-table-column>
         <el-table-column label="岗位信息" min-width="250">
           <template #default="{ row }">
             <div class="job-info">
@@ -252,7 +254,7 @@
       <div v-loading="detailLoading">
         <el-descriptions v-if="currentJob" :column="2" border>
           <!-- 基本信息 -->
-          <el-descriptions-item label="岗位ID">{{ currentJob.jobId }}</el-descriptions-item>
+          <el-descriptions-item label="岗位编码">{{ currentJob.jobNo || '-' }}</el-descriptions-item>
           <el-descriptions-item label="岗位状态">
             <el-tag :type="jobStatusMeta(currentJob.status).type">{{ jobStatusMeta(currentJob.status).label }}</el-tag>
           </el-descriptions-item>
@@ -372,11 +374,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="职位类目" prop="category">
-              <JobPositionPicker
-                v-model="editForm.positionName"
-                placeholder="请选择标准职位（来自职位类目库）"
-                @pick="selectEditStandardPosition"
-              />
+              <JobPositionPicker v-model="editForm.positionName" placeholder="请选择标准职位（来自职位类目库）" @pick="selectEditStandardPosition" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -651,7 +649,11 @@
     <el-dialog v-model="handleSelectApplyUsersVisible" title="投递人员" width="85%" append-to-body>
       <!-- ========== 数据表格 ========== -->
       <el-table :data="SelectApplyUsertableData" border stripe>
-        <el-table-column label="投递ID" prop="applyId" width="200" align="center" />
+        <el-table-column label="投递编码" prop="applyNo" width="180" align="center" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.applyNo || row.applyId || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column label="求职者信息" min-width="160">
           <template #default="{ row }">
             <div class="user-cell">
@@ -668,7 +670,7 @@
         <el-table-column label="岗位信息" min-width="150">
           <template #default="{ row }">
             <div class="job-cell">
-              <div class="job-name">{{ row.jobName || (row.jobId ? '岗位#' + row.jobId : '-') }}</div>
+              <div class="job-name">{{ row.jobName || row.jobNo || '-' }}</div>
               <div class="salary">{{ formatSalary(row.salaryMin, row.salaryMax, row.salaryUnit) }}</div>
             </div>
           </template>
@@ -718,8 +720,8 @@
 </template>
 
 <script setup name="JobManagement" lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   listJob,
@@ -741,6 +743,7 @@ import { jobStatusMeta, jobTypeMeta } from './constants';
 import JobPositionPicker from './components/JobPositionPicker.vue';
 
 const router = useRouter();
+const route = useRoute();
 const loading = ref(false);
 const refreshing = ref(false);
 const total = ref(0);
@@ -750,6 +753,8 @@ const SelectApplyUsertableData = ref<any[]>([]);
 const detailVisible = ref(false);
 const auditVisible = ref(false);
 const handleSelectApplyUsersVisible = ref(false);
+let jobChangedRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+let lastJobChangedEventKey = '';
 
 // 当前查看的岗位完整字段（数据来源：GET /admin/recruitment/jobDetail/{jobId} → JobFullVO）
 const currentJob = ref<JobFullVO | null>(null);
@@ -804,7 +809,7 @@ const benefitsList = computed<string[]>(() => {
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
-  jobId: '',
+  jobNo: '',
   jobName: '',
   jobType: '',
   status: '',
@@ -1384,7 +1389,7 @@ function buildJobQueryParams() {
 }
 
 function clearQueryFilters() {
-  queryParams.jobId = '';
+  queryParams.jobNo = '';
   queryParams.jobName = '';
   queryParams.jobType = '';
   queryParams.status = '';
@@ -1535,9 +1540,49 @@ function handleCopyPublish(row: any) {
   router.push({ name: 'RecruitmentJobPublish', query: { copyFrom: String(row.jobId) } });
 }
 
+async function applyRouteFocus() {
+  const qJobNo = route.query.jobNo;
+  if (typeof qJobNo === 'string' && qJobNo) {
+    queryParams.jobNo = qJobNo;
+  }
+  const qJobId = route.query.jobId;
+  if (typeof qJobId === 'string' && qJobId) {
+    await handleDetail({ jobId: qJobId });
+  }
+}
+
+function handleBusinessEvent(event: Event) {
+  const detail = (event as CustomEvent<{ type?: string; jobId?: number | string; action?: string; timestamp?: number | string }>)?.detail;
+  if (detail?.type !== 'job_changed') return;
+
+  const eventKey = [detail.jobId, detail.action, detail.timestamp].filter((item) => item !== undefined && item !== null && item !== '').join('|');
+  if (eventKey && eventKey === lastJobChangedEventKey) return;
+  lastJobChangedEventKey = eventKey;
+
+  // 业务事件只作为刷新信号；最终展示仍以 admin REST 列表和统计接口为准。
+  if (jobChangedRefreshTimer) {
+    clearTimeout(jobChangedRefreshTimer);
+  }
+  jobChangedRefreshTimer = setTimeout(() => {
+    loadData();
+    loadStatistics();
+    jobChangedRefreshTimer = undefined;
+  }, 500);
+}
+
 onMounted(() => {
+  applyRouteFocus();
   loadData();
   loadStatistics();
+  window.addEventListener('business-event', handleBusinessEvent);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('business-event', handleBusinessEvent);
+  if (jobChangedRefreshTimer) {
+    clearTimeout(jobChangedRefreshTimer);
+    jobChangedRefreshTimer = undefined;
+  }
 });
 
 function handleExport() {

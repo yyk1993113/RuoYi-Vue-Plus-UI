@@ -45,6 +45,14 @@ export const initWebSocket = (url: any) => {
       if (e.data === 'pong') {
         return;
       }
+      try {
+        const event = JSON.parse(e.data);
+        if (event?.type) {
+          window.dispatchEvent(new CustomEvent('business-event', { detail: event }));
+        }
+      } catch {
+        // 非业务 JSON 消息继续按原通知逻辑展示。
+      }
       useNoticeStore().addNotice({
         message: e.data,
         read: false,
