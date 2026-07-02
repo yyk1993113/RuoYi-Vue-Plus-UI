@@ -19,7 +19,7 @@
       content-type="html"
       :options="options"
       :style="styles"
-      @text-change="(e: any) => $emit('update:modelValue', content)"
+      @text-change="handleTextChange"
     />
   </div>
 </template>
@@ -29,9 +29,10 @@ import '@vueup/vue-quill/dist/vue-quill.snow.css';
 
 import { QuillEditor, Quill } from '@vueup/vue-quill';
 import { propTypes } from '@/utils/propTypes';
+import request from '@/utils/request';
 import type { UploadRequestHandler, UploadRequestOptions } from 'element-plus';
 
-defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue']);
 
 const props = defineProps({
   /* 编辑器的内容 */
@@ -52,6 +53,9 @@ const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 
 const quillEditorRef = ref();
 const uploadRef = ref<HTMLDivElement>();
+const CONTENT_IMAGE_PATH = '/api/content/oss/image/';
+const contentImagePathPattern = /^(?:https?:\/\/[^/]+)?(?:\/(?:dev-api|prod-api))?(\/api\/content\/oss\/image\/[^"'<\s]+)$/i;
+const uploadedPreviewUrlMap = new Map<string, string>();
 
 const options = ref<any>({
   theme: 'snow',
@@ -100,15 +104,72 @@ const styles = computed(() => {
 });
 
 const content = ref('');
+
+const buildPortableContentImageUrl = (ossId: string | number) => `${CONTENT_IMAGE_PATH}${ossId}`;
+
+const buildPreviewContentImageUrl = (portableUrl: string) => `${import.meta.env.VITE_APP_BASE_API}${portableUrl}`;
+
+const decodeHtmlAttribute = (value: string) => {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = value;
+  return textarea.value;
+};
+
+const extractPortableContentImagePath = (url: string) => {
+  const matched = String(url || '').match(contentImagePathPattern);
+  return matched ? matched[1] : '';
+};
+
+const normalizeContentImageUrl = (url: string, mode: 'preview' | 'portable') => {
+  const portablePath = extractPortableContentImagePath(url);
+  if (portablePath) {
+    return mode === 'preview' ? buildPreviewContentImageUrl(portablePath) : portablePath;
+  }
+  if (mode === 'portable') {
+    const decodedUrl = decodeHtmlAttribute(url);
+    const portablePreviewUrl = uploadedPreviewUrlMap.get(url) || uploadedPreviewUrlMap.get(decodedUrl);
+    if (portablePreviewUrl) {
+      return portablePreviewUrl;
+    }
+  }
+  return url;
+};
+
+// 富文本公告图片入库用稳定业务路径；编辑器预览时再补后台代理前缀，避免把 dev/prod 代理路径写进业务表。
+const rewriteContentImageUrls = (html: string, mode: 'preview' | 'portable') =>
+  String(html || '').replace(/(<img\b[^>]*?\bsrc\s*=\s*)(["'])(.*?)\2/gi, (_match, prefix, quote, src) => {
+    return `${prefix}${quote}${normalizeContentImageUrl(src, mode)}${quote}`;
+  });
+
+const toEditorContent = (html: string) => (props.type === 'url' ? rewriteContentImageUrls(html, 'preview') : html);
+
+const toModelContent = (html: string) => (props.type === 'url' ? rewriteContentImageUrls(html, 'portable') : html);
+
 watch(
   () => props.modelValue,
   (v: string) => {
-    if (v !== content.value) {
-      content.value = v || '<p></p>';
+    const next = toEditorContent(v || '<p></p>');
+    if (next !== content.value) {
+      content.value = next;
     }
   },
   { immediate: true }
 );
+
+const insertImageToEditor = (url: string) => {
+  const quill = toRaw(quillEditorRef.value)?.getQuill();
+  if (!quill) {
+    throw new Error('editor not ready');
+  }
+  const range = quill.selection?.savedRange;
+  const length = range ? range.index : quill.getLength();
+  quill.insertEmbed(length, 'image', url);
+  quill.setSelection(length + 1);
+};
+
+const handleTextChange = () => {
+  emit('update:modelValue', toModelContent(content.value));
+};
 
 // 图片上传前拦截
 const handleBeforeUpload = (file: any) => {
@@ -131,27 +192,51 @@ const handleBeforeUpload = (file: any) => {
   return true;
 };
 
-// base64 模式插入图片
+// 图片插入策略：默认保持历史 base64 行为；公告等运营内容可用 type=url 上传 OSS 后插入图片 URL。
 const handleUploadRequest: UploadRequestHandler = (options: UploadRequestOptions) => {
   return new Promise<void>((resolve, reject) => {
     const file = options.file as File;
-    const quill = toRaw(quillEditorRef.value)?.getQuill();
-    if (!quill) {
-      proxy?.$modal.msgError('编辑器未就绪');
-      proxy?.$modal.closeLoading();
-      reject(new Error('editor not ready'));
+    if (props.type === 'url') {
+      const formData = new FormData();
+      formData.append('file', file);
+      request
+        .post('/resource/oss/upload', formData)
+        .then((res: any) => {
+          const ossId = res?.data?.ossId;
+          const previewUrl = res?.data?.url;
+          if (!previewUrl) {
+            throw new Error('empty image url');
+          }
+          if (ossId) {
+            uploadedPreviewUrlMap.set(previewUrl, buildPortableContentImageUrl(ossId));
+          }
+          insertImageToEditor(previewUrl);
+          proxy?.$modal.closeLoading();
+          options.onSuccess?.({ url: previewUrl });
+          resolve();
+        })
+        .catch((err: any) => {
+          proxy?.$modal.msgError('图片上传失败');
+          proxy?.$modal.closeLoading();
+          options.onError?.(err as any);
+          reject(err);
+        });
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
-      const base64 = reader.result as string;
-      const range = quill.selection?.savedRange;
-      const length = range ? range.index : quill.getLength();
-      quill.insertEmbed(length, 'image', base64);
-      quill.setSelection(length + 1);
-      proxy?.$modal.closeLoading();
-      options.onSuccess?.({ url: base64 });
-      resolve();
+      try {
+        const base64 = reader.result as string;
+        insertImageToEditor(base64);
+        proxy?.$modal.closeLoading();
+        options.onSuccess?.({ url: base64 });
+        resolve();
+      } catch (err: any) {
+        proxy?.$modal.msgError('图片插入失败');
+        proxy?.$modal.closeLoading();
+        options.onError?.(err as any);
+        reject(err);
+      }
     };
     reader.onerror = () => {
       proxy?.$modal.msgError('图片插入失败');
