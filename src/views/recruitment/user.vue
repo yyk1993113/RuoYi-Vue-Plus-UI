@@ -218,10 +218,9 @@
         </el-table-column>
 
         <!-- 禁言状态 -->
-        <el-table-column label="禁言状态" width="112" align="center">
+        <el-table-column label="禁言状态" width="140" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.isRecruitmentSilenced === '1'" type="danger" size="small" class="silence-status-tag">
-              <el-icon><WarnTriangleFilled /></el-icon>
               <span>已禁言</span>
             </el-tag>
             <el-tag v-else type="success" size="small">正常</el-tag>
@@ -1322,7 +1321,7 @@ function closeImportDialog() {
   color: #c0c4cc;
 }
 
-/* 禁言标签固定为图标+文字单行，避免表格列宽收紧时「已禁言」折行。 */
+/* 禁言标签固定为文字单行，避免表格列宽收紧时「已禁言」折行。 */
 .silence-status-tag {
   display: inline-flex;
   align-items: center;
