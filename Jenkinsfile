@@ -1,6 +1,6 @@
 // ============================================================
 // RuoYi-Vue-Plus-UI Frontend Jenkinsfile
-// Vue3 + Vite + pnpm + Element Plus
+// Vue3 + Vite + pnpm 11 + Element Plus
 // ============================================================
 
 pipeline {
@@ -37,9 +37,9 @@ pipeline {
                 bat 'echo registry=https://registry.npmmirror.com>.npmrc'
                 script {
                     def rc = bat(returnStatus: true, script: 'pnpm install --no-frozen-lockfile')
-                    echo "pnpm install exited with code: ${rc}"
+                    echo "pnpm install exited with code: ${rc} (warnings are expected for pnpm 11)"
                 }
-                bat 'pnpm rebuild esbuild @parcel/watcher'
+                bat 'pnpm approve-builds --all'
             }
         }
 
