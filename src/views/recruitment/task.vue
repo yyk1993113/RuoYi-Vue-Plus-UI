@@ -115,7 +115,9 @@
         </el-table-column>
         <el-table-column label="企业" prop="companyName" min-width="120" show-overflow-tooltip />
         <el-table-column label="工作地点" prop="address" min-width="120" show-overflow-tooltip />
-        <el-table-column label="工作时间" prop="workTime" width="160" align="center" />
+        <el-table-column label="工作时间" width="180" align="center" show-overflow-tooltip>
+          <template #default="{ row }">{{ formatTaskWorkTime(row) }}</template>
+        </el-table-column>
         <el-table-column label="状态" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="taskStatusMeta(row.status).type" size="small">{{ taskStatusMeta(row.status).label }}</el-tag>
@@ -160,7 +162,7 @@
               formatSalary(currentTask.salaryMin, currentTask.salaryMax, currentTask.salaryUnit)
             }}</el-descriptions-item>
             <el-descriptions-item label="工作地点">{{ currentTask.address || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="工作时间">{{ formatDateTime(currentTask.workTime) }}</el-descriptions-item>
+            <el-descriptions-item label="工作时间">{{ formatTaskWorkTime(currentTask) }}</el-descriptions-item>
             <el-descriptions-item label="创建时间">{{ formatDateTime(currentTask.createTime) }}</el-descriptions-item>
           </el-descriptions>
 
@@ -317,6 +319,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage, type FormRules } from 'element-plus';
 import { Refresh, Clock, Warning, Money } from '@element-plus/icons-vue';
 import { listTask, getTaskStatistics, getTaskAbnormalStatistics, getTask, verifyTask, taskExportUrl, listLedger } from '@/api/recruitment';
+import { listByIds } from '@/api/system/oss';
 import { download } from '@/utils/request';
 import { unwrapList, splitToArray, formatSalary, formatMoney, formatDateTime } from './helpers';
 import { taskStatusMeta, taskAbnormalMeta, ledgerStatusMeta, ledgerInvoiceStatusMeta } from './constants';
@@ -329,6 +332,7 @@ const total = ref(0);
 const tableData = ref<any[]>([]);
 const detailVisible = ref(false);
 const currentTask = ref<any>(null);
+const photoUrlMap = ref<Record<string, string>>({});
 const queryFormRef = ref();
 // 平台代核验
 const verifyVisible = ref(false);
@@ -414,13 +418,102 @@ const statusOptions = [
   { value: 'cancelled', label: '已取消' }
 ];
 
+function formatWorkTimeItem(item: any): string {
+  if (item == null) return '';
+  if (typeof item === 'string') return item.trim();
+  const day = item.day ?? item.week ?? item.date ?? item.label ?? item.name ?? '';
+  const start = item.start ?? item.startTime ?? item.from ?? item.begin ?? '';
+  const end = item.end ?? item.endTime ?? item.to ?? '';
+  const range = start || end ? `${start}${start && end ? '-' : ''}${end}` : '';
+  const text = `${day}${day && range ? ' ' : ''}${range}`.trim();
+  return text || JSON.stringify(item);
+}
+
+function formatWorkSchedule(value: any): string {
+  if (value == null || value === '') return '';
+  if (Array.isArray(value)) return value.map(formatWorkTimeItem).filter(Boolean).join('；');
+  const text = String(value).trim();
+  if (!text) return '';
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed.map(formatWorkTimeItem).filter(Boolean).join('；');
+    return formatWorkTimeItem(parsed);
+  } catch {
+    return text;
+  }
+}
+
+// 履约详情优先展示任务约定/岗位快照排期；workTime 是 Date 兜底，不再把排期 JSON 当日期吞成空值。
+function formatTaskWorkTime(task: any): string {
+  const schedule = formatWorkSchedule(task?.agreedWorkSchedule) || formatWorkSchedule(task?.workSchedule) || formatWorkSchedule(task?.workTime);
+  const start = task?.agreedStartTime ? formatDateTime(task.agreedStartTime) : '';
+  const end = task?.agreedEndTime ? formatDateTime(task.agreedEndTime) : '';
+  const agreedRange = start || end ? `${start || '-'} 至 ${end || '-'}` : '';
+  if (schedule && agreedRange) return `${schedule}（${agreedRange}）`;
+  return schedule || agreedRange || '-';
+}
+
+function splitPhotoValues(value: any): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item?.url ?? item?.ossId ?? item?.id ?? item).trim()).filter(Boolean);
+  }
+  const text = String(value).trim();
+  if (!text) return [];
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return splitPhotoValues(parsed);
+    const single = parsed?.url ?? parsed?.ossId ?? parsed?.id;
+    return single ? [String(single).trim()] : [];
+  } catch {
+    return splitToArray(text);
+  }
+}
+
+const isOssId = (value: string) => /^\d+$/.test(value);
+
+function normalizePhotoUrl(value: string): string {
+  if (!value) return '';
+  if (isOssId(value)) return photoUrlMap.value[value] || '';
+  if (/^https?:\/\//i.test(value) || /^data:/i.test(value) || /^blob:/i.test(value)) return value;
+  if (value.startsWith('//')) return `${window.location.protocol}${value}`;
+  const baseUrl = import.meta.env.VITE_APP_BASE_API || '';
+  if (baseUrl && value.startsWith(baseUrl)) return value;
+  return `${baseUrl}${value.startsWith('/') ? value : `/${value}`}`;
+}
+
+function resolvePhotoList(value: any): string[] {
+  return splitPhotoValues(value).map(normalizePhotoUrl).filter(Boolean);
+}
+
+async function loadTaskPhotoUrls(task: any) {
+  photoUrlMap.value = {};
+  const idSet = new Set<string>();
+  ['arrivalPhotos', 'midPhotos', 'finishPhotos'].forEach((field) => {
+    splitPhotoValues(task?.[field]).forEach((token) => {
+      if (isOssId(token)) idSet.add(token);
+    });
+  });
+  if (!idSet.size) return;
+  try {
+    const res = await listByIds(Array.from(idSet).join(','));
+    const map: Record<string, string> = {};
+    (res.data || []).forEach((file: any) => {
+      if (file?.ossId && file?.url) map[String(file.ossId)] = file.url;
+    });
+    photoUrlMap.value = map;
+  } catch (error) {
+    console.error('解析履约照片失败:', error);
+  }
+}
+
 // 详情：三段履约照片分组 + 合并预览列表
 const photoGroups = computed(() => {
   const t = currentTask.value || {};
   return [
-    { title: '到岗照片', list: splitToArray(t.arrivalPhotos) },
-    { title: '中途照片', list: splitToArray(t.midPhotos) },
-    { title: '完工照片', list: splitToArray(t.finishPhotos) }
+    { title: '到岗照片', list: resolvePhotoList(t.arrivalPhotos) },
+    { title: '中途照片', list: resolvePhotoList(t.midPhotos) },
+    { title: '完工照片', list: resolvePhotoList(t.finishPhotos) }
   ];
 });
 const allPhotos = computed(() => photoGroups.value.flatMap((g) => g.list));
@@ -432,6 +525,13 @@ const statusTimeline = computed(() => {
   // type 收窄为 el-timeline-item 接受的语义色，避免被推断成宽松 string
   type TlType = 'primary' | 'success' | 'warning' | 'danger' | 'info';
   const steps: { label: string; time?: string; type: TlType; done: boolean }[] = [];
+  const nodeTime = (done: boolean, keys: string[], fallbackKeys: string[] = []) => {
+    if (!done) return '-';
+    for (const key of [...keys, ...fallbackKeys]) {
+      if (t[key]) return formatDateTime(t[key]);
+    }
+    return '-';
+  };
   steps.push({ label: '生成任务', time: formatDateTime(t.createTime), type: 'primary', done: true });
   const confirmed = !!s && !['pending_confirm', 'cancelled'].includes(s);
   steps.push({ label: '确认承接', type: confirmed ? 'success' : 'info', done: confirmed });
@@ -443,7 +543,25 @@ const statusTimeline = computed(() => {
   else if (s === 'rejected') steps.push({ label: '已退回（待求职者补充）', time: formatDateTime(t.updateTime), type: 'danger', done: true });
   else if (s === 'cancelled') steps.push({ label: '已取消', time: formatDateTime(t.updateTime), type: 'info', done: true });
   else steps.push({ label: '待核验 / 完成', type: 'info', done: false });
-  return steps;
+  steps[0].time = nodeTime(true, ['createTime']);
+  if (steps[1]) steps[1].time = nodeTime(steps[1].done, ['confirmedTime', 'confirmTime', 'acceptedTime', 'acceptTime'], ['updateTime', 'createTime']);
+  if (steps[2]) {
+    steps[2].time = nodeTime(
+      steps[2].done,
+      ['startTime', 'beginTime', 'workStartTime', 'arrivalTime', 'arriveTime', 'agreedStartTime'],
+      ['updateTime', 'createTime']
+    );
+  }
+  if (steps[3])
+    steps[3].time = nodeTime(steps[3].done, ['submitTime', 'submittedTime', 'verifySubmitTime', 'reportTime'], ['updateTime', 'createTime']);
+  if (steps[4] && (!steps[4].time || steps[4].time === '-')) {
+    steps[4].time = nodeTime(
+      steps[4].done,
+      ['completedTime', 'finishTime', 'rejectedTime', 'rejectTime', 'cancelledTime', 'cancelTime'],
+      ['updateTime', 'createTime']
+    );
+  }
+  return steps.map((step) => ({ ...step, time: step.time || '-' }));
 });
 
 // 列表「异常」列：前端用与服务端相同的默认阈值给出超时提示（仅展示提示，权威以服务端筛选/计数为准）。
@@ -609,6 +727,7 @@ async function handleDetail(row: any) {
   try {
     const res = await getTask(row.taskId);
     currentTask.value = res.data;
+    await loadTaskPhotoUrls(currentTask.value);
   } catch (error) {
     ElMessage.error('获取任务详情失败');
     detailVisible.value = false;
