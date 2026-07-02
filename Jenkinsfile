@@ -35,7 +35,8 @@ pipeline {
         stage('安装依赖') {
             steps {
                 echo '安装pnpm依赖...'
-                bat 'pnpm install --registry=https://registry.npmmirror.com --config.approve-builds="*"'
+                writeFile file: '.npmrc', text: 'approve-builds=*\r\nregistry=https://registry.npmmirror.com'
+                bat 'pnpm install'
             }
         }
 
