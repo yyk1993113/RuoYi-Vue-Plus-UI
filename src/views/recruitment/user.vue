@@ -110,6 +110,8 @@
         <div class="card-header">
           <span class="header-title">求职者列表</span>
           <div style="display: flex; gap: 8px">
+            <el-button plain icon="Download" @click="importTemplate">下载模板</el-button>
+            <el-button type="success" plain icon="Upload" @click="handleImport">导入</el-button>
             <el-button type="success" plain icon="Download" @click="handleExport">导出</el-button>
             <el-button type="primary" plain icon="Refresh" @click="loadData" :loading="loading">刷新</el-button>
           </div>
@@ -202,10 +204,11 @@
         </el-table-column>
 
         <!-- 禁言状态 -->
-        <el-table-column label="禁言状态" width="90" align="center">
+        <el-table-column label="禁言状态" width="96" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.isRecruitmentSilenced === '1'" type="danger" size="small">
-              <el-icon><WarnTriangleFilled /></el-icon> 已禁言
+            <el-tag v-if="row.isRecruitmentSilenced === '1'" type="danger" size="small" class="silence-status-tag">
+              <el-icon><WarnTriangleFilled /></el-icon>
+              <span>已禁言</span>
             </el-tag>
             <el-tag v-else type="success" size="small">正常</el-tag>
           </template>
@@ -439,12 +442,44 @@
         @pagination="loadApplyDialogData"
       />
     </el-dialog>
+
+    <!-- 求职者导入：沿用 RuoYi Excel 导入形态，上传到运营台 /admin/recruitment/user/importData。 -->
+    <el-dialog v-model="upload.open" :title="upload.title" width="420px" append-to-body>
+      <el-upload
+        ref="uploadRef"
+        :limit="1"
+        accept=".xlsx, .xls"
+        :headers="upload.headers"
+        :action="upload.url + '?updateSupport=' + upload.updateSupport"
+        :disabled="upload.isUploading"
+        :on-progress="handleFileUploadProgress"
+        :on-success="handleFileSuccess"
+        :auto-upload="false"
+        drag
+      >
+        <el-icon class="el-icon--upload">
+          <i-ep-upload-filled />
+        </el-icon>
+        <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+        <template #tip>
+          <div class="text-center el-upload__tip">
+            <div class="el-upload__tip"><el-checkbox v-model="upload.updateSupport" />更新已存在手机号的求职者</div>
+            <span>仅允许导入 xls、xlsx 格式文件。</span>
+            <el-link type="primary" :underline="false" style="font-size: 12px; vertical-align: baseline" @click="importTemplate">下载模板</el-link>
+          </div>
+        </template>
+      </el-upload>
+      <template #footer>
+        <el-button @click="upload.open = false">取消</el-button>
+        <el-button type="primary" :loading="upload.isUploading" @click="submitFileForm">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, type UploadFile, type UploadInstance } from 'element-plus';
 import {
   statisticsUser,
   listUsersWithStats,
@@ -455,7 +490,7 @@ import {
   type ApplyVO,
   type RecruitmentUserVO
 } from '@/api/recruitment';
-import { download } from '@/utils/request';
+import { download, globalHeaders } from '@/utils/request';
 import { unwrapList } from './helpers';
 import { applyStatusMeta } from './constants';
 
@@ -474,8 +509,18 @@ const applyDialogInitialStatus = ref('');
 const applyDateRange = ref<[string, string] | []>([]);
 const queryFormRef = ref();
 const silenceFormRef = ref();
+const uploadRef = ref<UploadInstance>();
 type StatFilter = 'total' | 'normal' | 'applied' | 'pending' | 'silenced';
 const activeStat = ref<StatFilter>('total');
+
+const upload = reactive({
+  open: false,
+  title: '',
+  isUploading: false,
+  updateSupport: 0,
+  headers: globalHeaders(),
+  url: import.meta.env.VITE_APP_BASE_API + '/admin/recruitment/user/importData'
+});
 
 const queryParams = reactive({
   pageNum: 1,
@@ -827,6 +872,38 @@ function handleExport() {
     `求职者数据_${new Date().getTime()}.xlsx`
   );
 }
+
+function handleImport() {
+  upload.title = '求职者导入';
+  upload.open = true;
+}
+
+function importTemplate() {
+  download('/admin/recruitment/user/importTemplate', {}, `求职者导入模板_${new Date().getTime()}.xlsx`);
+}
+
+function handleFileUploadProgress() {
+  upload.isUploading = true;
+}
+
+function handleFileSuccess(response: any, file: UploadFile) {
+  upload.open = false;
+  upload.isUploading = false;
+  uploadRef.value?.handleRemove(file);
+  ElMessageBox.alert(
+    "<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" + (response?.msg || '导入完成') + '</div>',
+    '导入结果',
+    {
+      dangerouslyUseHTMLString: true
+    }
+  );
+  loadData();
+  loadStatistics();
+}
+
+function submitFileForm() {
+  uploadRef.value?.submit();
+}
 </script>
 
 <style scoped>
@@ -1071,6 +1148,14 @@ function handleExport() {
 
 .text-muted {
   color: #c0c4cc;
+}
+
+/* 禁言标签固定为图标+文字单行，避免表格列宽收紧时「已禁言」折行。 */
+.silence-status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
 }
 
 .apply-dialog-query {
