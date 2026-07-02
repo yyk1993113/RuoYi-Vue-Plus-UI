@@ -34,15 +34,12 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 echo 'Installing pnpm dependencies...'
-                bat '''
-                @echo off
-                set CI=
-                echo registry=https://registry.npmmirror.com>.npmrc
-                pnpm install --no-frozen-lockfile
-                echo Rebuilding native modules...
-                pnpm rebuild esbuild @parcel/watcher
-                exit /b 0
-                '''
+                bat 'echo registry=https://registry.npmmirror.com>.npmrc'
+                script {
+                    def rc = bat(returnStatus: true, script: 'pnpm install --no-frozen-lockfile')
+                    echo "pnpm install exited with code: ${rc}"
+                }
+                bat 'pnpm rebuild esbuild @parcel/watcher'
             }
         }
 
