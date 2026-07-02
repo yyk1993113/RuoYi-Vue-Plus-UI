@@ -10,6 +10,7 @@ pipeline {
         PROJECT_NAME = 'ruoyi-vue-plus-ui'
         DEPLOY_DIR = 'D:\\deploy\\ruoyi-vue-plus-ui'
         PATH = "D:\\maven\\apache-maven-3.9.9\\bin;C:\\Program Files\\nodejs;C:\\Program Files\\Git\\cmd;${env.PATH}"
+        CI = 'true'
     }
 
     options {
@@ -34,7 +35,7 @@ pipeline {
         stage('安装依赖') {
             steps {
                 echo '安装pnpm依赖...'
-                bat 'pnpm install --registry=https://registry.npmmirror.com'
+                bat 'pnpm install --registry=https://registry.npmmirror.com --config.approve-builds="*"'
             }
         }
 
