@@ -33,6 +33,15 @@ export interface CompanyVO {
   remark?: string;
   jobCount?: number;
   applyCount?: number;
+  // 最新待联系结算意向：来自 job_settlement_intent，仅运营企业管理列表展示。
+  settlementIntentId?: number | string;
+  settlementIntentType?: string;
+  settlementFollowStatus?: string;
+  settlementOperatorName?: string;
+  settlementOperatorPhone?: string;
+  settlementContactPhone?: string;
+  settlementJobName?: string;
+  settlementCreateTime?: string;
 }
 
 // ========== 岗位相关 ==========
@@ -449,6 +458,8 @@ export interface CompanyQuery {
   applyCount?: number | string;
   feedbackCount?: number | string;
   noFeedbackCount?: number | string;
+  // 结算意向跟进状态筛选；当前列表仅支持 0=待联系。
+  settlementFollowStatus?: string;
   params?: Record<string, any>;
 }
 
@@ -971,6 +982,11 @@ export function listPromoterWorkbenchDetail(query: PromotionAttributionQuery & {
 
 export function listCompany(query: CompanyQuery) {
   return request.get<any>(`${baseUrl}/company/list`, { params: query });
+}
+
+// 标记发布岗位时产生的结算服务意向已联系；处理后企业列表待联系提醒消失。
+export function markSettlementIntentContacted(data: { intentId: number | string; remark?: string }) {
+  return request.post(`${baseUrl}/company/settlementIntent/contacted`, data);
 }
 
 // companyId 为19位雪花ID：必须按原值(字符串)透传到 URL，禁止 Number() 转换（超出安全整数会丢精度，后端按错误ID查不到→「企业不存在」）
