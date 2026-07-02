@@ -372,15 +372,10 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="职位类目" prop="category">
-              <el-cascader
-                v-model="editForm.categoryPath"
-                :options="categoryOptions"
-                :props="{ checkStrictly: true, emitPath: true }"
-                filterable
-                clearable
-                placeholder="请选择职位类目"
-                style="width: 100%"
-                @change="syncEditCategoryFromPath"
+              <JobPositionPicker
+                v-model="editForm.positionName"
+                placeholder="请选择标准职位（来自职位类目库）"
+                @pick="selectEditStandardPosition"
               />
             </el-form-item>
           </el-col>
@@ -743,7 +738,7 @@ import { download } from '@/utils/request';
 import { REGIONS } from '@/utils/region-data';
 import { unwrapList, splitToArray, formatSalary } from './helpers';
 import { jobStatusMeta, jobTypeMeta } from './constants';
-import { getJobPositionTree } from '@/api/recruitment/jobCategory';
+import JobPositionPicker from './components/JobPositionPicker.vue';
 
 const router = useRouter();
 const loading = ref(false);
@@ -854,10 +849,11 @@ const editFormRef = ref();
 const editForm = reactive({
   jobId: undefined as number | string | undefined,
   jobName: '',
+  positionId: '' as number | string | '',
+  positionName: '',
   jobType: '0',
   categoryId: '' as number | string | '',
   category: '',
-  categoryPath: [] as string[],
   regionPath: [] as string[],
   province: '',
   city: '',
@@ -1084,99 +1080,49 @@ const regionOptions = REGIONS.map((province: any) => ({
   }))
 }));
 
-// 职位类目树：编辑弹窗只选择类目节点，不再用标准职位覆盖岗位名称。
-interface CategoryOption {
-  value: string;
-  label: string;
-  children?: CategoryOption[];
+interface StandardPositionPick {
+  positionId?: number | string;
+  positionName?: string;
+  categoryId?: number | string;
+  categoryName?: string;
+  name?: string;
+  category?: string;
 }
 
-const categoryOptions = ref<CategoryOption[]>([]);
-
-async function loadCategoryTree() {
-  const res = await getJobPositionTree();
-  const list: any[] = (res as any)?.data || [];
-  categoryOptions.value = list.map(mapCategoryOption);
-  syncEditCategoryPathFromId();
-}
-
-function mapCategoryOption(node: any): CategoryOption {
-  return {
-    value: String(node.id ?? ''),
-    label: String(node.name || ''),
-    children: (node.children || []).map(mapCategoryOption)
-  };
-}
-
-function syncEditCategoryFromPath() {
-  const path = editForm.categoryPath || [];
-  const selectedId = path[path.length - 1] || '';
-  const selected = findCategoryOptionById(selectedId);
-  editForm.categoryId = selectedId;
-  editForm.category = selected?.label || '';
+// 编辑弹窗同样选择 positions 叶子，避免只保存二级类目而丢失标准职位。
+function selectEditStandardPosition(position: StandardPositionPick) {
+  const previousPositionName = String(editForm.positionName || '');
+  const nextPositionName = String(position?.positionName || position?.name || '');
+  editForm.positionId = position?.positionId != null ? String(position.positionId) : '';
+  editForm.positionName = nextPositionName;
+  editForm.categoryId = position?.categoryId != null ? String(position.categoryId) : '';
+  editForm.category = String(position?.categoryName || position?.category || '');
+  if (nextPositionName && (!editForm.jobName.trim() || editForm.jobName.trim() === previousPositionName)) {
+    editForm.jobName = nextPositionName;
+  }
   editFormRef.value?.validateField?.('category');
+  editFormRef.value?.validateField?.('jobName');
 }
 
-function syncEditCategoryPathFromId() {
-  const id = editForm.categoryId ? String(editForm.categoryId) : '';
-  editForm.categoryPath = id ? findCategoryPath(id) : [];
-}
-
-function applyEditCategorySnapshot(categoryId: unknown, categoryText: unknown) {
+function applyEditPositionSnapshot(positionId: unknown, positionName: unknown, categoryId: unknown, categoryText: unknown) {
+  editForm.positionId = positionId != null ? String(positionId) : '';
+  editForm.positionName = String(positionName || '');
   editForm.categoryId = categoryId != null ? String(categoryId) : '';
   editForm.category = String(categoryText || '');
-  if (editForm.categoryId) {
-    syncEditCategoryPathFromId();
+}
+
+function validateEditStandardPosition(_rule: unknown, _value: unknown, callback: (error?: Error) => void) {
+  if (editForm.positionId && editForm.positionName && editForm.categoryId && editForm.category) {
+    callback();
     return;
   }
-  // 兼容历史详情只返回类目名称、没有 categoryId 的记录。
-  const path = findCategoryPathByLabel(editForm.category);
-  editForm.categoryPath = path;
-  const selected = path.length ? findCategoryOptionById(path[path.length - 1]) : undefined;
-  if (selected) {
-    editForm.categoryId = selected.value;
-    editForm.category = selected.label;
-  }
-}
-
-function findCategoryOptionById(id: string): CategoryOption | undefined {
-  if (!id) return undefined;
-  const stack = [...categoryOptions.value];
-  while (stack.length) {
-    const node = stack.shift();
-    if (!node) continue;
-    if (node.value === id) return node;
-    stack.push(...(node.children || []));
-  }
-  return undefined;
-}
-
-function findCategoryPath(id: string, nodes: CategoryOption[] = categoryOptions.value, parents: string[] = []): string[] {
-  for (const node of nodes) {
-    const path = [...parents, node.value];
-    if (node.value === id) return path;
-    const childPath = findCategoryPath(id, node.children || [], path);
-    if (childPath.length) return childPath;
-  }
-  return [];
-}
-
-function findCategoryPathByLabel(label: string, nodes: CategoryOption[] = categoryOptions.value, parents: string[] = []): string[] {
-  const text = String(label || '').trim();
-  if (!text) return [];
-  for (const node of nodes) {
-    const path = [...parents, node.value];
-    if (node.label === text) return path;
-    const childPath = findCategoryPathByLabel(text, node.children || [], path);
-    if (childPath.length) return childPath;
-  }
-  return [];
+  callback(new Error('请选择标准职位'));
 }
 
 const editRules = {
   jobName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
   jobType: [{ required: true, message: '请选择用工性质', trigger: 'change' }],
-  category: [{ required: true, message: '请选择职位类目', trigger: 'change' }],
+  category: [{ required: true, validator: validateEditStandardPosition, trigger: 'change' }],
   // 至少选到省即可（min:1）：配合 checkStrictly 支持「全省/全市」类部分路径岗位的回显与保存，不强制必须到区县
   regionPath: [{ required: true, type: 'array', min: 1, message: '请至少选择省份', trigger: 'change' }],
   workAddress: [{ required: true, message: '请输入工作地点', trigger: 'blur' }],
@@ -1237,15 +1183,12 @@ async function handleEdit(row: any) {
   editVisible.value = true;
   editLoading.value = true;
   try {
-    if (!categoryOptions.value.length) {
-      await loadCategoryTree();
-    }
     const res = await getJobFullDetail(row.jobId);
     const d: any = res.data || {};
     editForm.jobId = d.jobId ?? row.jobId;
     editForm.jobName = d.jobName || d.positionName || '';
     editForm.jobType = d.jobType != null ? String(d.jobType) : '0';
-    applyEditCategorySnapshot(d.categoryId, d.categoryName || d.category);
+    applyEditPositionSnapshot(d.positionId, d.positionName, d.categoryId, d.categoryName || d.category);
     editForm.province = d.province ?? '';
     editForm.city = d.city ?? '';
     editForm.district = d.district ?? '';
@@ -1283,6 +1226,8 @@ function buildEditPayload() {
   const payload: any = {
     jobId: editForm.jobId,
     jobName: editForm.jobName,
+    positionId: editForm.positionId || undefined,
+    positionName: editForm.positionName || undefined,
     jobType: editForm.jobType,
     categoryId: editForm.categoryId || undefined,
     categoryName: editForm.category,
@@ -1591,7 +1536,6 @@ function handleCopyPublish(row: any) {
 }
 
 onMounted(() => {
-  loadCategoryTree();
   loadData();
   loadStatistics();
 });

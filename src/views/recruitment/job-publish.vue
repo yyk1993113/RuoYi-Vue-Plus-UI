@@ -72,15 +72,10 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="职位类目" prop="category">
-              <el-cascader
-                v-model="form.categoryPath"
-                :options="categoryOptions"
-                :props="{ checkStrictly: true, emitPath: true }"
-                filterable
-                clearable
-                placeholder="请选择职位类目"
-                style="width: 100%"
-                @change="syncCategoryFromPath"
+              <JobPositionPicker
+                v-model="form.positionName"
+                placeholder="请选择标准职位（来自职位类目库）"
+                @pick="selectStandardPosition"
               />
             </el-form-item>
           </el-col>
@@ -330,8 +325,8 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { addJob, saveJobDraft, listCompany, getJobFullDetail } from '@/api/recruitment';
-import { getJobPositionTree } from '@/api/recruitment/jobCategory';
 import { unwrapList, formatSalary } from './helpers';
+import JobPositionPicker from './components/JobPositionPicker.vue';
 import {
   jobTypeOptions,
   experienceOptions,
@@ -363,10 +358,11 @@ function emptyForm() {
   return {
     companyId: undefined as number | string | undefined,
     jobName: '',
+    positionId: '' as number | string | '',
+    positionName: '',
     jobType: '0',
     categoryId: '' as number | string | '',
     category: '',
-    categoryPath: [] as string[],
     regionPath: [] as string[],
     province: '',
     city: '',
@@ -406,93 +402,43 @@ async function searchCompany(keyword: string) {
   }
 }
 
-// ===== 职位类目：从职位类目树选择，categoryId/category 是提交给后端的权威类目快照 =====
-interface CategoryOption {
-  value: string;
-  label: string;
-  children?: CategoryOption[];
+interface StandardPositionPick {
+  positionId?: number | string;
+  positionName?: string;
+  categoryId?: number | string;
+  categoryName?: string;
+  name?: string;
+  category?: string;
 }
 
-const categoryOptions = ref<CategoryOption[]>([]);
-
-async function loadCategoryTree() {
-  const res = await getJobPositionTree();
-  const list: any[] = (res as any)?.data || [];
-  categoryOptions.value = list.map(mapCategoryOption);
-  syncCategoryPathFromId();
-}
-
-function mapCategoryOption(node: any): CategoryOption {
-  return {
-    value: String(node.id ?? ''),
-    label: String(node.name || ''),
-    children: (node.children || []).map(mapCategoryOption)
-  };
-}
-
-function syncCategoryFromPath() {
-  const path = form.categoryPath || [];
-  const selectedId = path[path.length - 1] || '';
-  const selected = findCategoryOptionById(selectedId);
-  form.categoryId = selectedId;
-  form.category = selected?.label || '';
+// BOSS 式选择器以 positions 叶子为标准职位；选中后同时回填职位和直接所属类目快照。
+function selectStandardPosition(position: StandardPositionPick) {
+  const previousPositionName = String(form.positionName || '');
+  const nextPositionName = String(position?.positionName || position?.name || '');
+  form.positionId = position?.positionId != null ? String(position.positionId) : '';
+  form.positionName = nextPositionName;
+  form.categoryId = position?.categoryId != null ? String(position.categoryId) : '';
+  form.category = String(position?.categoryName || position?.category || '');
+  if (nextPositionName && (!form.jobName.trim() || form.jobName.trim() === previousPositionName)) {
+    form.jobName = nextPositionName;
+  }
   formRef.value?.validateField?.('category');
+  formRef.value?.validateField?.('jobName');
 }
 
-function syncCategoryPathFromId() {
-  const id = form.categoryId ? String(form.categoryId) : '';
-  form.categoryPath = id ? findCategoryPath(id) : [];
-}
-
-function applyCategorySnapshot(categoryId: unknown, categoryText: unknown) {
+function applyPositionSnapshot(positionId: unknown, positionName: unknown, categoryId: unknown, categoryText: unknown) {
+  form.positionId = positionId != null ? String(positionId) : '';
+  form.positionName = String(positionName || '');
   form.categoryId = categoryId != null ? String(categoryId) : '';
   form.category = String(categoryText || '');
-  if (form.categoryId) {
-    syncCategoryPathFromId();
+}
+
+function validateStandardPosition(_rule: unknown, _value: unknown, callback: (error?: Error) => void) {
+  if (form.positionId && form.positionName && form.categoryId && form.category) {
+    callback();
     return;
   }
-  // 兼容复制发布时历史详情只返回类目名称、没有 categoryId 的记录。
-  const path = findCategoryPathByLabel(form.category);
-  form.categoryPath = path;
-  const selected = path.length ? findCategoryOptionById(path[path.length - 1]) : undefined;
-  if (selected) {
-    form.categoryId = selected.value;
-    form.category = selected.label;
-  }
-}
-
-function findCategoryOptionById(id: string): CategoryOption | undefined {
-  if (!id) return undefined;
-  const stack = [...categoryOptions.value];
-  while (stack.length) {
-    const node = stack.shift();
-    if (!node) continue;
-    if (node.value === id) return node;
-    stack.push(...(node.children || []));
-  }
-  return undefined;
-}
-
-function findCategoryPath(id: string, nodes: CategoryOption[] = categoryOptions.value, parents: string[] = []): string[] {
-  for (const node of nodes) {
-    const path = [...parents, node.value];
-    if (node.value === id) return path;
-    const childPath = findCategoryPath(id, node.children || [], path);
-    if (childPath.length) return childPath;
-  }
-  return [];
-}
-
-function findCategoryPathByLabel(label: string, nodes: CategoryOption[] = categoryOptions.value, parents: string[] = []): string[] {
-  const text = String(label || '').trim();
-  if (!text) return [];
-  for (const node of nodes) {
-    const path = [...parents, node.value];
-    if (node.label === text) return path;
-    const childPath = findCategoryPathByLabel(text, node.children || [], path);
-    if (childPath.length) return childPath;
-  }
-  return [];
+  callback(new Error('请选择标准职位'));
 }
 
 // ===== 校验规则 =====
@@ -500,7 +446,7 @@ const rules = {
   companyId: [{ required: true, message: '请选择所属企业', trigger: 'change' }],
   jobName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
   jobType: [{ required: true, message: '请选择用工性质', trigger: 'change' }],
-  category: [{ required: true, message: '请选择职位类目', trigger: 'change' }],
+  category: [{ required: true, validator: validateStandardPosition, trigger: 'change' }],
   regionPath: [{ required: true, type: 'array', min: 3, message: '请选择省市区', trigger: 'change' }],
   workAddress: [{ required: true, message: '请输入工作地点', trigger: 'blur' }],
   experience: [{ required: true, message: '请选择经验要求', trigger: 'change' }],
@@ -641,6 +587,8 @@ function buildPayload(status: string) {
   const payload: any = {
     companyId: form.companyId,
     jobName: form.jobName?.trim(),
+    positionId: form.positionId || undefined,
+    positionName: form.positionName || undefined,
     jobType: form.jobType,
     categoryId: form.categoryId || undefined,
     categoryName: form.category,
@@ -723,7 +671,6 @@ function afterSuccess(msg: string) {
     .catch((action) => {
       if (action === 'cancel') {
         Object.assign(form, emptyForm());
-        syncCategoryPathFromId();
         formRef.value?.clearValidate?.();
       }
     });
@@ -737,7 +684,6 @@ function handleReset() {
   })
     .then(() => {
       Object.assign(form, emptyForm());
-      syncCategoryPathFromId();
       formRef.value?.clearValidate?.();
       clearLocalDraft();
     })
@@ -785,7 +731,6 @@ function restoreLocalDraft() {
     if (!raw) return;
     const saved = JSON.parse(raw);
     Object.assign(form, saved);
-    syncCategoryPathFromId();
     lastAutoSavedText.value = '已恢复上次未提交的草稿';
     // 恢复企业名以便选择器回显
     if (form.companyId) {
@@ -816,7 +761,7 @@ async function loadCopyFrom(jobId: string) {
     if (d.companyId) companyOptions.value = [{ companyId: d.companyId, companyName: d.companyName || `企业#${d.companyId}` }];
     form.jobName = d.jobName || d.positionName || '';
     form.jobType = d.jobType != null ? String(d.jobType) : '0';
-    applyCategorySnapshot(d.categoryId, d.categoryName || d.category);
+    applyPositionSnapshot(d.positionId, d.positionName, d.categoryId, d.categoryName || d.category);
     form.province = d.province ?? '';
     form.city = d.city ?? '';
     form.district = d.district ?? '';
@@ -842,7 +787,6 @@ async function loadCopyFrom(jobId: string) {
 
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown);
-  await loadCategoryTree();
   if (isCopy.value) {
     await loadCopyFrom(String(route.query.copyFrom));
   } else {
