@@ -9,8 +9,7 @@ pipeline {
     environment {
         PROJECT_NAME = 'ruoyi-vue-plus-ui'
         DEPLOY_DIR = 'D:\\deploy\\ruoyi-vue-plus-ui'
-        PATH = "D:\\maven\\apache-maven-3.9.9\\bin;C:\\Program Files\\nodejs;C:\\Program Files\\Git\\cmd;${env.PATH}"
-        CI = 'false'
+        PATH = "C:\\Program Files\\nodejs;C:\\Program Files\\Git\\cmd;D:\\maven\\apache-maven-3.9.9\\bin;${env.PATH}"
     }
 
     options {
@@ -35,8 +34,15 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 echo 'Installing pnpm dependencies...'
-                writeFile file: '.npmrc', text: 'onlyBuiltDependencies=*\r\nregistry=https://registry.npmmirror.com'
-                bat 'pnpm install --config.onlyBuiltDependencies=*'
+                bat '''
+                @echo off
+                set CI=
+                echo registry=https://registry.npmmirror.com>.npmrc
+                pnpm install --no-frozen-lockfile
+                echo Rebuilding native modules...
+                pnpm rebuild esbuild @parcel/watcher
+                exit /b 0
+                '''
             }
         }
 
