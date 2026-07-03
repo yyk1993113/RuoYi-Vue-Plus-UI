@@ -113,6 +113,12 @@
             <el-option label="已禁用" value="2" />
           </el-select>
         </el-form-item>
+        <el-form-item label="数据状态" prop="deleted">
+          <el-select v-model="queryParams.deleted" placeholder="全部" style="width: 140px" @change="handleQuery">
+            <el-option label="正常" value="0" />
+            <el-option label="已删除" value="1" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="禁言状态" prop="isSilenced">
           <el-select v-model="queryParams.isSilenced" placeholder="全部" clearable style="width: 150px">
             <el-option label="正常" value="0" />
@@ -195,7 +201,8 @@
           </el-col>
           <el-col :span="1.5">
             <!-- 批量删除：未勾选时点击给出提示，勾选后按所选 companyId 批量删除 -->
-            <el-button type="danger" plain icon="Delete" @click="handleBatchDelete">删除</el-button>
+            <el-button v-if="queryParams.deleted !== '1'" type="danger" plain icon="Delete" @click="handleBatchDelete">删除</el-button>
+            <el-button v-else type="success" plain icon="RefreshLeft" @click="handleBatchRestore">恢复</el-button>
           </el-col>
           <el-col :span="1.5">
             <el-button type="success" plain icon="Download" @click="handleExport">导出</el-button>
@@ -216,7 +223,10 @@
                 {{ row.companyName?.charAt(0) }}
               </el-avatar>
               <div class="company-detail">
-                <div class="name">{{ row.companyName }}</div>
+                <div class="name">
+                  {{ row.companyName }}
+                  <el-tag v-if="row.deleted === '1'" type="info" size="small" effect="plain">已删除</el-tag>
+                </div>
                 <div class="desc text-secondary">{{ row.description || '暂无描述' }}</div>
               </div>
             </div>
@@ -273,6 +283,12 @@
             <el-tag :type="companyStatusMeta(row.status).type">{{ companyStatusMeta(row.status).label }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="数据状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.deleted === '1'" type="info">已删除</el-tag>
+            <el-tag v-else type="success">正常</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="禁言状态" width="110" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.isSilenced === '1'" type="danger">
@@ -285,34 +301,40 @@
         <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
             <div style="display: flex; align-items: center; justify-content: center; gap: 8px">
-              <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
-              <el-button link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
-              <el-dropdown trigger="click">
-                <span class="el-dropdown-link">
-                  <el-button link type="primary"
-                    >管理<el-icon class="el-icon--right"><arrow-down /></el-icon
-                  ></el-button>
-                </span>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <!-- 人员：已认证企业的人员管理入口，置于菜单最上方（行为待接，后端接口待补） -->
-                    <el-dropdown-item v-if="row.status === '1'" icon="User" @click="handleStaff(row)">人员</el-dropdown-item>
-                    <el-dropdown-item v-if="row.status === '0'" icon="CircleCheck" @click="handleAudit(row, '1')">审核通过</el-dropdown-item>
-                    <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '2')">审核拒绝</el-dropdown-item>
-                    <el-dropdown-item v-if="hasPendingSettlementIntent(row)" icon="Phone" @click="handleSettlementContacted(row)">
-                      标记已联系
-                    </el-dropdown-item>
-                    <el-dropdown-item v-if="row.status === '1'" icon="Lock" @click="handleStatusChange(row, '2')">禁用企业</el-dropdown-item>
-                    <el-dropdown-item v-if="row.status === '2'" icon="Unlock" @click="handleStatusChange(row, '1')">启用企业</el-dropdown-item>
-                    <el-dropdown-item divided icon="MuteNotification" @click="handleSilence(row)" v-if="row.isSilenced !== '1'">
-                      禁言企业
-                    </el-dropdown-item>
-                    <el-dropdown-item icon="MuteNotification" @click="handleUnsilence(row)" v-if="row.isSilenced === '1'">
-                      取消禁言
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <template v-if="row.deleted === '1'">
+                <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
+                <el-button link type="success" icon="RefreshLeft" @click="handleRestore(row)">恢复</el-button>
+              </template>
+              <template v-else>
+                <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
+                <el-button link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
+                <el-dropdown trigger="click">
+                  <span class="el-dropdown-link">
+                    <el-button link type="primary"
+                      >管理<el-icon class="el-icon--right"><arrow-down /></el-icon
+                    ></el-button>
+                  </span>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <!-- 人员：已认证企业的人员管理入口，置于菜单最上方（行为待接，后端接口待补） -->
+                      <el-dropdown-item v-if="row.status === '1'" icon="User" @click="handleStaff(row)">人员</el-dropdown-item>
+                      <el-dropdown-item v-if="row.status === '0'" icon="CircleCheck" @click="handleAudit(row, '1')">审核通过</el-dropdown-item>
+                      <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '2')">审核拒绝</el-dropdown-item>
+                      <el-dropdown-item v-if="hasPendingSettlementIntent(row)" icon="Phone" @click="handleSettlementContacted(row)">
+                        标记已联系
+                      </el-dropdown-item>
+                      <el-dropdown-item v-if="row.status === '1'" icon="Lock" @click="handleStatusChange(row, '2')">禁用企业</el-dropdown-item>
+                      <el-dropdown-item v-if="row.status === '2'" icon="Unlock" @click="handleStatusChange(row, '1')">启用企业</el-dropdown-item>
+                      <el-dropdown-item divided icon="MuteNotification" @click="handleSilence(row)" v-if="row.isSilenced !== '1'">
+                        禁言企业
+                      </el-dropdown-item>
+                      <el-dropdown-item icon="MuteNotification" @click="handleUnsilence(row)" v-if="row.isSilenced === '1'">
+                        取消禁言
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </template>
             </div>
           </template>
         </el-table-column>
@@ -330,6 +352,11 @@
           <el-descriptions-item label="企业状态">
             <el-tag :type="companyStatusMeta(currentCompany.status).type">{{ companyStatusMeta(currentCompany.status).label }}</el-tag>
           </el-descriptions-item>
+          <el-descriptions-item label="数据状态">
+            <el-tag v-if="currentCompany.deleted === '1'" type="info">已删除</el-tag>
+            <el-tag v-else type="success">正常</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="currentCompany.deleted === '1'" label="删除时间">{{ currentCompany.deletedTime || '-' }}</el-descriptions-item>
           <el-descriptions-item label="企业名称" :span="2">{{ currentCompany.companyName }}</el-descriptions-item>
           <el-descriptions-item label="企业描述" :span="2">{{ currentCompany.description || '无' }}</el-descriptions-item>
           <el-descriptions-item label="联系人">{{ currentCompany.contactPerson || '-' }}</el-descriptions-item>
@@ -814,6 +841,7 @@ import {
   type JobVO,
   addOrUpdate,
   delCompany,
+  restoreCompany,
   listApply
 } from '@/api/recruitment';
 import ApplyDetailDialog from './components/ApplyDetailDialog.vue';
@@ -931,6 +959,8 @@ const queryParams = reactive({
   contactPerson: '',
   contactPhone: '',
   status: '',
+  // deleted 是企业业务归档筛选；默认只展示正常企业，切到已删除时作为恢复列表使用。
+  deleted: '0',
   isSilenced: '',
   jobCount: undefined as number | undefined,
   applyCount: undefined as number | undefined,
@@ -1027,6 +1057,7 @@ function clearQueryFilters() {
   queryParams.contactPerson = '';
   queryParams.contactPhone = '';
   queryParams.status = '';
+  queryParams.deleted = '0';
   queryParams.isSilenced = '';
   queryParams.jobCount = undefined;
   queryParams.applyCount = undefined;
@@ -1500,7 +1531,7 @@ function handleSelectionChange(rows: any[]) {
   selectedIds.value = rows.map((r) => r.companyId);
 }
 
-// 批量删除：二次确认后按所选 companyId 删除（后端接口待补，前端已对接 delCompany）
+// 批量删除：后端执行软删除归档并下架在线岗位，企业从活动列表隐藏但历史业务数据保留。
 async function handleBatchDelete() {
   // 未勾选任何企业时给出提示，避免静默无反应
   if (selectedIds.value.length === 0) {
@@ -1508,19 +1539,61 @@ async function handleBatchDelete() {
     return;
   }
   try {
-    await ElMessageBox.confirm(`是否删除选中企业？`, '提示', {
+    await ElMessageBox.confirm('删除后企业将移入已删除列表，关联在线岗位会自动下架；投递、履约和财务历史会保留。是否继续？', '提示', {
       confirmButtonText: '确认',
       cancelButtonText: '取消',
       type: 'warning'
     });
     await delCompany(selectedIds.value);
-    ElMessage.success('删除成功');
+    ElMessage.success('已移入已删除列表');
     selectedIds.value = [];
     loadData();
     loadStatistics();
   } catch (error: any) {
     if (error !== 'cancel') {
       ElMessage.error('删除失败');
+    }
+  }
+}
+
+// 恢复只解除企业归档状态；岗位是否重新上架仍由岗位管理流程决定。
+async function handleRestore(row: any) {
+  try {
+    await ElMessageBox.confirm('确定要恢复该企业吗？恢复后企业会回到正常列表，但不会自动重新上架岗位。', '提示', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning'
+    });
+    await restoreCompany(row.companyId);
+    ElMessage.success('恢复成功');
+    loadData();
+    loadStatistics();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('恢复失败');
+    }
+  }
+}
+
+async function handleBatchRestore() {
+  if (selectedIds.value.length === 0) {
+    ElMessage.warning('请先选择要恢复的企业');
+    return;
+  }
+  try {
+    await ElMessageBox.confirm('确定要恢复选中的企业吗？恢复后不会自动重新上架岗位。', '提示', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning'
+    });
+    await restoreCompany(selectedIds.value);
+    ElMessage.success('恢复成功');
+    selectedIds.value = [];
+    loadData();
+    loadStatistics();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('恢复失败');
     }
   }
 }

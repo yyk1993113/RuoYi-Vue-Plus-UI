@@ -24,6 +24,11 @@ export interface CompanyVO {
   // 营业执照图片地址（后端 company.business_license），资质图片预览用
   businessLicense?: string;
   status?: string;
+  // 业务归档状态 0:正常 1:已删除；活动列表默认只查正常企业。
+  deleted?: string;
+  deletedTime?: string;
+  deletedBy?: number;
+  deleteReason?: string;
   // 平台禁言状态 0:未禁言 1:禁言中（后端 company.is_silenced）
   isSilenced?: string;
   silenceReason?: string;
@@ -460,6 +465,8 @@ export interface CompanyQuery {
   contactPerson?: string;
   contactPhone?: string;
   status?: string;
+  // 业务归档状态筛选；后端未传时默认按未删除企业查询。
+  deleted?: string;
   userId?: number;
   isSilenced?: string;
   jobCount?: number | string;
@@ -1037,18 +1044,30 @@ export function getCompanyStatistics() {
   return request.get<any>(`${baseUrl}/company/statistics`);
 }
 
-// 删除企业（支持批量）。按 RuoYi-Vue-Plus 惯例走 DELETE /company/{ids}，
-// 多选时 ids 以逗号拼接传入路径，与 delJob 一致。后端接口待补。
+// 删除企业（支持批量）：后端执行业务归档，在线岗位自动下架，历史岗位/投递/履约/财务数据保留。
 export function delCompany(companyId: number | number[]) {
   return request.delete(`${baseUrl}/company/${companyId}`);
 }
 
-//新增企业
+// 恢复已删除企业（支持批量）：只恢复企业主体可见性，不自动恢复岗位上架状态。
+export function restoreCompany(companyId: number | number[]) {
+  const ids = Array.isArray(companyId) ? companyId : [companyId];
+  return request.post(`${baseUrl}/company/restore`, ids);
+}
+
+type CompanyArchiveFields = Pick<CompanyVO, 'deleted' | 'deletedTime' | 'deletedBy' | 'deleteReason'>;
+
+// 新增/编辑企业：归档字段由删除/恢复接口维护，普通保存请求不透传，避免误触发恢复或覆盖删除留痕。
 export const addOrUpdate = (data: UserForm) => {
+  const payload = { ...(data as UserForm & CompanyArchiveFields) };
+  delete payload.deleted;
+  delete payload.deletedTime;
+  delete payload.deletedBy;
+  delete payload.deleteReason;
   return request({
     url: `${baseUrl}/company/addOrUpdate`,
     method: 'post',
-    data: data
+    data: payload
   });
 };
 
