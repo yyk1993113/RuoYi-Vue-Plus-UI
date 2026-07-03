@@ -34,15 +34,6 @@ export interface CompanyVO {
   remark?: string;
   jobCount?: number;
   applyCount?: number;
-  // 最新待联系结算意向：来自 job_settlement_intent，仅运营企业管理列表展示。
-  settlementIntentId?: number | string;
-  settlementIntentType?: string;
-  settlementFollowStatus?: string;
-  settlementOperatorName?: string;
-  settlementOperatorPhone?: string;
-  settlementContactPhone?: string;
-  settlementJobName?: string;
-  settlementCreateTime?: string;
 }
 
 // ========== 岗位相关 ==========
@@ -79,6 +70,13 @@ export interface JobVO {
   remark?: string;
   isRecommend?: string;
   isHot?: string;
+  // 意向结算：来自 job_settlement_intent，岗位管理列表展示/编辑/线索入口使用。
+  settlementIntentId?: number | string;
+  settlementIntentType?: string;
+  settlementNeedFollowUp?: string;
+  settlementFollowStatus?: string;
+  settlementFollowRemark?: string;
+  settlementCreateTime?: string;
 }
 
 // 岗位完整字段 VO（运营台审核详情用）。
@@ -146,6 +144,13 @@ export interface JobFullVO {
   createTime?: string;
   updateTime?: string;
   remark?: string;
+  // 意向结算：来自 job_settlement_intent，详情弹窗展示使用。
+  settlementIntentId?: number | string;
+  settlementIntentType?: string;
+  settlementNeedFollowUp?: string;
+  settlementFollowStatus?: string;
+  settlementFollowRemark?: string;
+  settlementCreateTime?: string;
 }
 
 // ========== 投递相关 ==========
@@ -466,8 +471,6 @@ export interface CompanyQuery {
   applyCount?: number | string;
   feedbackCount?: number | string;
   noFeedbackCount?: number | string;
-  // 结算意向跟进状态筛选；当前列表仅支持 0=待联系。
-  settlementFollowStatus?: string;
   params?: Record<string, any>;
 }
 
@@ -477,7 +480,7 @@ export interface JobQuery {
   jobName?: string;
   jobId?: number | string;
   jobNo?: string;
-  companyId?: number;
+  companyId?: number | string;
   companyName?: string;
   status?: string;
   jobType?: string;
@@ -503,7 +506,7 @@ export interface ApplyQuery {
   beginTime?: string;
   endTime?: string;
   // 企业管理「已反馈/未反馈」弹窗用：companyId 精确过滤企业；feedback=0 未反馈 / 1 已反馈
-  companyId?: number;
+  companyId?: number | string;
   feedback?: string;
 }
 
@@ -511,7 +514,8 @@ export interface TaskQuery {
   pageNum?: number;
   pageSize?: number;
   jobId?: number;
-  companyId?: number;
+  applyId?: number;
+  companyId?: number | string;
   userId?: number;
   status?: string;
   // 运营端监控台筛选维度（后端 AdminRecruitmentController#listTask 已支持）
@@ -525,7 +529,10 @@ export interface TaskQuery {
 export interface LedgerQuery {
   pageNum?: number;
   pageSize?: number;
-  companyId?: number;
+  companyId?: number | string;
+  jobId?: number;
+  applyId?: number;
+  taskId?: number;
   userId?: number;
   orderNo?: string;
   status?: string; // 结算状态筛选 0待结算/1已结算/2已取消
@@ -993,11 +1000,6 @@ export function listCompany(query: CompanyQuery) {
   return request.get<any>(`${baseUrl}/company/list`, { params: query });
 }
 
-// 标记发布岗位时产生的结算服务意向已联系；处理后企业列表待联系提醒消失。
-export function markSettlementIntentContacted(data: { intentId: number | string; remark?: string }) {
-  return request.post(`${baseUrl}/company/settlementIntent/contacted`, data);
-}
-
 // companyId 为19位雪花ID：必须按原值(字符串)透传到 URL，禁止 Number() 转换（超出安全整数会丢精度，后端按错误ID查不到→「企业不存在」）
 export function getCompany(companyId: number | string) {
   return request.get<any>(`${baseUrl}/company/${companyId}`);
@@ -1161,6 +1163,17 @@ export function delJob(jobId: number | number[]) {
 
 export function updateJob(data: any) {
   return request.put(`${baseUrl}/job`, data);
+}
+
+export function updateJobSettlementIntent(data: {
+  intentId?: number | string;
+  jobId?: number | string;
+  intentType: string;
+  followStatus?: string;
+  followRemark?: string;
+  settlementCreateTime?: string;
+}) {
+  return request.post<JobFullVO>(`${baseUrl}/job/settlementIntent`, data);
 }
 
 // 运营代发岗位：POST /admin/recruitment/job/add，body 为 CreateJobRequest（含 companyId 指定归属企业）。
