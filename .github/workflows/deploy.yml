@@ -32,6 +32,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build (vite build:prod -> dist/)
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm build:prod
 
       - name: Package dist
