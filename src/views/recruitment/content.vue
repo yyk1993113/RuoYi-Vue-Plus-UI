@@ -2,8 +2,8 @@
   <div class="p-4">
     <!--
       运营台·内容配置页
-      职责：统一运营首页六类内容位（轮播图 / 六大金刚区 / 平台公告 / 技能课程 / 求职干货 / 求职服务）。
-      数据来源：后端 AdminContentController（/admin/content/<type>/...），六类接口同构。
+      职责：统一运营首页七类内容位（轮播图 / 六大金刚区 / 平台公告 / 线下招聘会 / 技能课程 / 求职干货 / 求职服务）。
+      数据来源：后端 AdminContentController（/admin/content/<type>/...），七类接口同构。
       实现策略：用 TAB_CONFIGS 描述每个 tab 的“主键字段 / 列定义 / 表单字段 / API 方法”，
                 el-table + 新增编辑弹窗 + 上下架开关 + 排序 这套交互只写一份，按当前 tab 取配置渲染。
     -->
@@ -150,6 +150,8 @@
           <el-form-item :label="field.label" :prop="field.prop">
             <!-- 图片上传 -->
             <image-upload v-if="field.type === 'image'" v-model="form[field.prop]" :limit="1" value-type="url" />
+            <!-- 招聘会海报专用:上传后固定裁切成 3:1 横幅,保证小程序卡片铺满且不裁主体。 -->
+            <fair-poster-crop-upload v-else-if="field.type === 'fairPoster'" v-model="form[field.prop]" />
             <!-- 数字 -->
             <el-input-number
               v-else-if="field.type === 'number'"
@@ -243,6 +245,13 @@ import {
   delHomeNotice,
   changeHomeNoticeStatus,
   changeHomeNoticeHomeVisible,
+  // 线下招聘会
+  listFairEvent,
+  getFairEvent,
+  addFairEvent,
+  updateFairEvent,
+  delFairEvent,
+  changeFairEventStatus,
   // 技能课程
   listCourse,
   getCourse,
@@ -266,6 +275,7 @@ import {
   changeJobServiceStatus
 } from '@/api/recruitment/content';
 import { unwrapList, splitToArray } from './helpers';
+import FairPosterCropUpload from './components/FairPosterCropUpload.vue';
 
 // 列定义：type 决定单元格渲染方式（image/price/tags/status/text/缺省纯文本）
 interface ColumnDef {
@@ -285,7 +295,7 @@ interface FieldOption {
 interface FieldDef {
   prop: string;
   label: string;
-  type?: 'image' | 'number' | 'textarea' | 'editor' | 'select' | 'datetime' | 'status' | 'text';
+  type?: 'image' | 'fairPoster' | 'number' | 'textarea' | 'editor' | 'select' | 'datetime' | 'status' | 'text';
   placeholder?: string;
   maxlength?: number;
   min?: number;
@@ -352,7 +362,7 @@ const noticeTargetMap: Record<string, { label: string; tagType: 'primary' | 'suc
   none: { label: '不跳转', tagType: 'info' }
 };
 
-// 六类内容位配置表（顺序即 tab 顺序）
+// 七类内容位配置表（顺序即 tab 顺序）
 const tabConfigs: TabConfig[] = [
   // ---------- 轮播图 ----------
   {
@@ -469,6 +479,55 @@ const tabConfigs: TabConfig[] = [
       del: delHomeNotice,
       changeStatus: changeHomeNoticeStatus,
       changeHomeVisible: changeHomeNoticeHomeVisible
+    }
+  },
+  // ---------- 线下招聘会 ----------
+  {
+    key: 'fair',
+    label: '线下招聘会',
+    idKey: 'fairId',
+    keywordField: 'title',
+    nameLabel: '标题',
+    statusOnText: '上架',
+    statusOffText: '下架',
+    columns: [
+      { prop: 'fairId', label: 'ID', width: 180, type: 'id' },
+      { prop: 'title', label: '标题', minWidth: 180, align: 'left', type: 'text' },
+      { prop: 'posterUrl', label: '海报', width: 90, type: 'image' },
+      { prop: 'startTime', label: '开始时间', width: 165 },
+      { prop: 'endTime', label: '结束时间', width: 165 },
+      { prop: 'venue', label: '场馆', minWidth: 160, align: 'left', type: 'text' },
+      { prop: 'address', label: '地址', minWidth: 200, align: 'left', type: 'text' },
+      sortColumn,
+      statusColumn,
+      createTimeColumn
+    ],
+    fields: [
+      { prop: 'title', label: '标题', maxlength: 80 },
+      { prop: 'posterUrl', label: '海报', type: 'fairPoster' },
+      { prop: 'startTime', label: '开始时间', type: 'datetime' },
+      { prop: 'endTime', label: '结束时间', type: 'datetime', placeholder: '不填表示长期展示' },
+      { prop: 'venue', label: '举办场馆', maxlength: 100 },
+      { prop: 'address', label: '详细地址', maxlength: 200 },
+      { prop: 'summary', label: '活动摘要', type: 'textarea', maxlength: 300 },
+      { prop: 'content', label: '活动详情', type: 'textarea', maxlength: 2000 },
+      sortField,
+      statusField
+    ],
+    rules: {
+      title: [{ required: true, message: '请输入招聘会标题', trigger: 'blur' }],
+      posterUrl: [{ required: true, message: '请上传招聘会海报', trigger: 'change' }],
+      startTime: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
+      venue: [{ required: true, message: '请输入举办场馆', trigger: 'blur' }]
+    },
+    defaults: { sort: 0, status: '1' },
+    api: {
+      list: listFairEvent,
+      get: getFairEvent,
+      add: addFairEvent,
+      update: updateFairEvent,
+      del: delFairEvent,
+      changeStatus: changeFairEventStatus
     }
   },
   // ---------- 技能课程 ----------
