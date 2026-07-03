@@ -163,7 +163,7 @@
         </el-row>
       </template>
 
-      <el-table v-loading="loading" :data="tableData" border stripe>
+      <el-table v-loading="loading" :data="tableData" border stripe :row-class-name="jobRowClassName">
         <el-table-column label="岗位编码" prop="jobNo" width="180" align="center" show-overflow-tooltip>
           <template #default="{ row }">{{ row.jobNo || '-' }}</template>
         </el-table-column>
@@ -173,6 +173,7 @@
               <div class="job-header">
                 <span class="job-name">{{ row.jobName }}</span>
                 <el-tag :type="jobTypeMeta(row.jobType).type" size="small">{{ jobTypeMeta(row.jobType).label }}</el-tag>
+                <el-tag v-if="isComplianceSettlement(row)" type="success" size="small" effect="dark">合规结算</el-tag>
               </div>
               <div class="job-salary">{{ formatSalary(row.salaryMin, row.salaryMax, row.salaryUnit) }}</div>
               <div class="job-location">
@@ -211,6 +212,20 @@
             <el-tag :type="jobStatusMeta(row.status).type">{{ jobStatusMeta(row.status).label }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="意向结算" width="190" align="center">
+          <template #default="{ row }">
+            <div v-if="canShowSettlementIntent(row) && row.settlementIntentId" class="job-settlement-cell">
+              <el-button link type="primary" @click="handleSettlementIntent(row)">意向结算</el-button>
+              <div class="job-settlement-tags">
+                <el-tag :type="settlementIntentMeta(row.settlementIntentType).type" size="small" effect="plain">
+                  {{ settlementIntentShortLabel(row.settlementIntentType) }}
+                </el-tag>
+              </div>
+              <el-button link type="success" icon="Search" @click.stop="handleSettlementLead(row)">线索</el-button>
+            </div>
+            <span v-else class="text-muted">-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="发布时间" prop="publishTime" width="160" align="center" />
         <!-- 240px 容纳 详情/编辑/更多 三按钮单行展示；nowrap 防止"更多"折到第二行 -->
         <el-table-column label="操作" width="240" fixed="right" align="center">
@@ -236,6 +251,9 @@
                     <el-dropdown-item v-if="row.status === '1'" icon="Bottom" @click="handleStatusChange(row, '2')">下架</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '2'" icon="Top" @click="handleStatusChange(row, '1')">上架</el-dropdown-item>
                     <!-- 复制发布：进入代发整页并按 jobId 回填原岗位信息，少量修改即可重发 -->
+                    <el-dropdown-item v-if="canShowSettlementIntent(row)" icon="Tickets" @click="handleSettlementIntent(row)"
+                      >意向结算</el-dropdown-item
+                    >
                     <el-dropdown-item icon="CopyDocument" @click="handleCopyPublish(row)">复制发布</el-dropdown-item>
                     <el-dropdown-item icon="Delete" @click="handleDelete(row)">删除</el-dropdown-item>
                   </el-dropdown-menu>
@@ -320,6 +338,98 @@
         <el-button @click="detailVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 意向结算：字段来自 job_settlement_intent，运营在岗位维度维护临时用工服务意向和线索跟进状态。 -->
+    <el-dialog v-model="settlementIntentVisible" title="意向结算（临时用工服务意向）" width="680px" append-to-body>
+      <div v-loading="settlementIntentLoading">
+        <el-form v-if="settlementIntentJob" label-width="96px" class="settlement-intent-form">
+          <el-form-item label="岗位名称">{{ settlementIntentJob.jobName || '-' }}</el-form-item>
+          <el-form-item label="所属企业">{{ settlementIntentJob.companyName || '-' }}</el-form-item>
+          <el-form-item label="用工性质">{{ jobTypeMeta(settlementIntentJob.jobType).label }}</el-form-item>
+          <el-form-item label="服务意向" required>
+            <el-radio-group v-model="settlementIntentForm.intentType" class="settlement-intent-radio">
+              <el-radio v-for="item in settlementIntentOptions" :key="item.value" :label="item.value" border>
+                <div class="settlement-radio-text">
+                  <span>{{ item.label }}</span>
+                  <small>{{ item.desc }}</small>
+                </div>
+              </el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="线索状态">
+            <el-select v-model="settlementIntentForm.followStatus" style="width: 180px">
+              <el-option label="待联系" value="0" />
+              <el-option label="已联系" value="1" />
+              <el-option label="已关闭" value="2" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="跟进备注">
+            <el-input
+              v-model="settlementIntentForm.followRemark"
+              type="textarea"
+              :rows="3"
+              maxlength="500"
+              show-word-limit
+              placeholder="例如：已电话沟通，后续发送合规结算方案"
+            />
+          </el-form-item>
+          <el-form-item label="选择时间">
+            <el-date-picker
+              v-model="settlementIntentForm.settlementCreateTime"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              placeholder="请选择意向选择时间"
+              style="width: 220px"
+            />
+          </el-form-item>
+        </el-form>
+        <el-empty v-else-if="!settlementIntentLoading" description="暂无服务意向记录" />
+      </div>
+      <template #footer>
+        <el-button @click="settlementIntentVisible = false">关闭</el-button>
+        <el-button plain type="success" icon="Search" @click="handleSettlementLead(settlementIntentJob)"> 线索 </el-button>
+        <el-button type="primary" :loading="settlementIntentSubmitting" @click="submitSettlementIntent">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-drawer v-model="settlementLeadVisible" title="意向结算线索" size="720px" append-to-body>
+      <div v-loading="settlementLeadLoading" class="settlement-lead-drawer">
+        <template v-if="settlementLead">
+          <div class="settlement-chain">
+            <div
+              v-for="(step, index) in settlementLeadSteps"
+              :key="step.key"
+              class="settlement-chain-node"
+              :class="{ 'is-done': step.done, 'is-empty': !step.done, 'is-active': settlementLeadActiveKey === step.key }"
+              role="button"
+              tabindex="0"
+              @click="selectSettlementLeadStep(step.key)"
+              @keyup.enter="selectSettlementLeadStep(step.key)"
+              @keyup.space="selectSettlementLeadStep(step.key)"
+            >
+              <div class="settlement-chain-marker">{{ index + 1 }}</div>
+              <div class="settlement-chain-card">
+                <div class="settlement-chain-title">
+                  <span>{{ step.title }}</span>
+                  <el-tag size="small" :type="step.done ? 'success' : 'info'" effect="plain">{{ step.done ? '已关联' : '暂无' }}</el-tag>
+                </div>
+                <div class="settlement-chain-code">{{ step.code || step.emptyText }}</div>
+                <div v-if="step.desc" class="settlement-chain-desc">{{ step.desc }}</div>
+              </div>
+            </div>
+          </div>
+          <el-descriptions class="settlement-chain-detail mt-4" :title="settlementLeadActiveStep?.title || '链路详情'" :column="2" border>
+            <el-descriptions-item v-for="item in settlementLeadActiveDetails" :key="item.label" :label="item.label">
+              {{ item.value || '-' }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </template>
+        <el-empty v-else-if="!settlementLeadLoading" description="暂无线索链路" />
+      </div>
+      <template #footer>
+        <el-button @click="settlementLeadVisible = false">关闭</el-button>
+      </template>
+    </el-drawer>
 
     <!-- 审核对话框：通过即上架（status=1），驳回写 status=6（独立驳回态，区别企业自主已下架=2） -->
     <el-dialog v-model="auditVisible" title="岗位审核" width="500px" append-to-body>
@@ -731,11 +841,13 @@ import {
   changeJobStatus,
   delJob,
   updateJob,
+  updateJobSettlementIntent,
   refreshJobRecommendCache,
   listApply2,
   listApply
 } from '@/api/recruitment';
 import type { JobFullVO } from '@/api/recruitment';
+import { getBizNoChainByCompanyId, type BizNoChainVO } from '@/api/recruitment/serialRule';
 import { download } from '@/utils/request';
 import { REGIONS } from '@/utils/region-data';
 import { unwrapList, splitToArray, formatSalary } from './helpers';
@@ -753,6 +865,22 @@ const SelectApplyUsertableData = ref<any[]>([]);
 const detailVisible = ref(false);
 const auditVisible = ref(false);
 const handleSelectApplyUsersVisible = ref(false);
+const settlementIntentVisible = ref(false);
+const settlementIntentLoading = ref(false);
+const settlementIntentSubmitting = ref(false);
+const settlementIntentJob = ref<any | null>(null);
+const settlementIntentForm = reactive({
+  intentId: '' as string | number,
+  jobId: '' as string | number,
+  intentType: '',
+  followStatus: '0',
+  followRemark: '',
+  settlementCreateTime: ''
+});
+const settlementLeadVisible = ref(false);
+const settlementLeadLoading = ref(false);
+const settlementLead = ref<BizNoChainVO | null>(null);
+const settlementLeadActiveKey = ref('company');
 let jobChangedRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 let lastJobChangedEventKey = '';
 
@@ -805,6 +933,134 @@ const benefitsList = computed<string[]>(() => {
     return splitToArray(raw);
   }
 });
+
+const settlementIntentMap: Record<string, { label: string; type: 'info' | 'primary' | 'success' | 'warning'; desc: string }> = {
+  '1': {
+    label: '企业全程自主对接，线下自行结算',
+    type: 'info',
+    desc: '企业独立对接候选人、线下履约发薪；平台仅提供人员匹配服务。'
+  },
+  '2': {
+    label: '自主线下结算，需平台提供合规用工方案参考',
+    type: 'warning',
+    desc: '薪资仍由企业自主发放，平台可提供劳务协议模板、临时用工风控指引等参考方案。'
+  },
+  '3': {
+    label: '录用后平台线上签约 + 第三方合规结算',
+    type: 'success',
+    desc: '录用人员后可线上签署标准化劳务合约，薪资经由平台合作第三方机构代发并保留台账。'
+  }
+};
+
+const settlementIntentOptions = Object.entries(settlementIntentMap).map(([value, meta]) => ({ value, ...meta }));
+
+function settlementIntentMeta(type?: string) {
+  return settlementIntentMap[String(type || '')] || { label: '暂无服务意向记录', type: 'info' as const, desc: '当前岗位未返回服务意向字段。' };
+}
+
+function settlementIntentShortLabel(type?: string) {
+  const map: Record<string, string> = {
+    '1': '自主结算',
+    '2': '方案参考',
+    '3': '合规结算'
+  };
+  return map[String(type || '')] || '未选择';
+}
+
+function isComplianceSettlement(row: any) {
+  return canShowSettlementIntent(row) && String(row?.settlementIntentType || '') === '3';
+}
+
+function isPendingSettlementLead(row: any) {
+  return !!row?.settlementIntentId && String(row?.settlementFollowStatus || '') === '0';
+}
+
+function canShowSettlementIntent(row: any) {
+  return String(row?.status || '') === '1' && ['1', '2', '3'].includes(String(row?.jobType || ''));
+}
+
+function jobRowClassName({ row }: { row: any }) {
+  return isComplianceSettlement(row) ? 'settlement-compliance-row' : '';
+}
+
+const settlementLeadSteps = computed(() => {
+  const chain = settlementLead.value;
+  if (!chain) return [];
+  return [
+    {
+      key: 'company',
+      title: '企业',
+      code: chain.companyNo || chain.companyId,
+      desc: chain.companyName,
+      emptyText: '未关联企业',
+      details: [
+        { label: '企业名称', value: chain.companyName },
+        { label: '企业编号', value: chain.companyNo },
+        { label: '企业ID', value: chain.companyId }
+      ]
+    },
+    {
+      key: 'job',
+      title: '岗位',
+      code: chain.jobNo || chain.jobId,
+      desc: chain.jobName,
+      emptyText: '未关联岗位',
+      details: [
+        { label: '岗位名称', value: chain.jobName },
+        { label: '岗位编号', value: chain.jobNo },
+        { label: '岗位ID', value: chain.jobId }
+      ]
+    },
+    {
+      key: 'apply',
+      title: '投递',
+      code: chain.applyNo || chain.applyId,
+      desc: chain.jobSeekerName,
+      emptyText: '暂无投递',
+      details: [
+        { label: '投递编号', value: chain.applyNo },
+        { label: '投递ID', value: chain.applyId },
+        { label: '求职者', value: chain.jobSeekerName },
+        { label: '求职者编号', value: chain.jobSeekerNo }
+      ]
+    },
+    {
+      key: 'task',
+      title: '履约',
+      code: chain.taskNo || chain.taskId,
+      desc: '',
+      emptyText: '暂无履约',
+      details: [
+        { label: '履约编号', value: chain.taskNo },
+        { label: '履约ID', value: chain.taskId }
+      ]
+    },
+    {
+      key: 'ledger',
+      title: '台账',
+      code: chain.orderNo || chain.ledgerId,
+      desc: chain.orderAmount != null ? `¥${chain.orderAmount}` : '',
+      emptyText: '暂无台账',
+      details: [
+        { label: '台账编号', value: chain.orderNo },
+        { label: '台账ID', value: chain.ledgerId },
+        { label: '结算金额', value: chain.orderAmount != null ? `¥${chain.orderAmount}` : '' }
+      ]
+    }
+  ].map((step) => ({ ...step, done: !!step.code || !!step.desc }));
+});
+
+const settlementLeadActiveStep = computed(() => {
+  return settlementLeadSteps.value.find((step) => step.key === settlementLeadActiveKey.value) || settlementLeadSteps.value[0];
+});
+
+const settlementLeadActiveDetails = computed(() => {
+  return settlementLeadActiveStep.value?.details || [];
+});
+
+function selectSettlementLeadStep(key: string) {
+  settlementLeadActiveKey.value = key;
+}
 
 const queryParams = reactive({
   pageNum: 1,
@@ -1458,6 +1714,100 @@ async function handleDetail(row: any) {
   }
 }
 
+async function handleSettlementIntent(row: any) {
+  settlementIntentVisible.value = true;
+  settlementIntentLoading.value = true;
+  settlementIntentJob.value = null;
+  // 意向结算优先使用列表行字段；若列表轻量字段缺失，再拉完整详情兜底。
+  settlementIntentJob.value = { ...row };
+  try {
+    if (row?.jobId && !row?.settlementIntentId) {
+      const res = await getJobFullDetail(row.jobId);
+      settlementIntentJob.value = { ...row, ...(res.data || {}) };
+    }
+    fillSettlementIntentForm(settlementIntentJob.value);
+  } catch {
+    ElMessage.error('获取服务意向失败');
+  } finally {
+    settlementIntentLoading.value = false;
+  }
+}
+
+function fillSettlementIntentForm(row: any) {
+  settlementIntentForm.intentId = row?.settlementIntentId || '';
+  settlementIntentForm.jobId = row?.jobId || '';
+  settlementIntentForm.intentType = String(row?.settlementIntentType || '');
+  settlementIntentForm.followStatus = String(row?.settlementFollowStatus || (row?.settlementIntentType === '3' ? '0' : '2'));
+  settlementIntentForm.followRemark = String(row?.settlementFollowRemark || '');
+  settlementIntentForm.settlementCreateTime = String(row?.settlementCreateTime || '');
+}
+
+async function submitSettlementIntent() {
+  if (!settlementIntentForm.intentId && !settlementIntentForm.jobId) {
+    ElMessage.warning('当前岗位信息缺失，无法保存意向结算');
+    return;
+  }
+  if (!settlementIntentForm.intentType) {
+    ElMessage.warning('请选择临时用工服务意向');
+    return;
+  }
+  settlementIntentSubmitting.value = true;
+  try {
+    const res = await updateJobSettlementIntent({
+      intentId: settlementIntentForm.intentId || undefined,
+      jobId: settlementIntentForm.jobId || undefined,
+      intentType: settlementIntentForm.intentType,
+      followStatus: settlementIntentForm.followStatus,
+      followRemark: settlementIntentForm.followRemark,
+      settlementCreateTime: settlementIntentForm.settlementCreateTime || undefined
+    });
+    ElMessage.success('意向结算已保存');
+    if (res.data) {
+      settlementIntentJob.value = { ...(settlementIntentJob.value || {}), ...res.data };
+      fillSettlementIntentForm(settlementIntentJob.value);
+    } else if (settlementIntentForm.jobId) {
+      const res = await getJobFullDetail(settlementIntentForm.jobId as number);
+      settlementIntentJob.value = { ...(settlementIntentJob.value || {}), ...(res.data || {}) };
+      fillSettlementIntentForm(settlementIntentJob.value);
+    }
+    await loadData();
+  } catch {
+    ElMessage.error('意向结算保存失败');
+  } finally {
+    settlementIntentSubmitting.value = false;
+  }
+}
+
+async function handleSettlementLead(row: any) {
+  let leadRow = row;
+  if (!leadRow?.settlementIntentId && leadRow?.jobId) {
+    const res = await getJobFullDetail(leadRow.jobId);
+    leadRow = { ...leadRow, ...(res.data || {}) };
+    settlementIntentJob.value = { ...(settlementIntentJob.value || {}), ...leadRow };
+    fillSettlementIntentForm(settlementIntentJob.value);
+  }
+  if (!leadRow?.settlementIntentId) {
+    ElMessage.warning('当前岗位暂无意向结算记录');
+    return;
+  }
+  settlementLeadVisible.value = true;
+  settlementLeadLoading.value = true;
+  settlementLead.value = null;
+  settlementLeadActiveKey.value = 'company';
+  try {
+    if (!leadRow.companyId) {
+      throw new Error('missing companyId');
+    }
+    const res = await getBizNoChainByCompanyId(leadRow.companyId, leadRow.settlementIntentId);
+    settlementLead.value = res.data || null;
+    settlementLeadActiveKey.value = settlementLeadSteps.value.find((step) => step.done)?.key || 'company';
+  } catch {
+    ElMessage.error('线索链路加载失败');
+  } finally {
+    settlementLeadLoading.value = false;
+  }
+}
+
 function handleAudit(row: any, status: string) {
   auditForm.jobId = row.jobId;
   auditForm.status = status;
@@ -1843,6 +2193,164 @@ function formatStartDate(val?: string | number): string {
   background: #2b7fff;
   border-color: #2b7fff;
   color: #fff;
+}
+
+.p-4 :deep(.el-table__body tr.settlement-compliance-row > td) {
+  background: #f0f9eb !important;
+}
+
+.p-4 :deep(.el-table__body tr.settlement-compliance-row:hover > td) {
+  background: #e6f7dc !important;
+}
+
+.job-settlement-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
+}
+
+.job-settlement-tags {
+  display: inline-flex;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.settlement-intent-form :deep(.el-form-item__content) {
+  align-items: center;
+}
+
+.settlement-intent-radio {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.settlement-intent-radio :deep(.el-radio.is-bordered) {
+  width: 100%;
+  height: auto;
+  margin-right: 0;
+  padding: 10px 12px;
+}
+
+.settlement-radio-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.settlement-radio-text small {
+  color: #909399;
+}
+
+.settlement-lead-drawer {
+  min-height: 220px;
+}
+
+.settlement-chain {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(108px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.settlement-chain-node {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+  outline: none;
+}
+
+.settlement-chain-node:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: calc(100% - 2px);
+  width: 14px;
+  height: 2px;
+  background: #dcdfe6;
+}
+
+.settlement-chain-marker {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #f4f4f5;
+  color: #909399;
+  font-weight: 700;
+  border: 1px solid #dcdfe6;
+}
+
+.settlement-chain-node.is-done .settlement-chain-marker {
+  background: #ecf5ff;
+  border-color: #409eff;
+  color: #409eff;
+}
+
+.settlement-chain-node.is-active .settlement-chain-marker {
+  background: #409eff;
+  border-color: #409eff;
+  color: #fff;
+}
+
+.settlement-chain-card {
+  min-height: 106px;
+  padding: 10px;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.settlement-chain-node.is-done .settlement-chain-card {
+  border-color: #a0cfff;
+  background: #f5faff;
+}
+
+.settlement-chain-node.is-active .settlement-chain-card,
+.settlement-chain-node:focus-visible .settlement-chain-card {
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.12);
+}
+
+.settlement-chain-node.is-empty .settlement-chain-card {
+  background: #fafafa;
+}
+
+.settlement-chain-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: #303133;
+  font-weight: 600;
+}
+
+.settlement-chain-code {
+  min-height: 20px;
+  color: #606266;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.settlement-chain-desc {
+  margin-top: 4px;
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.settlement-chain-detail {
+  margin-top: 12px;
 }
 
 /* 薪资区间：快捷标签 + 数值输入 + 极低薪提示纵向排布 */
