@@ -270,7 +270,7 @@
         </el-table-column>
         <el-table-column label="认证状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="companyStatusMeta(row.status).type">{{ companyStatusMeta(row.status).label }}</el-tag>
+            <el-tag :type="companyAuditStatusMeta(row).type">{{ companyAuditStatusMeta(row).label }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="禁言状态" width="110" align="center">
@@ -328,7 +328,7 @@
         <el-descriptions title="主体信息" :column="2" border>
           <el-descriptions-item label="企业编码">{{ currentCompany.companyNo || '-' }}</el-descriptions-item>
           <el-descriptions-item label="企业状态">
-            <el-tag :type="companyStatusMeta(currentCompany.status).type">{{ companyStatusMeta(currentCompany.status).label }}</el-tag>
+            <el-tag :type="companyAuditStatusMeta(currentCompany).type">{{ companyAuditStatusMeta(currentCompany).label }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="企业名称" :span="2">{{ currentCompany.companyName }}</el-descriptions-item>
           <el-descriptions-item label="企业描述" :span="2">{{ currentCompany.description || '无' }}</el-descriptions-item>
@@ -1078,6 +1078,14 @@ function fileExt(source?: string) {
 function authLetterKind(oss: any, url?: string): 'image' | 'doc' {
   const ext = fileExt(oss?.fileSuffix || oss?.originalName || url || '');
   return AUTH_LETTER_IMAGE_EXTS.includes(ext) ? 'image' : 'doc';
+}
+
+function companyAuditStatusMeta(company?: any) {
+  // Reject keeps company.status as draft so B-side users can log in and resubmit; admin list should still show the audit result.
+  if (company?.status === '4' && String(company?.remark || '').trim()) {
+    return { label: '驳回', type: 'danger' as const };
+  }
+  return companyStatusMeta(company?.status);
 }
 
 // 授权书允许 PDF 或图片，必须保留文件元数据供下载卡片/图片预览判断。
