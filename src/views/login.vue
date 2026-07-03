@@ -3,7 +3,7 @@
     <el-form ref="loginRef" :model="loginForm" :rules="loginRules" class="login-form">
       <div class="title-box">
         <h3 class="title">{{ title }}</h3>
-        <lang-select />
+        <lang-select class="login-language" />
       </div>
       <el-form-item v-if="tenantEnabled" prop="tenantId">
         <el-select v-model="loginForm.tenantId" filterable :placeholder="proxy.$t('login.selectPlaceholder')" style="width: 100%">
@@ -12,7 +12,7 @@
         </el-select>
       </el-form-item>
       <el-form-item prop="username">
-        <el-input v-model="loginForm.username" type="text" size="large" auto-complete="off" :placeholder="proxy.$t('login.username')">
+        <el-input v-model="loginForm.username" type="text" size="large" autocomplete="username" :placeholder="proxy.$t('login.username')">
           <template #prefix><svg-icon icon-class="user" class="el-input__icon input-icon" /></template>
         </el-input>
       </el-form-item>
@@ -21,36 +21,39 @@
           v-model="loginForm.password"
           type="password"
           size="large"
-          auto-complete="off"
+          autocomplete="current-password"
+          show-password
           :placeholder="proxy.$t('login.password')"
           @keyup.enter="handleLogin"
         >
           <template #prefix><svg-icon icon-class="password" class="el-input__icon input-icon" /></template>
         </el-input>
       </el-form-item>
-      <el-form-item v-if="captchaEnabled" prop="code">
+      <el-form-item v-if="captchaEnabled" prop="code" class="captcha-row">
         <el-input
           v-model="loginForm.code"
+          class="captcha-input"
           size="large"
-          auto-complete="off"
+          autocomplete="off"
           :placeholder="proxy.$t('login.code')"
-          style="width: 63%"
           @keyup.enter="handleLogin"
         >
           <template #prefix><svg-icon icon-class="validCode" class="el-input__icon input-icon" /></template>
         </el-input>
         <div class="login-code">
-          <img :src="codeUrl" class="login-code-img" @click="getCode" />
+          <img :src="codeUrl" class="login-code-img" :alt="proxy.$t('login.code')" @click="getCode" />
         </div>
       </el-form-item>
-      <el-checkbox v-model="loginForm.rememberMe" style="margin: 0 0 25px 0">{{ proxy.$t('login.rememberPassword') }}</el-checkbox>
+      <div class="login-options">
+        <el-checkbox v-model="loginForm.rememberMe">{{ proxy.$t('login.rememberPassword') }}</el-checkbox>
+      </div>
 
-      <el-form-item style="width: 100%">
+      <el-form-item class="login-submit">
         <el-button :loading="loading" size="large" type="primary" style="width: 100%" @click.prevent="handleLogin">
           <span v-if="!loading">{{ proxy.$t('login.login') }}</span>
           <span v-else>{{ proxy.$t('login.logging') }}</span>
         </el-button>
-        <div v-if="register" style="float: right">
+        <div v-if="register" class="register-link">
           <router-link class="link-type" :to="'/register'">{{ proxy.$t('login.switchRegisterPage') }}</router-link>
         </div>
       </el-form-item>
@@ -78,6 +81,7 @@ const userStore = useUserStore();
 const router = useRouter();
 const { t } = useI18n();
 
+// 登录页只负责采集认证表单；租户列表、验证码和登录结果都来自后端认证接口。
 const loginForm = ref<LoginData>({
   tenantId: '000000',
   username: 'admin',
@@ -221,52 +225,86 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100%;
+  min-height: 100dvh;
+  height: auto;
+  padding: 56px 20px 64px;
   background-image: url('../assets/images/login-background.jpg');
   background-size: cover;
   background-position: center;
+  overflow: hidden;
 }
 
 .title-box {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 26px;
 
   .title {
-    margin: 0px auto 26px auto;
+    margin: 0;
     text-align: center;
-    color: var(--el-text-color-primary);
-    font-weight: 600;
-    letter-spacing: 0.5px;
+    color: #273849;
+    font-size: 22px;
+    line-height: 32px;
+    font-weight: 700;
+    letter-spacing: 0;
   }
 
-  :deep(.lang-select--style) {
-    line-height: 0;
-    color: var(--el-text-color-secondary);
+  .login-language {
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+
+  .login-language :deep(.lang-select--style) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    line-height: 1;
+    color: rgba(39, 56, 73, 0.58);
+    border-radius: var(--app-radius-sm);
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .login-language :deep(.lang-select--style:hover) {
+    color: var(--el-color-primary);
+    background: rgba(64, 158, 255, 0.1);
   }
 }
 
 .login-form {
-  border-radius: var(--app-radius-lg);
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: var(--app-radius-md);
+  background: rgba(244, 251, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   width: min(420px, 90vw);
-  padding: 32px 30px 12px 30px;
+  padding: 31px 31px 24px;
   z-index: 1;
-  box-shadow: var(--app-shadow-lg);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 20px 42px rgba(47, 125, 195, 0.13);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  :deep(.el-form-item) {
+    margin-bottom: 18px;
+  }
+
   .el-input {
     height: 40px;
+
     input {
       height: 40px;
     }
   }
 
   .input-icon {
-    height: 39px;
+    height: 40px;
     width: 14px;
     margin-left: 0px;
+    color: rgba(39, 56, 73, 0.46);
   }
 }
 
@@ -278,15 +316,24 @@ onMounted(() => {
 
 .login-form :deep(.el-input__wrapper) {
   background-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px rgba(139, 167, 194, 0.34) inset;
+  transition:
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .login-form :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  background-color: rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 0 0 1px rgba(64, 158, 255, 0.55) inset,
+    0 0 0 3px rgba(64, 158, 255, 0.12);
 }
 
 .login-form :deep(.el-button--primary) {
-  border-radius: var(--app-radius-md);
-  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.25);
+  height: 40px;
+  border-radius: var(--app-radius-sm);
+  font-weight: 600;
+  box-shadow: 0 10px 22px rgba(64, 158, 255, 0.26);
 }
 
 .login-form :deep(.el-button.is-circle) {
@@ -300,16 +347,27 @@ onMounted(() => {
   border-color: rgba(59, 130, 246, 0.2);
 }
 
+.captcha-row {
+  :deep(.el-form-item__content) {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+}
+
+.captcha-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .login-code {
-  width: calc(37% - 10px);
+  flex: 0 0 122px;
   height: 40px;
-  float: right;
-  margin-left: 10px;
   box-sizing: border-box;
   border-radius: var(--app-radius-sm);
   overflow: hidden;
   background: rgba(255, 255, 255, 0.9);
-  border: 1px solid var(--el-border-color-light);
+  border: 1px solid rgba(139, 167, 194, 0.34);
 
   img {
     cursor: pointer;
@@ -321,6 +379,29 @@ onMounted(() => {
   }
 }
 
+.login-options {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  margin: 0 0 25px 0;
+
+  :deep(.el-checkbox) {
+    height: 22px;
+    color: #409eff;
+  }
+}
+
+.login-submit {
+  margin-bottom: 6px !important;
+  width: 100%;
+}
+
+.register-link {
+  width: 100%;
+  margin-top: 12px;
+  text-align: right;
+}
+
 .el-login-footer {
   height: 40px;
   line-height: 40px;
@@ -328,10 +409,10 @@ onMounted(() => {
   bottom: 0;
   width: 100%;
   text-align: center;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(39, 92, 139, 0.66);
   font-family: Arial, serif;
   font-size: 12px;
-  letter-spacing: 1px;
+  letter-spacing: 0;
 }
 
 .login-code-img {
@@ -340,13 +421,38 @@ onMounted(() => {
 }
 
 :global(html.dark) {
+  .login {
+    background-color: #0f172a;
+  }
+
   .login-form {
     background: rgba(17, 24, 39, 0.9);
     border-color: rgba(148, 163, 184, 0.2);
   }
 
+  .title-box {
+    .title {
+      color: #e5e7eb;
+    }
+
+    :deep(.lang-select--style) {
+      color: rgba(226, 232, 240, 0.68);
+    }
+  }
+
   .login-form :deep(.el-input__wrapper) {
     background-color: rgba(17, 24, 39, 0.7);
+    box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.24) inset;
+  }
+
+  .login-form :deep(.el-input__wrapper.is-focus) {
+    box-shadow:
+      0 0 0 1px rgba(58, 123, 232, 0.65) inset,
+      0 0 0 3px rgba(58, 123, 232, 0.18);
+  }
+
+  .login-form .input-icon {
+    color: rgba(226, 232, 240, 0.58);
   }
 
   .login-form :deep(.el-button.is-circle) {
@@ -357,6 +463,35 @@ onMounted(() => {
 
   .el-login-footer {
     color: rgba(226, 232, 240, 0.65);
+  }
+}
+
+@media (max-width: 600px) {
+  .login {
+    align-items: flex-start;
+    padding: 12dvh 16px 72px;
+    background-position: center bottom;
+  }
+
+  .login-form {
+    width: 100%;
+    padding: 28px 22px 22px;
+  }
+
+  .title-box {
+    margin-bottom: 24px;
+
+    .title {
+      font-size: 20px;
+    }
+  }
+
+  .login-code {
+    flex-basis: 112px;
+  }
+
+  .el-login-footer {
+    display: none;
   }
 }
 </style>
