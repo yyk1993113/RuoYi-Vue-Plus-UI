@@ -72,11 +72,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="职位类目" prop="category">
-              <JobPositionPicker
-                v-model="form.positionName"
-                placeholder="请选择标准职位（来自职位类目库）"
-                @pick="selectStandardPosition"
-              />
+              <JobPositionPicker v-model="form.positionName" placeholder="请选择标准职位（来自职位类目库）" @pick="selectStandardPosition" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -308,6 +304,39 @@
         <div class="c-note">* 模拟展示，实际样式以求职者端为准</div>
       </div>
     </el-drawer>
+
+    <el-dialog
+      v-model="settlementDialogVisible"
+      title="临时用工服务意向选择"
+      width="620px"
+      :close-on-click-modal="false"
+      append-to-body
+      @close="cancelSettlementIntent"
+    >
+      <div class="settlement-dialog">
+        <p class="settlement-dialog-desc">
+          您当前发布的是{{
+            currentJobTypeLabel
+          }}岗位，请选择本次用工服务方向。本次选择仅用于需求调研与用工风险提示，不会限制岗位发布、简历查看、人员选用等基础功能。
+        </p>
+        <el-radio-group v-model="settlementIntentType" class="settlement-options">
+          <el-radio v-for="opt in settlementIntentOptions" :key="opt.value" :label="opt.value" border>
+            <div class="settlement-option">
+              <div class="settlement-option-title">
+                {{ opt.title }}
+                <el-tag v-if="opt.recommended" size="small" type="success" effect="plain">合规推荐</el-tag>
+              </div>
+              <div class="settlement-option-desc">{{ opt.desc }}</div>
+            </div>
+          </el-radio>
+        </el-radio-group>
+        <p class="settlement-dialog-note">本意向选择仅为前置参考调研，后续录用人员时可重新自由切换平台提供的三类选用履约模式，无需受本次选择限制。</p>
+      </div>
+      <template #footer>
+        <el-button @click="cancelSettlementIntent">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="confirmSettlementIntent">确认选择并发布岗位</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -348,6 +377,8 @@ const formRef = ref();
 const submitting = ref(false);
 const savingDraft = ref(false);
 const previewVisible = ref(false);
+const settlementDialogVisible = ref(false);
+const settlementIntentType = ref<'1' | '2' | '3' | ''>('');
 
 // 复制发布：route query copyFrom=jobId，进入后拉全量详情回填
 const isCopy = computed(() => !!route.query.copyFrom);
@@ -384,6 +415,27 @@ function emptyForm() {
 }
 
 const form = reactive(emptyForm());
+const currentJobTypeLabel = computed(() => labelOf(jobTypeOptions, form.jobType) || '临时用工');
+
+// 对齐 B 端：新发布非全职岗位前采集服务意向，随 CreateJobRequest 透传给后端。
+const settlementIntentOptions = [
+  {
+    value: '1' as const,
+    title: '企业全程自主对接，线下自行结算',
+    desc: '企业独立对接候选人、线下履约发薪；平台仅提供人员匹配服务，不留存用工履约、薪资结算等台账记录。'
+  },
+  {
+    value: '2' as const,
+    title: '自主线下结算，需平台提供合规用工方案参考',
+    desc: '薪资仍由企业自主发放，选定后专属客服可提供劳务协议模板、临时用工风控指引等参考方案。'
+  },
+  {
+    value: '3' as const,
+    title: '录用后平台线上签约 + 第三方合规结算',
+    desc: '录用人员后可线上签署标准化劳务合约，薪资经由平台合作第三方机构代发并保留台账，支持导出留证。',
+    recommended: true
+  }
+];
 
 // ===== 所属企业远程搜索 =====
 const companyOptions = ref<any[]>([]);
@@ -472,6 +524,15 @@ const rules = {
 };
 
 // ===== 各字段交互 =====
+function shouldCollectSettlementIntent() {
+  return ['1', '2', '3'].includes(String(form.jobType));
+}
+
+function openSettlementIntentDialog() {
+  settlementIntentType.value = '';
+  settlementDialogVisible.value = true;
+}
+
 function selectJobType(v: string) {
   form.jobType = v;
   formRef.value?.validateField?.('jobType');
@@ -623,14 +684,31 @@ function validateForm(): Promise<boolean> {
 }
 
 async function handleSubmit() {
+  if (shouldCollectSettlementIntent()) {
+    // 对齐 B 端：非全职岗位点击提交审核先采集服务意向，确认后再执行原表单校验和创建请求。
+    openSettlementIntentDialog();
+    return;
+  }
+  await validateAndSubmitJob();
+}
+
+async function validateAndSubmitJob(extraPayload?: Record<string, any>) {
   const valid = await validateForm();
   if (!valid) {
     ElMessage.warning('请完善表单中标红的必填项');
     return;
   }
+  const payload = {
+    ...buildPayload('0'),
+    ...(extraPayload || {})
+  };
+  await submitJobPayload(payload);
+}
+
+async function submitJobPayload(payload: Record<string, any>) {
   submitting.value = true;
   try {
-    await addJob(buildPayload('0'));
+    await addJob(payload);
     clearLocalDraft();
     afterSuccess('岗位已提交审核');
   } catch {
@@ -638,6 +716,22 @@ async function handleSubmit() {
   } finally {
     submitting.value = false;
   }
+}
+
+async function confirmSettlementIntent() {
+  if (!settlementIntentType.value) {
+    ElMessage.warning('请选择临时用工服务意向');
+    return;
+  }
+  const selectedIntentType = settlementIntentType.value;
+  settlementDialogVisible.value = false;
+  await validateAndSubmitJob({ settlementIntentType: selectedIntentType });
+}
+
+function cancelSettlementIntent() {
+  if (submitting.value) return;
+  settlementDialogVisible.value = false;
+  settlementIntentType.value = '';
 }
 
 // 保存草稿：后端 /add 对草稿同样做完整字段校验（与 B 端一致），故这里也走完整校验，仅 status 不同。
@@ -1060,5 +1154,99 @@ onBeforeUnmount(() => {
   margin-top: 16px;
   font-size: 11px;
   color: #c0c4cc;
+}
+
+.settlement-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settlement-dialog-desc,
+.settlement-dialog-note {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.settlement-dialog-note {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.settlement-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.settlement-options :deep(.el-radio.is-bordered) {
+  display: flex;
+  width: 100%;
+  height: auto;
+  min-height: 76px;
+  margin-right: 0;
+  padding: 12px 14px;
+  align-items: flex-start;
+  border-color: #e2e8f0;
+  border-radius: 8px;
+  white-space: normal;
+  transition: all 0.2s;
+}
+
+.settlement-options :deep(.el-radio.is-bordered:hover),
+.settlement-options :deep(.el-radio.is-bordered.is-checked) {
+  border-color: #2b7fff;
+}
+
+.settlement-options :deep(.el-radio.is-bordered.is-checked) {
+  background: #eef5ff;
+}
+
+.settlement-options :deep(.el-radio__input) {
+  flex: 0 0 auto;
+  padding-top: 3px;
+}
+
+.settlement-options :deep(.el-radio__label) {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding-left: 10px;
+  white-space: normal;
+}
+
+.settlement-option {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.settlement-option-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.settlement-option-title :deep(.el-tag) {
+  flex: 0 0 auto;
+}
+
+.settlement-option-desc {
+  color: #64748b;
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: normal;
 }
 </style>

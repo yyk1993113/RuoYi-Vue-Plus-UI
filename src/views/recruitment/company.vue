@@ -165,11 +165,6 @@
             style="width: 130px"
           />
         </el-form-item>
-        <el-form-item v-show="showMoreQuery" label="结算意向" prop="settlementFollowStatus">
-          <el-select v-model="queryParams.settlementFollowStatus" placeholder="全部" clearable style="width: 150px">
-            <el-option label="待联系" value="0" />
-          </el-select>
-        </el-form-item>
         <el-form-item v-show="showMoreQuery" label="注册时间">
           <el-date-picker
             v-model="dateRange"
@@ -260,27 +255,9 @@
             <el-tag type="info" class="count-clickable" @click="openApplyDialog(row, '0')">{{ row.noFeedbackCount || 0 }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="结算意向" width="190" align="center">
-          <template #default="{ row }">
-            <el-tooltip
-              v-if="hasPendingSettlementIntent(row)"
-              placement="top"
-              :content="`岗位：${row.settlementJobName || '-'}；时间：${row.settlementCreateTime || '-'}`"
-            >
-              <div class="settlement-intent-cell">
-                <el-tag type="danger" effect="plain">待联系</el-tag>
-                <div class="settlement-intent-main">{{ settlementIntentLabel(row.settlementIntentType) }}</div>
-                <div class="text-secondary">
-                  {{ row.settlementOperatorName || '企业用户' }} {{ row.settlementOperatorPhone || row.settlementContactPhone || '' }}
-                </div>
-              </div>
-            </el-tooltip>
-            <span v-else class="text-secondary">-</span>
-          </template>
-        </el-table-column>
         <el-table-column label="认证状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="companyStatusMeta(row.status).type">{{ companyStatusMeta(row.status).label }}</el-tag>
+            <el-tag :type="companyAuditStatusMeta(row).type">{{ companyAuditStatusMeta(row).label }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="数据状态" width="100" align="center">
@@ -350,7 +327,7 @@
         <el-descriptions title="主体信息" :column="2" border>
           <el-descriptions-item label="企业编码">{{ currentCompany.companyNo || '-' }}</el-descriptions-item>
           <el-descriptions-item label="企业状态">
-            <el-tag :type="companyStatusMeta(currentCompany.status).type">{{ companyStatusMeta(currentCompany.status).label }}</el-tag>
+            <el-tag :type="companyAuditStatusMeta(currentCompany).type">{{ companyAuditStatusMeta(currentCompany).label }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="数据状态">
             <el-tag v-if="currentCompany.deleted === '1'" type="info">已删除</el-tag>
@@ -814,13 +791,132 @@
       />
     </el-dialog>
 
+    <el-drawer
+      v-model="chainDrawerVisible"
+      :title="chainDrawerTitle"
+      direction="rtl"
+      size="min(760px, 92vw)"
+      append-to-body
+      class="company-chain-drawer"
+    >
+      <div v-loading="chainLoading" class="company-chain-body">
+        <el-empty v-if="!chainCascade.company && !chainLoading" description="暂无链路线索" />
+        <template v-else-if="chainCascade.company">
+          <div class="company-chain-summary">
+            <div>
+              <div class="summary-title">{{ chainCascade.company.companyName || '-' }}</div>
+              <div class="summary-subtitle">{{ chainCascade.company.companyNo || chainCascade.company.companyId || '-' }}</div>
+            </div>
+            <el-tag v-if="chainCascade.ledgers.length" type="success" effect="plain">已形成台账</el-tag>
+            <el-tag v-else type="warning" effect="plain">线索跟进中</el-tag>
+          </div>
+
+          <div class="company-chain-flow">
+            <template v-for="(step, index) in companyChainSteps" :key="step.kind">
+              <button
+                type="button"
+                class="company-chain-node"
+                :class="{ active: chainActiveNode === step.kind }"
+                @click="handleChainStepClick(step.kind)"
+              >
+                <span class="chain-node-dot"></span>
+                <span class="chain-node-label">{{ step.label }}</span>
+                <span class="chain-node-code">{{ step.code }}</span>
+                <span v-if="step.desc" class="chain-node-desc">{{ step.desc }}</span>
+              </button>
+              <span v-if="index < companyChainSteps.length - 1" class="company-chain-arrow"></span>
+            </template>
+          </div>
+
+          <el-divider />
+
+          <el-skeleton v-if="chainDetailLoading" :rows="6" animated />
+          <div v-else class="company-chain-detail">
+            <div class="chain-detail-title">{{ activeChainTitle }}</div>
+            <el-descriptions v-if="chainActiveNode === 'company'" :column="2" border>
+              <el-descriptions-item label="企业ID">{{ chainCascade.company.companyId || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="企业编码">{{ chainCascade.company.companyNo || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="企业名称">{{ chainCascade.company.companyName || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="联系人">{{ chainCascade.company.contactPerson || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="联系电话">{{ chainCascade.company.contactPhone || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="创建时间">{{ chainCascade.company.createTime || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="备注" :span="2">{{ chainCascade.company.remark || '-' }}</el-descriptions-item>
+            </el-descriptions>
+
+            <el-table v-else-if="chainActiveNode === 'job'" :data="chainCascade.jobs" border height="360" @row-click="selectChainJob">
+              <el-table-column prop="jobId" label="岗位ID" width="170" show-overflow-tooltip />
+              <el-table-column prop="jobName" label="岗位名称" min-width="180" show-overflow-tooltip />
+              <el-table-column label="用工性质" width="110">
+                <template #default="{ row }">{{ jobTypeMeta(row.jobType).label }}</template>
+              </el-table-column>
+              <el-table-column label="薪资" width="130">
+                <template #default="{ row }">{{ formatChainSalary(row) }}</template>
+              </el-table-column>
+              <el-table-column label="状态" width="100">
+                <template #default="{ row }">{{ row.statusName || jobStatusMeta(row.status).label }}</template>
+              </el-table-column>
+            </el-table>
+
+            <el-table v-else-if="chainActiveNode === 'apply'" :data="chainCascade.applies" border height="360" @row-click="selectChainApply">
+              <el-table-column prop="applyId" label="投递ID" width="170" show-overflow-tooltip />
+              <el-table-column prop="userName" label="求职人" width="130" show-overflow-tooltip />
+              <el-table-column prop="phone" label="手机号" width="140" show-overflow-tooltip />
+              <el-table-column label="状态" width="110">
+                <template #default="{ row }">{{ row.statusName || applyStatusMeta(row.status).label }}</template>
+              </el-table-column>
+              <el-table-column prop="applyTime" label="投递时间" min-width="160" show-overflow-tooltip />
+            </el-table>
+
+            <el-table v-else-if="chainActiveNode === 'user'" :data="chainCascade.users" border height="360" @row-click="selectChainUser">
+              <el-table-column prop="userId" label="求职人ID" width="170" show-overflow-tooltip />
+              <el-table-column prop="userName" label="姓名" min-width="160" show-overflow-tooltip />
+              <el-table-column prop="phone" label="手机号" width="150" show-overflow-tooltip />
+              <el-table-column prop="applyCount" label="投递数" width="100" />
+            </el-table>
+
+            <el-table v-else-if="chainActiveNode === 'task'" :data="chainCascade.tasks" border height="360" @row-click="selectChainTask">
+              <el-table-column prop="taskId" label="履约ID" width="170" show-overflow-tooltip />
+              <el-table-column prop="workerName" label="求职人" width="130" show-overflow-tooltip />
+              <el-table-column prop="jobName" label="岗位" min-width="170" show-overflow-tooltip />
+              <el-table-column prop="statusName" label="状态" width="110" show-overflow-tooltip />
+              <el-table-column label="结算金额" width="120">
+                <template #default="{ row }">{{ row.settleAmount != null ? `¥${formatMoney(row.settleAmount)}` : '-' }}</template>
+              </el-table-column>
+            </el-table>
+
+            <el-table
+              v-else-if="chainActiveNode === 'ledger'"
+              :data="chainCascade.ledgers"
+              border
+              height="360"
+              @row-click="(row) => (chainCascade.selectedLedger = row)"
+            >
+              <el-table-column prop="ledgerId" label="台账ID" width="170" show-overflow-tooltip />
+              <el-table-column prop="orderNo" label="台账编号" min-width="180" show-overflow-tooltip />
+              <el-table-column label="金额" width="120">
+                <template #default="{ row }">¥{{ formatMoney(row.amount) }}</template>
+              </el-table-column>
+              <el-table-column label="结算状态" width="110">
+                <template #default="{ row }">{{ ledgerStatusMeta(row.status).label }}</template>
+              </el-table-column>
+              <el-table-column label="发票状态" width="110">
+                <template #default="{ row }">{{ ledgerInvoiceStatusMeta(row.invoiceStatus).label }}</template>
+              </el-table-column>
+            </el-table>
+
+            <el-empty v-else description="暂无详情" />
+          </div>
+        </template>
+      </div>
+    </el-drawer>
+
     <!-- 投递全景详情弹窗（复用组件）：点击投递行后按 applyId 加载完整详情 -->
     <ApplyDetailDialog ref="applyDetailRef" />
   </div>
 </template>
 
 <script setup name="CompanyManagement" lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus';
 import { Document } from '@element-plus/icons-vue';
@@ -834,8 +930,9 @@ import {
   rejectCompanyCert,
   silenceCompany,
   unsilenceCompany,
-  markSettlementIntentContacted,
   listJob,
+  listTask,
+  listLedger,
   type CompanyAuditHistoryVO,
   type CompanyCertVO,
   type JobVO,
@@ -847,8 +944,16 @@ import {
 import ApplyDetailDialog from './components/ApplyDetailDialog.vue';
 import { download } from '@/utils/request';
 import { listByIds } from '@/api/system/oss';
-import { unwrapList, splitToArray, formatSalary } from './helpers';
-import { companyStatusMeta, certStatusMeta, applyStatusMeta, jobStatusMeta, jobTypeMeta } from './constants';
+import { unwrapList, splitToArray, formatSalary, formatMoney } from './helpers';
+import {
+  companyStatusMeta,
+  certStatusMeta,
+  applyStatusMeta,
+  jobStatusMeta,
+  jobTypeMeta,
+  ledgerStatusMeta,
+  ledgerInvoiceStatusMeta
+} from './constants';
 import { UserForm } from '@/api/system/user/types';
 import { updateUserProfile } from '@/api/system/user';
 import { RoleVO } from '@/api/system/role/types';
@@ -862,6 +967,22 @@ interface CertMaterialFile {
   name?: string;
   ossId?: string;
   suffix?: string;
+}
+
+type ChainNodeKind = 'company' | 'job' | 'user' | 'apply' | 'task' | 'ledger';
+
+interface CompanyChainStep {
+  kind: ChainNodeKind;
+  label: string;
+  code?: string;
+  desc?: string;
+}
+
+interface ChainUserItem {
+  userId?: number;
+  userName?: string;
+  phone?: string;
+  applyCount: number;
 }
 
 const loading = ref(false);
@@ -898,6 +1019,37 @@ const applyLoading = ref(false);
 const applyList = ref<any[]>([]);
 const applyTotal = ref(0);
 const applyQuery = reactive({ pageNum: 1, pageSize: 10, companyId: undefined as number | undefined, feedback: '' });
+
+const chainDrawerVisible = ref(false);
+const chainDrawerTitle = ref('线索链路');
+const chainLoading = ref(false);
+const chainDetailLoading = ref(false);
+const chainActiveNode = ref<ChainNodeKind>('company');
+const chainCascade = reactive<{
+  company: any | null;
+  jobs: any[];
+  applies: any[];
+  users: ChainUserItem[];
+  tasks: any[];
+  ledgers: any[];
+  selectedJob: any | null;
+  selectedApply: any | null;
+  selectedUser: ChainUserItem | null;
+  selectedTask: any | null;
+  selectedLedger: any | null;
+}>({
+  company: null,
+  jobs: [],
+  applies: [],
+  users: [],
+  tasks: [],
+  ledgers: [],
+  selectedJob: null,
+  selectedApply: null,
+  selectedUser: null,
+  selectedTask: null,
+  selectedLedger: null
+});
 
 // 投递全景详情弹窗组件引用：点击投递行 → open(applyId)
 const applyDetailRef = ref<InstanceType<typeof ApplyDetailDialog>>();
@@ -965,8 +1117,7 @@ const queryParams = reactive({
   jobCount: undefined as number | undefined,
   applyCount: undefined as number | undefined,
   feedbackCount: undefined as number | undefined,
-  noFeedbackCount: undefined as number | undefined,
-  settlementFollowStatus: ''
+  noFeedbackCount: undefined as number | undefined
 });
 
 const statistics = reactive({
@@ -1007,19 +1158,198 @@ const silenceForm = reactive({
   reason: ''
 });
 
-// 结算意向来自岗位发布弹窗，仅展示后端聚合出的待联系线索。
-const settlementIntentLabelMap: Record<string, string> = {
-  '1': '自主线下结算',
-  '2': '需方案参考',
-  '3': '平台合规结算'
-};
+const companyChainSteps = computed<CompanyChainStep[]>(() => {
+  const company = chainCascade.company;
+  if (!company) return [];
+  return [
+    { kind: 'company', label: '企业', code: company.companyNo || String(company.companyId || '-'), desc: company.companyName },
+    { kind: 'job', label: '岗位', code: `${chainCascade.jobs.length} 条`, desc: chainCascade.selectedJob?.jobName },
+    { kind: 'apply', label: '投递', code: `${chainCascade.applies.length} 条`, desc: chainCascade.selectedApply?.userName },
+    { kind: 'user', label: '求职人', code: `${chainCascade.users.length} 人`, desc: chainCascade.selectedUser?.userName },
+    {
+      kind: 'task',
+      label: '履约',
+      code: `${chainCascade.tasks.length} 条`,
+      desc: chainCascade.selectedTask?.statusName || chainCascade.selectedTask?.status
+    },
+    { kind: 'ledger', label: '台账', code: `${chainCascade.ledgers.length} 条`, desc: chainCascade.selectedLedger?.orderNo }
+  ];
+});
 
-function settlementIntentLabel(type?: string) {
-  return settlementIntentLabelMap[String(type || '')] || '结算意向';
+const activeChainTitle = computed(() => companyChainSteps.value.find((step) => step.kind === chainActiveNode.value)?.label || '链路详情');
+
+function resetCompanyChainCascade() {
+  chainActiveNode.value = 'company';
+  chainCascade.company = null;
+  chainCascade.jobs = [];
+  chainCascade.applies = [];
+  chainCascade.users = [];
+  chainCascade.tasks = [];
+  chainCascade.ledgers = [];
+  chainCascade.selectedJob = null;
+  chainCascade.selectedApply = null;
+  chainCascade.selectedUser = null;
+  chainCascade.selectedTask = null;
+  chainCascade.selectedLedger = null;
 }
 
-function hasPendingSettlementIntent(row: any) {
-  return !!row?.settlementIntentId && String(row?.settlementFollowStatus || '') === '0';
+function formatChainSalary(job: any) {
+  if (!job) return '-';
+  if (job.salary) return job.salary;
+  return formatSalary(job.salaryMin, job.salaryMax, job.salaryUnit);
+}
+
+function buildChainUsers(applies: any[]): ChainUserItem[] {
+  const map = new Map<number, ChainUserItem>();
+  for (const item of applies) {
+    if (item?.userId == null) continue;
+    const userId = Number(item.userId);
+    const existing = map.get(userId);
+    if (existing) {
+      existing.applyCount += 1;
+      continue;
+    }
+    map.set(userId, {
+      userId,
+      userName: item.userName || item.realName || item.nickName || '-',
+      phone: item.phone || item.jobSeekerContact || '',
+      applyCount: 1
+    });
+  }
+  return Array.from(map.values());
+}
+
+function clearChainAfter(level: ChainNodeKind) {
+  if (level === 'company') {
+    chainCascade.jobs = [];
+    chainCascade.selectedJob = null;
+  }
+  if (['company', 'job'].includes(level)) {
+    chainCascade.applies = [];
+    chainCascade.users = [];
+    chainCascade.selectedApply = null;
+    chainCascade.selectedUser = null;
+  }
+  if (['company', 'job', 'apply', 'user'].includes(level)) {
+    chainCascade.tasks = [];
+    chainCascade.selectedTask = null;
+  }
+  if (['company', 'job', 'apply', 'user', 'task'].includes(level)) {
+    chainCascade.ledgers = [];
+    chainCascade.selectedLedger = null;
+  }
+}
+
+async function loadChainJobs(companyId: number | string, preferredJobId?: number | string, preferredJobName?: string) {
+  chainDetailLoading.value = true;
+  try {
+    const res = await listJob({ pageNum: 1, pageSize: 100, companyId });
+    chainCascade.jobs = unwrapList(res).rows;
+    const preferred = preferredJobId
+      ? chainCascade.jobs.find((job) => String(job.jobId || '') === String(preferredJobId))
+      : preferredJobName
+        ? chainCascade.jobs.find((job) => String(job.jobName || '') === String(preferredJobName))
+        : null;
+    const firstJob = preferred || chainCascade.jobs[0] || null;
+    if (firstJob) {
+      await selectChainJob(firstJob, true);
+    } else {
+      chainActiveNode.value = 'job';
+    }
+  } finally {
+    chainDetailLoading.value = false;
+  }
+}
+
+async function selectChainJob(row: any, keepNode = false) {
+  if (!row?.jobId || !chainCascade.company?.companyId) return;
+  chainCascade.selectedJob = row;
+  clearChainAfter('job');
+  chainDetailLoading.value = true;
+  try {
+    const res = await listApply({ pageNum: 1, pageSize: 100, companyId: chainCascade.company.companyId, jobId: row.jobId });
+    chainCascade.applies = unwrapList(res).rows;
+    chainCascade.users = buildChainUsers(chainCascade.applies);
+    if (chainCascade.applies[0]) {
+      await selectChainApply(chainCascade.applies[0], true);
+    }
+    chainActiveNode.value = keepNode ? 'job' : 'apply';
+  } finally {
+    chainDetailLoading.value = false;
+  }
+}
+
+async function selectChainApply(row: any, keepNode = false) {
+  if (!row?.applyId || !chainCascade.company?.companyId) return;
+  chainCascade.selectedApply = row;
+  chainCascade.selectedUser = chainCascade.users.find((user) => Number(user.userId) === Number(row.userId)) || null;
+  clearChainAfter('apply');
+  chainDetailLoading.value = true;
+  try {
+    const res = await listTask({ pageNum: 1, pageSize: 100, companyId: chainCascade.company.companyId, jobId: row.jobId, applyId: row.applyId });
+    chainCascade.tasks = unwrapList(res).rows;
+    if (chainCascade.tasks[0]) {
+      await selectChainTask(chainCascade.tasks[0], true);
+    } else {
+      await loadChainLedgers({ companyId: chainCascade.company.companyId, jobId: row.jobId, applyId: row.applyId });
+    }
+    chainActiveNode.value = keepNode ? 'apply' : 'task';
+  } finally {
+    chainDetailLoading.value = false;
+  }
+}
+
+async function selectChainUser(row: ChainUserItem, keepNode = false) {
+  if (!row?.userId || !chainCascade.company?.companyId) return;
+  chainCascade.selectedUser = row;
+  chainCascade.selectedApply = chainCascade.applies.find((item) => Number(item.userId) === Number(row.userId)) || null;
+  clearChainAfter('user');
+  chainDetailLoading.value = true;
+  try {
+    const res = await listTask({
+      pageNum: 1,
+      pageSize: 100,
+      companyId: chainCascade.company.companyId,
+      jobId: chainCascade.selectedJob?.jobId,
+      userId: row.userId
+    });
+    chainCascade.tasks = unwrapList(res).rows;
+    if (chainCascade.tasks[0]) {
+      await selectChainTask(chainCascade.tasks[0], true);
+    }
+    chainActiveNode.value = keepNode ? 'user' : 'task';
+  } finally {
+    chainDetailLoading.value = false;
+  }
+}
+
+async function selectChainTask(row: any, keepNode = false) {
+  if (!row?.taskId || !chainCascade.company?.companyId) return;
+  chainCascade.selectedTask = row;
+  clearChainAfter('task');
+  chainDetailLoading.value = true;
+  try {
+    await loadChainLedgers({ companyId: chainCascade.company.companyId, jobId: row.jobId, applyId: row.applyId, taskId: row.taskId });
+    chainActiveNode.value = keepNode ? 'task' : 'ledger';
+  } finally {
+    chainDetailLoading.value = false;
+  }
+}
+
+async function loadChainLedgers(query: { companyId: number | string; jobId?: number; applyId?: number; taskId?: number }) {
+  try {
+    const res = await listLedger({ pageNum: 1, pageSize: 100, ...query });
+    chainCascade.ledgers = unwrapList(res).rows;
+    chainCascade.selectedLedger = chainCascade.ledgers[0] || null;
+  } catch (error) {
+    chainCascade.ledgers = [];
+    chainCascade.selectedLedger = null;
+    ElMessage.warning('台账链路加载失败，请确认台账权限');
+  }
+}
+
+function handleChainStepClick(kind: ChainNodeKind) {
+  chainActiveNode.value = kind;
 }
 
 async function loadData() {
@@ -1063,7 +1393,6 @@ function clearQueryFilters() {
   queryParams.applyCount = undefined;
   queryParams.feedbackCount = undefined;
   queryParams.noFeedbackCount = undefined;
-  queryParams.settlementFollowStatus = '';
   dateRange.value = [];
 }
 
@@ -1109,6 +1438,14 @@ function fileExt(source?: string) {
 function authLetterKind(oss: any, url?: string): 'image' | 'doc' {
   const ext = fileExt(oss?.fileSuffix || oss?.originalName || url || '');
   return AUTH_LETTER_IMAGE_EXTS.includes(ext) ? 'image' : 'doc';
+}
+
+function companyAuditStatusMeta(company?: any) {
+  // Reject keeps company.status as draft so B-side users can log in and resubmit; admin list should still show the audit result.
+  if (company?.status === '4' && String(company?.remark || '').trim()) {
+    return { label: '驳回', type: 'danger' as const };
+  }
+  return companyStatusMeta(company?.status);
 }
 
 // 授权书允许 PDF 或图片，必须保留文件元数据供下载卡片/图片预览判断。
@@ -1366,22 +1703,41 @@ async function handleStatusChange(row: any, status: string) {
   }
 }
 
-async function handleSettlementContacted(row: any) {
-  if (!hasPendingSettlementIntent(row)) return;
+// 企业线索按企业维度逐级查询：companyId -> jobId -> apply/userId -> taskId -> ledger。
+function getRowCompanyId(row: any) {
+  return String(row?.company_id ?? row?.companyId ?? '').trim();
+}
+
+async function openCompanyChain(row: any) {
+  const companyId = getRowCompanyId(row);
+  if (!companyId || companyId === '0') {
+    ElMessage.warning('该企业暂无企业ID，无法查询链路');
+    return;
+  }
+  chainDrawerVisible.value = true;
+  chainDrawerTitle.value = `线索链路${row?.companyName ? ' - ' + row.companyName : ''}`;
+  chainLoading.value = true;
+  resetCompanyChainCascade();
+  // 链路入口以列表行 company_id/companyId 为准，避免 19 位雪花 ID 经 Number 转换后丢精度。
+  chainCascade.company = { ...row, companyId: row?.companyId ?? row?.company_id ?? companyId };
   try {
-    const { value } = await ElMessageBox.prompt('可填写本次联系备注，留空也可直接确认。', '标记结算意向已联系', {
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      inputPlaceholder: '例如：已电话沟通，后续发送合规结算方案',
-      inputType: 'textarea'
-    });
-    await markSettlementIntentContacted({ intentId: row.settlementIntentId, remark: value || '' });
-    ElMessage.success('已标记联系');
-    loadData();
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('标记联系失败');
+    try {
+      const res = await getCompany(companyId);
+      const detail = res.data || {};
+      chainCascade.company = {
+        ...row,
+        ...detail,
+        companyId: detail.companyId ?? detail.company_id ?? row?.companyId ?? row?.company_id ?? companyId
+      };
+    } catch (error) {
+      console.warn('企业详情加载失败，使用列表 company_id 继续查询链路', error);
     }
+    await loadChainJobs(companyId, row?.settlementJobId, row?.settlementJobName);
+  } catch (error) {
+    resetCompanyChainCascade();
+    ElMessage.error('链路加载失败');
+  } finally {
+    chainLoading.value = false;
   }
 }
 
@@ -1794,22 +2150,147 @@ const handleOsslogoUrlChange = (ossIds) => {
   white-space: nowrap;
 }
 
-.settlement-intent-cell {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
+.company-chain-body {
+  min-height: 360px;
 }
 
-.settlement-intent-main {
-  max-width: 160px;
+.company-chain-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.summary-title {
+  max-width: 460px;
   overflow: hidden;
   color: #303133;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.summary-subtitle {
+  margin-top: 4px;
+  color: #909399;
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+}
+
+.company-chain-flow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.company-chain-node {
+  position: relative;
+  flex: 1 1 86px;
+  min-width: 78px;
+  min-height: 78px;
+  padding: 10px 8px 8px;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  background: #fff;
+  color: #303133;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    color 0.2s;
+}
+
+.company-chain-node:hover,
+.company-chain-node.active {
+  border-color: var(--el-color-primary);
+  box-shadow: 0 0 0 2px var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+}
+
+.chain-node-dot {
+  display: block;
+  width: 9px;
+  height: 9px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: #c0c4cc;
+}
+
+.company-chain-node.active .chain-node-dot,
+.company-chain-node:hover .chain-node-dot {
+  background: var(--el-color-primary);
+}
+
+.chain-node-label,
+.chain-node-code,
+.chain-node-desc {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chain-node-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chain-node-code {
+  margin-top: 6px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  color: #606266;
+}
+
+.chain-node-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.company-chain-arrow {
+  position: relative;
+  flex: 0 0 14px;
+  height: 1px;
+  background: #dcdfe6;
+}
+
+.company-chain-arrow::after {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  border-top: 1px solid #dcdfe6;
+  border-right: 1px solid #dcdfe6;
+  content: '';
+  transform: rotate(45deg);
+}
+
+.company-chain-detail {
+  padding: 2px 0 0;
+  min-height: 180px;
+}
+
+.chain-detail-title {
+  margin-bottom: 12px;
+  padding-left: 10px;
+  border-left: 4px solid var(--el-color-primary);
+  color: #303133;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .el-dropdown-link {

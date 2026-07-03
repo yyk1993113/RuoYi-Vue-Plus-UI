@@ -84,6 +84,10 @@ export function nextSerialNo(businessCode: string) {
   return request.post<{ serialNo: string }>(`${baseUrl}/next/${businessCode}`);
 }
 
-export function getBizNoChain(no: string) {
-  return request.get<BizNoChainVO>(`${baseUrl}/chain`, { params: { no } });
+export function getBizNoChain(no: string, intentId?: number | string) {
+  return request.get<BizNoChainVO>(`${baseUrl}/chain`, { params: { no, intentId } });
+}
+
+export function getBizNoChainByCompanyId(companyId: number | string, intentId?: number | string) {
+  return request.get<BizNoChainVO>(`${baseUrl}/chain`, { params: { companyId, intentId } });
 }
