@@ -19,15 +19,17 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.18.0
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      # 本仓 .gitignore 忽略 pnpm-lock.yaml，无提交的 lockfile，故不用 frozen/缓存。
+      # 使用提交的 lockfile 固定依赖解析，避免 CI 在不同时间安装到不同小版本。
       - name: Install deps
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build (vite build:prod -> dist/)
         run: pnpm build:prod

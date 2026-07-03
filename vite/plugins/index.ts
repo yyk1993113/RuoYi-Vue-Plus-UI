@@ -13,7 +13,10 @@ import path from 'path';
 export default (viteEnv: any, isBuild = false): [] => {
   const vitePlugins: any = [];
   vitePlugins.push(vue());
-  vitePlugins.push(vueDevTools());
+  // Vue DevTools is useful in local dev but adds unnecessary transform work and memory pressure in production builds.
+  if (!isBuild) {
+    vitePlugins.push(vueDevTools());
+  }
   vitePlugins.push(createUnoCss());
   vitePlugins.push(createAutoImport(path));
   vitePlugins.push(createComponents(path));
