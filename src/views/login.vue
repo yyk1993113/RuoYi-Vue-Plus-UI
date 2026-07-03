@@ -60,7 +60,9 @@
     </el-form>
     <!--  底部  -->
     <div class="el-login-footer">
-      <span>Copyright © 2018-2026 All Rights Reserved.</span>
+      <!-- 备案信息对应生产站点 zgypzp.com；域名或主体变更时需同步 ICP 号。 -->
+      <span>Copyright © 2018-2026 壹合（南京）科技服务有限公司 All Rights Reserved.</span>
+      <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">苏ICP备2025221611号-2</a>
     </div>
   </div>
 </template>
@@ -404,15 +406,29 @@ onMounted(() => {
 
 .el-login-footer {
   height: 40px;
-  line-height: 40px;
   position: fixed;
   bottom: 0;
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
   text-align: center;
   color: rgba(39, 92, 139, 0.66);
   font-family: Arial, serif;
   font-size: 12px;
+  line-height: 1.4;
   letter-spacing: 0;
+
+  a {
+    color: inherit;
+    text-decoration: none;
+
+    &:hover {
+      color: var(--el-color-primary);
+    }
+  }
 }
 
 .login-code-img {
