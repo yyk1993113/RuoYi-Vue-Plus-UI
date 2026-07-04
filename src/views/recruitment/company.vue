@@ -1862,6 +1862,10 @@ async function handleUnsilence(row: any) {
 }
 
 async function applyRouteFocus() {
+  const qStatus = route.query.status;
+  if (typeof qStatus === 'string' && qStatus) {
+    queryParams.status = qStatus;
+  }
   const qCompanyNo = route.query.companyNo;
   if (typeof qCompanyNo === 'string' && qCompanyNo) {
     queryParams.companyNo = qCompanyNo;

@@ -1461,8 +1461,8 @@ export function getOverview() {
 
 // 工作台「今日待办 + 风险提醒」：GET /admin/recruitment/dashboard/worklist。
 // 返回 R<DashboardWorklistVO>（业务载荷在 res.data）：三类待办计数 + riskAlerts 风险留痕列表。
-export function getWorklist() {
-  return request.get<DashboardWorklistVO>(`${baseUrl}/dashboard/worklist`);
+export function getWorklist(config?: any) {
+  return request.get<DashboardWorklistVO>(`${baseUrl}/dashboard/worklist`, config);
 }
 
 export function getApplyTrend(days: number = 7) {
