@@ -1,11 +1,22 @@
 <template>
   <div v-loading="state.loading" class="layout-navbars-breadcrumb-user-news">
     <div class="head-box">
-      <div class="head-box-title">通知公告</div>
+      <div class="head-box-title">运营待办</div>
       <div class="head-box-btn" @click="readAll">全部已读</div>
     </div>
     <div v-loading="state.loading" class="content-box">
+      <template v-if="todoItems.length > 0">
+        <div v-for="item in todoItems" :key="item.type" class="content-box-item todo-item" @click="goTodo(item.path)">
+          <div class="item-conten">
+            <div class="todo-title">{{ item.title }}</div>
+            <div class="content-box-msg">{{ item.desc }}</div>
+          </div>
+          <span class="el-tag el-tag--danger el-tag--mini read">{{ item.count }}</span>
+        </div>
+      </template>
+      <div v-if="todoItems.length && newsList.length" class="content-divider"></div>
       <template v-if="newsList.length > 0">
+        <div class="notice-section-title">通知公告</div>
         <div v-for="(v, k) in newsList" :key="k" class="content-box-item" @click="onNewsClick(k)">
           <div class="item-conten">
             <div>{{ v.message }}</div>
@@ -17,13 +28,15 @@
           <span v-else class="el-tag el-tag--danger el-tag--mini read">未读</span>
         </div>
       </template>
-      <el-empty v-else :description="'消息为空'"></el-empty>
+      <el-empty v-if="!todoItems.length && !newsList.length" :description="'暂无待办'"></el-empty>
     </div>
   </div>
 </template>
 
 <script setup lang="ts" name="layoutBreadcrumbUserNews">
 import { useNoticeStore } from '@/store/modules/notice';
+import { getWorklist } from '@/api/recruitment';
+import router from '@/router';
 
 const noticeStore = useNoticeStore();
 const { readAll } = useNoticeStore();
@@ -33,6 +46,26 @@ const state = reactive({
   loading: false
 });
 const newsList = ref([]) as any;
+const pendingCompanies = ref(0);
+const pendingJobs = ref(0);
+const todoItems = computed(() =>
+  [
+    {
+      type: 'company',
+      title: '企业待审核',
+      desc: `有 ${pendingCompanies.value} 个 B 端企业申请待处理`,
+      count: pendingCompanies.value,
+      path: '/recruitment/company?status=0'
+    },
+    {
+      type: 'job',
+      title: '岗位待审核',
+      desc: `有 ${pendingJobs.value} 个岗位发布申请待处理`,
+      count: pendingJobs.value,
+      path: '/recruitment/job?status=0'
+    }
+  ].filter((item) => item.count > 0)
+);
 
 /**
  * 初始化数据
@@ -40,8 +73,18 @@ const newsList = ref([]) as any;
  */
 const getTableData = async () => {
   state.loading = true;
-  newsList.value = noticeStore.state.notices;
-  state.loading = false;
+  try {
+    const res = await getWorklist({ silent: true });
+    const data = res.data || {};
+    pendingCompanies.value = Number(data.pendingCompanies || 0);
+    pendingJobs.value = Number(data.pendingJobs || 0);
+    newsList.value = noticeStore.state.notices;
+  } catch (error) {
+    console.warn('加载运营待办失败', error);
+    newsList.value = noticeStore.state.notices;
+  } finally {
+    state.loading = false;
+  }
 };
 
 //点击消息，写入已读
@@ -51,9 +94,8 @@ const onNewsClick = (item: any) => {
   noticeStore.state.notices = newsList.value;
 };
 
-// 前往通知中心点击
-const onGoToGiteeClick = () => {
-  window.open('https://gitee.com/dromara/RuoYi-Vue-Plus/tree/5.X/');
+const goTodo = (path: string) => {
+  router.push(path);
 };
 
 onMounted(() => {
@@ -90,6 +132,7 @@ onMounted(() => {
     .content-box-item {
       padding-top: 12px;
       display: flex;
+      cursor: pointer;
       &:last-of-type {
         padding-bottom: 12px;
       }
@@ -106,6 +149,23 @@ onMounted(() => {
         display: flex;
         flex-direction: column;
       }
+    }
+    .todo-item {
+      align-items: flex-start;
+    }
+    .todo-title {
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+    }
+    .content-divider {
+      height: 1px;
+      margin: 8px 0 2px;
+      background: var(--el-border-color-lighter);
+    }
+    .notice-section-title {
+      padding-top: 10px;
+      color: var(--el-text-color-secondary);
+      font-size: 12px;
     }
   }
   .foot-box {

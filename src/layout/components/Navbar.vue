@@ -75,6 +75,7 @@ import { useAppStore } from '@/store/modules/app';
 import { useUserStore } from '@/store/modules/user';
 import { useSettingsStore } from '@/store/modules/settings';
 import { useNoticeStore } from '@/store/modules/notice';
+import { getWorklist } from '@/api/recruitment';
 import { getTenantList } from '@/api/login';
 import { dynamicClear, dynamicTenant } from '@/api/system/tenant';
 import { TenantVO } from '@/api/types';
@@ -90,6 +91,8 @@ const userStore = useUserStore();
 const settingsStore = useSettingsStore();
 const noticeStore = storeToRefs(useNoticeStore());
 const newNotice = ref(<number>0);
+const adminTodoCount = ref(0);
+let adminTodoTimer: ReturnType<typeof setInterval> | undefined;
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 
@@ -178,14 +181,41 @@ const handleCommand = (command: string) => {
     commandMap[command]();
   }
 };
+
+const refreshAdminTodoCount = async () => {
+  try {
+    const res = await getWorklist({ silent: true });
+    const data = res.data || {};
+    adminTodoCount.value = Number(data.pendingCompanies || 0) + Number(data.pendingJobs || 0);
+  } catch (error) {
+    console.warn('刷新运营待办数量失败', error);
+  }
+};
+
+onMounted(() => {
+  refreshAdminTodoCount();
+  adminTodoTimer = setInterval(refreshAdminTodoCount, 60000);
+});
+
+onUnmounted(() => {
+  if (adminTodoTimer) {
+    clearInterval(adminTodoTimer);
+    adminTodoTimer = undefined;
+  }
+});
+
 //用深度监听 消息
 watch(
   () => noticeStore.state.value.notices,
   (newVal) => {
-    newNotice.value = newVal.filter((item: any) => !item.read).length;
+    newNotice.value = newVal.filter((item: any) => !item.read).length + adminTodoCount.value;
   },
   { deep: true }
 );
+
+watch(adminTodoCount, (count) => {
+  newNotice.value = noticeStore.state.value.notices.filter((item: any) => !item.read).length + count;
+});
 </script>
 
 <style lang="scss" scoped>

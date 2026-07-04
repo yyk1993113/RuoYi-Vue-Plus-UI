@@ -294,10 +294,10 @@
           <el-descriptions-item label="省市区">{{
             [currentJob.province, currentJob.city, currentJob.district].filter(Boolean).join(' / ') || '-'
           }}</el-descriptions-item>
-          <el-descriptions-item label="工作地点">{{ currentJob.workAddress || '未知' }}</el-descriptions-item>
+          <el-descriptions-item label="工作地点" :span="2">{{ currentJob.workAddress || '未知' }}</el-descriptions-item>
 
-          <!-- 兼职工作时间（仅在有数据时展示，benefits/workTime 为 JSON，已在 computed 中解析） -->
-          <el-descriptions-item v-if="workTimeList.length" label="兼职工作时间" :span="2">
+          <!-- 工作时间（仅在有数据时展示，兼容 JSON 数组与纯文本两种来源格式） -->
+          <el-descriptions-item v-if="workTimeList.length" label="工作时间" :span="2">
             <div class="detail-tags">
               <el-tag v-for="(wt, i) in workTimeList" :key="i" type="info" effect="plain" class="mr-1 mb-1">{{ wt }}</el-tag>
             </div>
@@ -313,16 +313,16 @@
 
           <!-- 详细文本 -->
           <el-descriptions-item label="职位亮点" :span="2">
-            <div style="white-space: pre-wrap">{{ currentJob.highlights || '暂无' }}</div>
+            <div class="detail-text">{{ detailHighlights }}</div>
           </el-descriptions-item>
           <el-descriptions-item label="岗位描述" :span="2">
-            <div style="white-space: pre-wrap">{{ currentJob.description || '暂无描述' }}</div>
+            <div class="detail-text">{{ detailDescription }}</div>
           </el-descriptions-item>
           <el-descriptions-item label="团队介绍" :span="2">
-            <div style="white-space: pre-wrap">{{ currentJob.teamIntro || '暂无' }}</div>
+            <div class="detail-text">{{ detailTeamIntro }}</div>
           </el-descriptions-item>
           <el-descriptions-item label="附加条件" :span="2">
-            <div style="white-space: pre-wrap">{{ currentJob.additionalConditions || '暂无' }}</div>
+            <div class="detail-text">{{ detailAdditionalConditions }}</div>
           </el-descriptions-item>
 
           <!-- 运营信息 -->
@@ -850,7 +850,7 @@ import type { JobFullVO } from '@/api/recruitment';
 import { getBizNoChainByCompanyId, type BizNoChainVO } from '@/api/recruitment/serialRule';
 import { download } from '@/utils/request';
 import { REGIONS } from '@/utils/region-data';
-import { unwrapList, splitToArray, formatSalary } from './helpers';
+import { unwrapList, formatSalary } from './helpers';
 import { jobStatusMeta, jobTypeMeta } from './constants';
 import JobPositionPicker from './components/JobPositionPicker.vue';
 
@@ -892,47 +892,102 @@ const auditFormRef = ref();
 const dateRange = ref<[string, string] | []>([]);
 const showMoreQuery = ref(false);
 
-// 兼职工作时间：后端 workTime 为 JSON 字符串，解析为可读的时段文本数组供详情渲染。
-// 兼容两种常见结构：字符串数组，或对象数组（取 start/end、day/time、label 等常见键拼装）。
+function parseMaybeJson(value?: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const text = value.trim();
+  if (!text) return '';
+  if (!/^[\[{"]/.test(text)) return value;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return value;
+  }
+}
+
+function primitiveText(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return value.map(primitiveText).filter(Boolean).join('\n');
+  if (typeof value === 'object') {
+    const item = value as Record<string, unknown>;
+    const direct = item.label ?? item.name ?? item.title ?? item.text ?? item.content ?? item.value ?? item.desc ?? item.description;
+    if (direct != null) return primitiveText(direct);
+    const values = Object.values(item).map(primitiveText).filter(Boolean);
+    return values.join(' ');
+  }
+  return '';
+}
+
+function splitDetailTags(text: string): string[] {
+  return text
+    .split(/[、,，;；\n\r]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function normalizeDetailTags(value?: unknown): string[] {
+  const parsed = parseMaybeJson(value);
+  if (Array.isArray(parsed)) {
+    return parsed.map(primitiveText).flatMap(splitDetailTags).filter(Boolean);
+  }
+  const text = primitiveText(parsed);
+  return text ? splitDetailTags(text) : [];
+}
+
+function normalizeDetailBreaks(text: string): string {
+  return text
+    .replace(/\\r\\n|\\n|\\r/g, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>\s*<p[^>]*>/gi, '\n')
+    .replace(/<\/div>\s*<div[^>]*>/gi, '\n')
+    .replace(/<\/li>\s*<li[^>]*>/gi, '\n')
+    .replace(/<\/?(p|div|span|section|ul|ol|li|strong|b|em)[^>]*>/gi, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+}
+
+function normalizeDetailText(value?: unknown, fallback = '暂无'): string {
+  const parsed = parseMaybeJson(value);
+  const text = normalizeDetailBreaks(primitiveText(parsed))
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return text || fallback;
+}
+
+function formatWorkTimeItem(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value !== 'object' || Array.isArray(value)) return primitiveText(value);
+  const item = value as Record<string, unknown>;
+  const direct = item.label ?? item.name ?? item.title ?? item.text ?? item.content ?? item.value;
+  if (direct != null) return primitiveText(direct);
+  const day = primitiveText(item.day ?? item.week ?? item.date);
+  const start = primitiveText(item.start ?? item.startTime ?? item.from);
+  const end = primitiveText(item.end ?? item.endTime ?? item.to);
+  const range = start || end ? `${start}${start && end ? '-' : ''}${end}` : '';
+  return `${day}${day && range ? ' ' : ''}${range}`.trim() || primitiveText(value);
+}
+
+// 工作时间：不同发布入口可能返回 JSON 数组、对象数组或纯文本，这里统一转成标签文案。
 const workTimeList = computed<string[]>(() => {
   const raw = currentJob.value?.workTime;
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [String(raw)];
-    return parsed
-      .map((it: any) => {
-        if (it == null) return '';
-        if (typeof it === 'string') return it;
-        const day = it.day ?? it.week ?? it.date ?? it.label ?? '';
-        const start = it.start ?? it.startTime ?? it.from ?? '';
-        const end = it.end ?? it.endTime ?? it.to ?? '';
-        const range = start || end ? `${start}${start && end ? '-' : ''}${end}` : '';
-        const text = `${day}${day && range ? ' ' : ''}${range}`.trim();
-        return text || JSON.stringify(it);
-      })
-      .filter(Boolean);
-  } catch {
-    // 非合法 JSON 时原样展示，避免详情空白
-    return [String(raw)];
+  const parsed = parseMaybeJson(raw);
+  if (Array.isArray(parsed)) {
+    return parsed.map(formatWorkTimeItem).filter(Boolean);
   }
+  const text = formatWorkTimeItem(parsed);
+  return text ? [text] : [];
 });
 
-// 岗位福利：后端 benefits 为 JSON 数组字符串，解析为标签数组渲染。非法 JSON 时按逗号兜底切分。
-const benefitsList = computed<string[]>(() => {
-  const raw = currentJob.value?.benefits;
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed.map((it: any) => (typeof it === 'string' ? it : (it?.label ?? it?.name ?? JSON.stringify(it)))).filter(Boolean);
-    }
-    return [String(parsed)];
-  } catch {
-    // 非法 JSON 时按中英文逗号兜底切分
-    return splitToArray(raw);
-  }
-});
+// 岗位福利：兼容 JSON 数组、对象数组和 B 端纯文本，统一拆成标签展示。
+const benefitsList = computed<string[]>(() => normalizeDetailTags(currentJob.value?.benefits));
+const detailHighlights = computed(() => normalizeDetailText(currentJob.value?.highlights));
+const detailDescription = computed(() => normalizeDetailText(currentJob.value?.description, '暂无描述'));
+const detailTeamIntro = computed(() => normalizeDetailText(currentJob.value?.teamIntro));
+const detailAdditionalConditions = computed(() => normalizeDetailText(currentJob.value?.additionalConditions));
 
 const settlementIntentMap: Record<string, { label: string; type: 'info' | 'primary' | 'success' | 'warning'; desc: string }> = {
   '1': {
@@ -1891,6 +1946,10 @@ function handleCopyPublish(row: any) {
 }
 
 async function applyRouteFocus() {
+  const qStatus = route.query.status;
+  if (typeof qStatus === 'string' && qStatus) {
+    queryParams.status = qStatus;
+  }
   const qJobNo = route.query.jobNo;
   if (typeof qJobNo === 'string' && qJobNo) {
     queryParams.jobNo = qJobNo;
@@ -2388,6 +2447,12 @@ function formatStartDate(val?: string | number): string {
 .detail-tags {
   display: flex;
   flex-wrap: wrap;
+}
+
+.detail-text {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  word-break: break-word;
 }
 
 .mr-1 {
