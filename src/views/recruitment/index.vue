@@ -143,9 +143,9 @@
             </div>
           </template>
           <el-row :gutter="12">
-            <!-- 待审核企业 → 企业管理（默认筛待审核 status=0） -->
+            <!-- 待审核企业 → 企业管理 -->
             <el-col :span="8">
-              <div class="todo-cell" @click="navigateTo('/recruitment/company?status=0')">
+              <div class="todo-cell" @click="navigateTo('/recruitment/company')">
                 <div class="todo-value primary">{{ worklist.pendingCompanies || 0 }}</div>
                 <div class="todo-label">
                   <el-icon><OfficeBuilding /></el-icon> 待审核企业

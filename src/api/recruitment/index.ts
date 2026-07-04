@@ -1195,6 +1195,10 @@ export function updateJobSettlementIntent(data: {
   return request.post<JobFullVO>(`${baseUrl}/job/settlementIntent`, data);
 }
 
+export function markCompanySettlementIntentContacted(data: { intentId: number | string; remark?: string }) {
+  return request.post(`${baseUrl}/company/settlementIntent/contacted`, data);
+}
+
 // 运营代发岗位：POST /admin/recruitment/job/add，body 为 CreateJobRequest（含 companyId 指定归属企业）。
 // status 由调用方决定：'0' 待审核 / '1' 直接上架 / '3' 存草稿（运营有发布权限）。
 export function addJob(data: any) {

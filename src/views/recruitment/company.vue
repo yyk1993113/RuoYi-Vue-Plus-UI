@@ -205,7 +205,13 @@
         </el-row>
       </template>
 
-      <el-table v-loading="loading" :data="tableData" border stripe @selection-change="handleSelectionChange">
+      <el-table
+        v-loading="loading"
+        :data="tableData"
+        border
+        stripe
+        @selection-change="handleSelectionChange"
+      >
         <el-table-column type="selection" width="50" align="center" />
         <el-table-column label="企业编码" prop="companyNo" width="180" align="center" show-overflow-tooltip>
           <template #default="{ row }">{{ row.companyNo || '-' }}</template>
@@ -933,6 +939,7 @@ import {
   listJob,
   listTask,
   listLedger,
+  markCompanySettlementIntentContacted,
   type CompanyAuditHistoryVO,
   type CompanyCertVO,
   type JobVO,
@@ -1356,14 +1363,97 @@ async function loadData() {
   loading.value = true;
   try {
     const res = await listCompany(buildCompanyQueryParams());
-    const list = unwrapList(res);
-    tableData.value = list.rows;
-    total.value = list.total;
+    const payload = resolveCompanyListPayload(res);
+    tableData.value = payload.rows.map(normalizeCompanyRow);
+    total.value = payload.total;
   } catch (error) {
     ElMessage.error('加载数据失败');
   } finally {
     loading.value = false;
   }
+}
+
+function resolveCompanyListPayload(res: any): { rows: any[]; total: number } {
+  const picked = pickCompanyRows(res);
+  if (picked) {
+    return {
+      rows: picked.rows,
+      total: Number(picked.total ?? findListTotal(res) ?? picked.rows.length) || 0
+    };
+  }
+  const list = unwrapList(res);
+  return { rows: list.rows, total: list.total || findListTotal(res) || list.rows.length };
+}
+
+function pickCompanyRows(source: any): { rows: any[]; total?: number | string } | null {
+  const queue = [source];
+  const seen = new Set<any>();
+  let emptyResult: { rows: any[]; total?: number | string } | null = null;
+
+  while (queue.length) {
+    const item = queue.shift();
+    if (!item || typeof item !== 'object' || seen.has(item)) continue;
+    seen.add(item);
+
+    if (Array.isArray(item)) {
+      if (item.length > 0) return { rows: item };
+      if (!item.length && !emptyResult) emptyResult = { rows: item };
+      continue;
+    }
+
+    for (const key of ['rows', 'records', 'list', 'content']) {
+      const value = item[key];
+      if (Array.isArray(value)) {
+        const result = { rows: value, total: item.total };
+        if (value.length > 0) return result;
+        if (!value.length && !emptyResult) emptyResult = result;
+      }
+    }
+
+    for (const key of ['data', 'page', 'result']) {
+      if (item[key] && typeof item[key] === 'object') queue.push(item[key]);
+    }
+  }
+
+  return emptyResult;
+}
+
+function findListTotal(source: any): number {
+  const queue = [source];
+  const seen = new Set<any>();
+  while (queue.length) {
+    const item = queue.shift();
+    if (!item || typeof item !== 'object' || seen.has(item)) continue;
+    seen.add(item);
+    if (item.total !== undefined && item.total !== null && !Number.isNaN(Number(item.total))) {
+      return Number(item.total);
+    }
+    for (const key of ['data', 'page', 'result']) {
+      if (item[key] && typeof item[key] === 'object') queue.push(item[key]);
+    }
+  }
+  return 0;
+}
+
+function normalizeCompanyRow(row: any): any {
+  return {
+    ...row,
+    companyId: row.companyId ?? row.company_id,
+    companyNo: row.companyNo ?? row.company_no,
+    companyName: row.companyName ?? row.company_name,
+    logoUrl: row.logoUrl ?? row.logo_url,
+    description: row.description ?? row.company_desc,
+    contactPerson: row.contactPerson ?? row.contact_person,
+    contactPhone: row.contactPhone ?? row.contact_phone,
+    jobCount: row.jobCount ?? row.job_count ?? 0,
+    applyCount: row.applyCount ?? row.apply_count ?? 0,
+    feedbackCount: row.feedbackCount ?? row.feedback_count ?? 0,
+    noFeedbackCount: row.noFeedbackCount ?? row.no_feedback_count ?? 0,
+    isSilenced: row.isSilenced ?? row.is_silenced,
+    createTime: row.createTime ?? row.create_time,
+    deletedTime: row.deletedTime ?? row.deleted_time,
+    userId: row.userId ?? row.user_id
+  };
 }
 
 async function loadStatistics() {
@@ -1446,6 +1536,14 @@ function companyAuditStatusMeta(company?: any) {
     return { label: '驳回', type: 'danger' as const };
   }
   return companyStatusMeta(company?.status);
+}
+
+function hasPendingSettlementIntent(row: any): boolean {
+  return Boolean(getSettlementIntentId(row));
+}
+
+function getSettlementIntentId(row: any): number | string | undefined {
+  return row?.settlementIntentId ?? row?.intentId ?? row?.settlement_intent_id ?? row?.intent_id;
 }
 
 // 授权书允许 PDF 或图片，必须保留文件元数据供下载卡片/图片预览判断。
@@ -1703,6 +1801,21 @@ async function handleStatusChange(row: any, status: string) {
   }
 }
 
+async function handleSettlementContacted(row: any) {
+  const intentId = getSettlementIntentId(row);
+  if (!intentId) {
+    ElMessage.warning('缺少结算意向ID，无法标记已联系');
+    return;
+  }
+  try {
+    await markCompanySettlementIntentContacted({ intentId });
+    ElMessage.success('已标记为已联系');
+    loadData();
+  } catch (error) {
+    ElMessage.error('标记已联系失败');
+  }
+}
+
 // 企业线索按企业维度逐级查询：companyId -> jobId -> apply/userId -> taskId -> ledger。
 function getRowCompanyId(row: any) {
   return String(row?.company_id ?? row?.companyId ?? '').trim();
@@ -1862,10 +1975,6 @@ async function handleUnsilence(row: any) {
 }
 
 async function applyRouteFocus() {
-  const qStatus = route.query.status;
-  if (typeof qStatus === 'string' && qStatus) {
-    queryParams.status = qStatus;
-  }
   const qCompanyNo = route.query.companyNo;
   if (typeof qCompanyNo === 'string' && qCompanyNo) {
     queryParams.companyNo = qCompanyNo;

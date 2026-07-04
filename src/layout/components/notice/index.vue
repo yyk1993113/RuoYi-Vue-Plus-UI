@@ -1,7 +1,7 @@
 <template>
   <div v-loading="state.loading" class="layout-navbars-breadcrumb-user-news">
     <div class="head-box">
-      <div class="head-box-title">运营待办</div>
+      <div class="head-box-title">运营待办<span v-if="todoTotal > 0">（{{ todoTotal }}）</span></div>
       <div class="head-box-btn" @click="readAll">全部已读</div>
     </div>
     <div v-loading="state.loading" class="content-box">
@@ -48,6 +48,7 @@ const state = reactive({
 const newsList = ref([]) as any;
 const pendingCompanies = ref(0);
 const pendingJobs = ref(0);
+const todoTotal = computed(() => pendingCompanies.value + pendingJobs.value);
 const todoItems = computed(() =>
   [
     {
@@ -55,7 +56,7 @@ const todoItems = computed(() =>
       title: '企业待审核',
       desc: `有 ${pendingCompanies.value} 个 B 端企业申请待处理`,
       count: pendingCompanies.value,
-      path: '/recruitment/company?status=0'
+      path: '/recruitment/company'
     },
     {
       type: 'job',
