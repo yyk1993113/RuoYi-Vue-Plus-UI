@@ -216,6 +216,9 @@ const deptExpand = ref(true);
 const deptNodeAll = ref(false);
 const deptOptions = ref<DeptTreeOption[]>([]);
 const openDataScope = ref(false);
+const COMPANY_RECRUITER_ROLE_KEY = 'B';
+const GENERAL_MANAGER_ROLE_NAME = '总经理';
+const GENERAL_MANAGER_ROLE_KEY = 'general_manager';
 
 /** 数据范围选项*/
 const dataScopeOptions = ref([
@@ -446,10 +449,18 @@ const getMenuAllCheckedKeys = (): any => {
   }
   return checkedKeys;
 };
+const normalizeRecruitmentRoleKey = () => {
+  const roleName = form.value.roleName?.trim() || '';
+  const roleKey = form.value.roleKey?.trim() || '';
+  form.value.roleName = roleName;
+  // B 是企业端招聘者身份角色；企业内“总经理”用 general_manager，避免 sys_role.role_key 全局冲突。
+  form.value.roleKey = roleName === GENERAL_MANAGER_ROLE_NAME && roleKey.toUpperCase() === COMPANY_RECRUITER_ROLE_KEY ? GENERAL_MANAGER_ROLE_KEY : roleKey;
+};
 /** 提交按钮 */
 const submitForm = () => {
   roleFormRef.value?.validate(async (valid: boolean) => {
     if (valid) {
+      normalizeRecruitmentRoleKey();
       form.value.menuIds = getMenuAllCheckedKeys();
       form.value.roleId ? await updateRole(form.value) : await addRole(form.value);
       proxy?.$modal.msgSuccess('操作成功');
