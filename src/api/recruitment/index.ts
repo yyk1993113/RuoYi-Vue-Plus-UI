@@ -111,6 +111,10 @@ export interface JobFullVO {
   salaryUnit?: string;
   salaryUnitName?: string;
   location?: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  regionScope?: string;
   // 职位所属类目
   categoryId?: number | string;
   categoryName?: string;

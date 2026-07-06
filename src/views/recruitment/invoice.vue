@@ -140,7 +140,13 @@
           <el-tag :type="invoiceStatusMeta(currentInvoice.status).type">{{ invoiceStatusMeta(currentInvoice.status).label }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="企业">{{ currentInvoice.companyName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="台账ID">{{ currentInvoice.ledgerId || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="台账编号">
+          <el-button v-if="currentInvoice.ledgerOrderNo" link type="primary" @click="openRelatedLedger(currentInvoice)">
+            {{ currentInvoice.ledgerOrderNo }}
+          </el-button>
+          <span v-else>-</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="金额(元)">{{ currentInvoice.amount != null ? formatMoney(currentInvoice.amount) : '-' }}</el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ currentInvoice.createTime }}</el-descriptions-item>
         <el-descriptions-item label="更新时间">{{ currentInvoice.updateTime || '-' }}</el-descriptions-item>
         <el-descriptions-item label="备注" :span="2">{{ currentInvoice.remark || '暂无' }}</el-descriptions-item>
@@ -226,12 +232,12 @@
 
 <script setup name="InvoiceManagement" lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, UploadInstance, UploadProps, UploadUserFile } from 'element-plus';
 import { globalHeaders } from '@/utils/request';
 import {
   getInvoiceStatistics,
-  getInvoice,
   listInvoiceManage,
   uploadInvoiceManage,
   bindInvoiceManage,
@@ -242,6 +248,7 @@ import { unwrapList, formatMoney } from './helpers';
 import { invoiceStatusMeta } from './constants';
 
 const loading = ref(false);
+const router = useRouter();
 const submitting = ref(false);
 const total = ref(0);
 const tableData = ref<InvoiceManageVO[]>([]);
@@ -343,13 +350,14 @@ function resetQuery() {
 }
 
 async function handleDetail(row: InvoiceManageVO) {
-  try {
-    const res = await getInvoice(row.invoiceId as number);
-    currentInvoice.value = res.data;
-    detailVisible.value = true;
-  } catch (error) {
-    ElMessage.error('获取发票详情失败');
-  }
+  currentInvoice.value = { ...row };
+  detailVisible.value = true;
+}
+
+function openRelatedLedger(row: InvoiceManageVO) {
+  if (!row?.ledgerOrderNo) return;
+  detailVisible.value = false;
+  router.push({ name: 'RecruitmentLedger', query: { orderNo: row.ledgerOrderNo } });
 }
 
 function previewFile(filePath: string) {

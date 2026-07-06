@@ -4,6 +4,12 @@
       <!-- 部门树 -->
       <el-col :lg="4" :xs="24" style="">
         <el-card shadow="hover">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <span>部门筛选</span>
+              <el-button link type="primary" @click="clearDeptFilter">全部</el-button>
+            </div>
+          </template>
           <el-input v-model="deptName" placeholder="请输入部门名称" prefix-icon="Search" clearable />
           <el-tree
             ref="deptTreeRef"
@@ -469,6 +475,13 @@ const filterDisabledDept = (deptList: DeptTreeVO[]) => {
 /** 节点单击事件 */
 const handleNodeClick = (data: DeptVO) => {
   queryParams.value.deptId = data.id;
+  handleQuery();
+};
+
+const clearDeptFilter = () => {
+  deptName.value = '';
+  queryParams.value.deptId = undefined;
+  deptTreeRef.value?.setCurrentKey(undefined);
   handleQuery();
 };
 

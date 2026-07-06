@@ -19,8 +19,8 @@
               <el-tag v-if="seeker.education" size="small" effect="plain" class="edu-tag">{{ seeker.education }}</el-tag>
               <el-tag v-if="seeker.isRecruitmentSilenced === '1'" size="small" type="danger" effect="dark">已禁言</el-tag>
             </div>
-            <div class="job-title">{{ job.jobName || '岗位#' + (detail.jobId || '') }}</div>
-            <div class="company-sub">{{ company.companyName || '企业#' + (detail.companyId || '') }}</div>
+            <div class="job-title">{{ job.jobName || job.jobNo || '-' }}</div>
+            <div class="company-sub">{{ company.companyName || company.companyNo || '-' }}</div>
           </div>
         </div>
         <div class="header-right">
@@ -157,12 +157,12 @@
               <div class="block-title mt-6">流转信息</div>
               <ul class="meta-info">
                 <li>
-                  <span class="label">投递ID</span>
-                  <span class="value">#{{ detail.applyId }}</span>
+                  <span class="label">投递编号</span>
+                  <span class="value">{{ detail.applyNo || '-' }}</span>
                 </li>
                 <li>
-                  <span class="label">企业ID</span>
-                  <span class="value">#{{ detail.companyId || '-' }}</span>
+                  <span class="label">企业编号</span>
+                  <span class="value">{{ company.companyNo || '-' }}</span>
                 </li>
                 <li>
                   <span class="label">已读状态</span>
@@ -210,7 +210,7 @@
                 <div v-if="detail.fulfillment && detail.fulfillment.tasks && detail.fulfillment.tasks.length" class="task-list">
                   <div v-for="t in detail.fulfillment.tasks" :key="t.taskId" class="task-item">
                     <div class="task-head">
-                      <span>任务 #{{ t.taskId }}</span>
+                      <span>{{ t.taskNo || '履约任务' }}</span>
                       <el-tag size="small" :type="taskTagType(t.status)">{{ t.statusName || t.status }}</el-tag>
                     </div>
                     <div class="task-meta">

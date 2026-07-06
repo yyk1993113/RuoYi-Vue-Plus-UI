@@ -281,7 +281,7 @@
           <el-descriptions-item label="用工性质">
             <el-tag :type="jobTypeMeta(currentJob.jobType).type">{{ jobTypeMeta(currentJob.jobType).label }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="职位类目">{{ currentJob.categoryName || currentJob.category || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="职位类目">{{ jobCategoryText(currentJob) }}</el-descriptions-item>
           <el-descriptions-item label="薪资范围">{{
             formatSalary(currentJob.salaryMin, currentJob.salaryMax, currentJob.salaryUnit)
           }}</el-descriptions-item>
@@ -291,9 +291,7 @@
           <el-descriptions-item label="经验要求">{{ currentJob.experienceName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="学历要求">{{ currentJob.educationName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="期望到岗时间">{{ formatStartDate(currentJob.expectedStartDate) }}</el-descriptions-item>
-          <el-descriptions-item label="省市区">{{
-            [currentJob.province, currentJob.city, currentJob.district].filter(Boolean).join(' / ') || '-'
-          }}</el-descriptions-item>
+          <el-descriptions-item label="省市区">{{ jobRegionText(currentJob) }}</el-descriptions-item>
           <el-descriptions-item label="工作地点" :span="2">{{ currentJob.workAddress || '未知' }}</el-descriptions-item>
 
           <!-- 工作时间（仅在有数据时展示，兼容 JSON 数组与纯文本两种来源格式） -->
@@ -427,6 +425,8 @@
         <el-empty v-else-if="!settlementLeadLoading" description="暂无线索链路" />
       </div>
       <template #footer>
+        <el-button v-if="settlementLead?.jobId" type="primary" plain @click="openSettlementLeadJob">查看岗位</el-button>
+        <el-button v-if="settlementLead?.orderNo" type="success" plain @click="openSettlementLeadLedger">查看台账</el-button>
         <el-button @click="settlementLeadVisible = false">关闭</el-button>
       </template>
     </el-drawer>
@@ -880,6 +880,7 @@ const settlementIntentForm = reactive({
 const settlementLeadVisible = ref(false);
 const settlementLeadLoading = ref(false);
 const settlementLead = ref<BizNoChainVO | null>(null);
+const settlementLeadContext = ref<any>(null);
 const settlementLeadActiveKey = ref('company');
 let jobChangedRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 let lastJobChangedEventKey = '';
@@ -969,6 +970,23 @@ function formatWorkTimeItem(value: unknown): string {
   const end = primitiveText(item.end ?? item.endTime ?? item.to);
   const range = start || end ? `${start}${start && end ? '-' : ''}${end}` : '';
   return `${day}${day && range ? ' ' : ''}${range}`.trim() || primitiveText(value);
+}
+
+function cleanDetailText(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function jobCategoryText(job?: JobFullVO | null): string {
+  const category = cleanDetailText(job?.categoryName || job?.category);
+  const position = cleanDetailText(job?.positionName);
+  const parts = [category, position].filter((item, index, arr) => item && arr.indexOf(item) === index);
+  return parts.join(' / ') || '-';
+}
+
+function jobRegionText(job?: JobFullVO | null): string {
+  if (!job) return '-';
+  if (job.regionScope === 'nationwide') return '全国';
+  return [job.province, job.city, job.district].map(cleanDetailText).filter(Boolean).join(' / ') || '-';
 }
 
 // 工作时间：不同发布入口可能返回 JSON 数组、对象数组或纯文本，这里统一转成标签文案。
@@ -1110,7 +1128,17 @@ const settlementLeadActiveStep = computed(() => {
 });
 
 const settlementLeadActiveDetails = computed(() => {
-  return settlementLeadActiveStep.value?.details || [];
+  const details = [...(settlementLeadActiveStep.value?.details || [])];
+  if (settlementLeadActiveStep.value?.key === 'company') {
+    details.push(
+      { label: '联系人', value: settlementLeadContext.value?.contactPerson || settlementLeadContext.value?.operatorName },
+      { label: '联系电话', value: settlementLeadContext.value?.contactPhone || settlementLeadContext.value?.operatorPhone }
+    );
+  }
+  if (settlementLeadActiveStep.value?.key === 'job') {
+    details.push({ label: '所属企业', value: settlementLeadContext.value?.companyName });
+  }
+  return details;
 });
 
 function selectSettlementLeadStep(key: string) {
@@ -1171,6 +1199,7 @@ const editForm = reactive({
   categoryId: '' as number | string | '',
   category: '',
   regionPath: [] as string[],
+  regionScope: '',
   province: '',
   city: '',
   district: '',
@@ -1383,18 +1412,22 @@ function appendBenefit(b: string) {
 }
 
 // 运营后台编辑岗位同样使用三级联动数据源，地区字段只由 cascader 拆分生成。
-const regionOptions = REGIONS.map((province: any) => ({
-  label: province.name,
-  value: province.name,
-  children: (province.cities || []).map((city: any) => ({
-    label: city.name,
-    value: city.name,
-    children: (city.areas || []).map((area: string) => ({
-      label: area,
-      value: area
+const NATIONAL_REGION_VALUE = '__nationwide__';
+const regionOptions = [
+  { label: '全国', value: NATIONAL_REGION_VALUE },
+  ...REGIONS.map((province: any) => ({
+    label: province.name,
+    value: province.name,
+    children: (province.cities || []).map((city: any) => ({
+      label: city.name,
+      value: city.name,
+      children: (city.areas || []).map((area: string) => ({
+        label: area,
+        value: area
+      }))
     }))
   }))
-}));
+];
 
 interface StandardPositionPick {
   positionId?: number | string;
@@ -1508,7 +1541,11 @@ async function handleEdit(row: any) {
     editForm.province = d.province ?? '';
     editForm.city = d.city ?? '';
     editForm.district = d.district ?? '';
-    editForm.regionPath = [d.province, d.city, d.district].filter(Boolean);
+    editForm.regionScope = d.regionScope || '';
+    editForm.regionPath =
+      d.regionScope === 'nationwide' || (!d.province && !d.city && !d.district && d.workAddress === '全国')
+        ? [NATIONAL_REGION_VALUE]
+        : [d.province, d.city, d.district].filter(Boolean);
     editForm.salaryMin = d.salaryMin ?? undefined;
     editForm.salaryMax = d.salaryMax ?? undefined;
     editForm.salaryUnit = normalizeSalaryUnit(d.salaryUnit);
@@ -1551,6 +1588,7 @@ function buildEditPayload() {
     province: editForm.province,
     city: editForm.city,
     district: editForm.district,
+    regionScope: editForm.regionScope,
     salaryMin: editForm.salaryMin,
     salaryMax: editForm.salaryMax,
     salaryUnit: editForm.salaryUnit,
@@ -1616,9 +1654,19 @@ async function submitEditAndAudit() {
 
 function syncEditRegionFromPath() {
   const [province = '', city = '', district = ''] = editForm.regionPath || [];
+  if (province === NATIONAL_REGION_VALUE) {
+    editForm.province = '';
+    editForm.city = '';
+    editForm.district = '';
+    editForm.regionScope = 'nationwide';
+    editForm.workAddress = '全国';
+    editFormRef.value?.validateField?.('workAddress');
+    return;
+  }
   editForm.province = province;
   editForm.city = city;
   editForm.district = district;
+  editForm.regionScope = district ? 'district' : city ? 'city' : province ? 'province' : '';
   // 工作地点为空时，用「省+市」预填地址前缀，HR 只需补街道门牌；已填则不覆盖，避免破坏运营已修正的地址
   if (!String(editForm.workAddress || '').trim() && (province || city)) {
     editForm.workAddress = `${province}${city}`;
@@ -1848,6 +1896,7 @@ async function handleSettlementLead(row: any) {
   settlementLeadVisible.value = true;
   settlementLeadLoading.value = true;
   settlementLead.value = null;
+  settlementLeadContext.value = { ...leadRow };
   settlementLeadActiveKey.value = 'company';
   try {
     if (!leadRow.companyId) {
@@ -1857,10 +1906,23 @@ async function handleSettlementLead(row: any) {
     settlementLead.value = res.data || null;
     settlementLeadActiveKey.value = settlementLeadSteps.value.find((step) => step.done)?.key || 'company';
   } catch {
+    settlementLeadContext.value = null;
     ElMessage.error('线索链路加载失败');
   } finally {
     settlementLeadLoading.value = false;
   }
+}
+
+function openSettlementLeadJob() {
+  if (!settlementLead.value?.jobId) return;
+  settlementLeadVisible.value = false;
+  router.push({ name: 'RecruitmentJob', query: { jobId: String(settlementLead.value.jobId) } });
+}
+
+function openSettlementLeadLedger() {
+  if (!settlementLead.value?.orderNo) return;
+  settlementLeadVisible.value = false;
+  router.push({ name: 'RecruitmentLedger', query: { orderNo: settlementLead.value.orderNo } });
 }
 
 function handleAudit(row: any, status: string) {

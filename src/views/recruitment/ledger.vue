@@ -240,7 +240,10 @@
     <el-dialog v-model="detailVisible" title="台账详情" width="600px" append-to-body>
       <el-descriptions :column="2" border v-if="currentLedger">
         <el-descriptions-item label="台账编号" :span="2">{{ currentLedger.orderNo }}</el-descriptions-item>
-        <el-descriptions-item label="岗位编号">{{ currentLedger.jobId ?? '-' }}</el-descriptions-item>
+        <el-descriptions-item label="岗位">
+          <el-button v-if="currentLedger.jobId" link type="primary" @click="openRelatedJob(currentLedger)">查看岗位详情</el-button>
+          <span v-else>-</span>
+        </el-descriptions-item>
         <el-descriptions-item label="投递编号">{{ currentLedger.applyId ?? '-' }}</el-descriptions-item>
         <el-descriptions-item label="企业">{{ currentLedger.companyName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="用户">{{ currentLedger.userName || '-' }}</el-descriptions-item>
@@ -294,7 +297,7 @@
 
 <script setup name="LedgerManagement" lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import {
   listLedger,
@@ -313,6 +316,7 @@ import { unwrapList, formatMoney } from './helpers';
 import { ledgerStatusMeta, ledgerInvoiceStatusMeta } from './constants';
 
 const loading = ref(false);
+const router = useRouter();
 const submitting = ref(false);
 const total = ref(0);
 const tableData = ref<any[]>([]);
@@ -582,6 +586,12 @@ async function handleDetail(row: any) {
   } catch (error) {
     ElMessage.error('获取台账详情失败');
   }
+}
+
+function openRelatedJob(row: any) {
+  if (!row?.jobId) return;
+  detailVisible.value = false;
+  router.push({ name: 'RecruitmentJob', query: { jobId: String(row.jobId) } });
 }
 
 // 打开结算确认（单条传 [row]，批量传选中列表）

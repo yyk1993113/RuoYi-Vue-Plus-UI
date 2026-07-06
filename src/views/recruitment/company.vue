@@ -342,6 +342,12 @@
           <el-descriptions-item v-if="currentCompany.deleted === '1'" label="删除时间">{{ currentCompany.deletedTime || '-' }}</el-descriptions-item>
           <el-descriptions-item label="企业名称" :span="2">{{ currentCompany.companyName }}</el-descriptions-item>
           <el-descriptions-item label="企业描述" :span="2">{{ currentCompany.description || '无' }}</el-descriptions-item>
+          <el-descriptions-item label="统一社会信用代码">{{ currentCompany.socialCreditCode || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="法定代表人">{{ currentCompany.legalPersonName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="法人手机号">{{ currentCompany.legalPersonPhone || currentCompany.contactPhone || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="超管手机号">{{ currentCompany.adminPhone || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="注册地址" :span="2">{{ currentCompany.registeredAddress || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="办公地址" :span="2">{{ currentCompany.companyAddress || '-' }}</el-descriptions-item>
           <el-descriptions-item label="联系人">{{ currentCompany.contactPerson || '-' }}</el-descriptions-item>
           <el-descriptions-item label="联系电话">{{ currentCompany.contactPhone || '-' }}</el-descriptions-item>
           <el-descriptions-item label="联系微信">{{ currentCompany.contactWechat || '-' }}</el-descriptions-item>

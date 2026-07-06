@@ -15,6 +15,23 @@
                 <el-option v-for="dict in sys_common_status" :key="dict.value" :label="dict.label" :value="dict.value" />
               </el-select>
             </el-form-item>
+            <el-form-item label="设备类型" prop="deviceType">
+              <el-select v-model="queryParams.deviceType" placeholder="全部设备" clearable style="width: 130px">
+                <el-option v-for="dict in sys_device_type" :key="dict.value" :label="dict.label" :value="dict.value" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="部门" prop="deptId">
+              <el-tree-select
+                v-model="queryParams.deptId"
+                :data="deptOptions"
+                :props="{ label: 'label', children: 'children', value: 'id' }"
+                check-strictly
+                clearable
+                filterable
+                placeholder="全部部门"
+                style="width: 180px"
+              />
+            </el-form-item>
             <el-form-item label="登录时间" style="width: 308px">
               <el-date-picker
                 v-model="dateRange"
@@ -77,10 +94,14 @@
           sortable="custom"
           :sort-orders="['descending', 'ascending']"
         />
-        <el-table-column label="客户端" align="center" prop="clientKey" :show-overflow-tooltip="true" />
+        <el-table-column label="客户端" align="center" prop="clientKey" :show-overflow-tooltip="true">
+          <template #default="scope">
+            <span>{{ formatClientKey(scope.row) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="设备类型" align="center">
           <template #default="scope">
-            <dict-tag :options="sys_device_type" :value="scope.row.deviceType" />
+            <span>{{ formatDeviceType(scope.row) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="地址" align="center" prop="ipaddr" :show-overflow-tooltip="true" />
@@ -92,7 +113,11 @@
             <dict-tag :options="sys_common_status" :value="scope.row.status" />
           </template>
         </el-table-column>
-        <el-table-column label="描述" align="center" prop="msg" :show-overflow-tooltip="true" />
+        <el-table-column label="描述" align="center" prop="msg" :show-overflow-tooltip="true">
+          <template #default="scope">
+            <span>{{ formatLoginMsg(scope.row) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="访问时间" align="center" prop="loginTime" sortable="custom" :sort-orders="['descending', 'ascending']" width="180">
           <template #default="scope">
             <span>{{ proxy.parseTime(scope.row.loginTime) }}</span>
@@ -108,6 +133,8 @@
 <script setup name="Logininfor" lang="ts">
 import { list, delLoginInfo, cleanLoginInfo, unlockLoginInfo } from '@/api/monitor/loginInfo';
 import { LoginInfoQuery, LoginInfoVO } from '@/api/monitor/loginInfo/types';
+import { deptTreeSelect } from '@/api/system/user';
+import type { DeptTreeVO } from '@/api/system/dept/types';
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 const { sys_device_type } = toRefs<any>(proxy?.useDict('sys_device_type'));
@@ -123,6 +150,7 @@ const selectName = ref<Array<string>>([]);
 const total = ref(0);
 const dateRange = ref<[DateModelType, DateModelType]>(['', '']);
 const defaultSort = ref<any>({ prop: 'loginTime', order: 'descending' });
+const deptOptions = ref<DeptTreeVO[]>([]);
 
 const queryFormRef = ref<ElFormInstance>();
 const loginInfoTableRef = ref<ElTableInstance>();
@@ -132,10 +160,94 @@ const queryParams = ref<LoginInfoQuery>({
   pageSize: 10,
   ipaddr: '',
   userName: '',
+  deviceType: '',
+  deptId: undefined,
   status: '',
   orderByColumn: defaultSort.value.prop,
   isAsc: defaultSort.value.order
 });
+
+const normalizeText = (value?: string | number | null) => String(value ?? '').trim();
+
+const joinRowText = (row: LoginInfoVO) =>
+  [row.clientKey, row.deviceType, row.browser, row.os, row.msg].map((item) => normalizeText(item)).join(' ').toLowerCase();
+
+const isSuccessStatus = (row: LoginInfoVO) => normalizeText(row.status) === '0';
+
+const isMiniProgramLog = (row: LoginInfoVO) => {
+  const clientKey = normalizeText(row.clientKey);
+  const lowerClientKey = clientKey.toLowerCase();
+  const rowText = joinRowText(row);
+  return (
+    clientKey === '小程序' ||
+    normalizeText(row.msg).includes('C端登录') ||
+    lowerClientKey === 'xcx' ||
+    rowText.includes('micromessenger') ||
+    rowText.includes('miniprogram') ||
+    rowText.includes('wechat')
+  );
+};
+
+const isMobileLog = (row: LoginInfoVO) => {
+  const rowText = joinRowText(row);
+  return ['android', 'ios', 'iphone', 'ipad', 'mobile', 'micromessenger', 'miniprogram'].some((keyword) => rowText.includes(keyword));
+};
+
+const getDeviceDictLabel = (value: string) => {
+  const option = (sys_device_type.value || []).find((item: any) => normalizeText(item.value).toLowerCase() === value.toLowerCase());
+  return option?.label || value;
+};
+
+const formatClientKey = (row: LoginInfoVO) => {
+  const clientKey = normalizeText(row.clientKey);
+  const lowerClientKey = clientKey.toLowerCase();
+  if (lowerClientKey === 'company' || clientKey === 'B端') {
+    return 'B端';
+  }
+  if (isMiniProgramLog(row)) {
+    return '小程序';
+  }
+  if (!clientKey) {
+    return 'B端';
+  }
+  if (lowerClientKey === 'pc') {
+    return 'PC';
+  }
+  if (lowerClientKey === 'app') {
+    return 'APP';
+  }
+  return clientKey;
+};
+
+const formatDeviceType = (row: LoginInfoVO) => {
+  if (isMiniProgramLog(row)) {
+    return '手机';
+  }
+  const deviceType = normalizeText(row.deviceType);
+  const lowerDeviceType = deviceType.toLowerCase();
+  if (!deviceType) {
+    return isMobileLog(row) ? '手机' : 'PC';
+  }
+  if (lowerDeviceType === 'pc') {
+    return 'PC';
+  }
+  if (lowerDeviceType === 'xcx' || lowerDeviceType === 'mobile' || lowerDeviceType === 'phone') {
+    return '手机';
+  }
+  return getDeviceDictLabel(deviceType);
+};
+
+const formatLoginMsg = (row: LoginInfoVO) => {
+  if (isMiniProgramLog(row) && isSuccessStatus(row)) {
+    return 'C端登录';
+  }
+  return normalizeText(row.msg) || '-';
+};
+
+const getDeptTree = async () => {
+  const res = await deptTreeSelect();
+  deptOptions.value = res.data || [];
+};
 
 /** 查询登录日志列表 */
 const getList = async () => {
@@ -204,6 +316,7 @@ const handleExport = () => {
 };
 
 onMounted(() => {
+  getDeptTree();
   getList();
 });
 </script>
