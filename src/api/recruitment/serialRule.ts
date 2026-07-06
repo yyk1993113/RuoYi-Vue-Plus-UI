@@ -29,6 +29,34 @@ export interface SerialNoRuleQuery {
   status?: string;
 }
 
+export interface SerialNoRecordVO {
+  businessCode?: string;
+  businessName?: string;
+  recordType?: string;
+  recordId?: string | number;
+  serialNo?: string;
+  title?: string;
+  relatedInfo?: string;
+  codeStatus?: 'current' | 'history' | 'empty' | string;
+  createTime?: string;
+  updateTime?: string;
+}
+
+export interface SerialNoRecordQuery {
+  pageNum?: number;
+  pageSize?: number;
+  businessCode?: string;
+  keyword?: string;
+  codeScope?: 'all' | 'current' | 'history' | 'empty' | string;
+  createTimeBegin?: string;
+  createTimeEnd?: string;
+}
+
+export interface SerialNoRecordRefreshBody {
+  businessCode?: string;
+  updateExisting?: boolean;
+}
+
 // 全链路追溯结果来自 /admin/serial-rule/chain；code 用于展示，ID 用于跳到对应详情弹窗。
 export interface BizNoChainVO {
   sourceNo?: string;
@@ -82,6 +110,18 @@ export function previewSerialRule(data: SerialNoRuleVO) {
 
 export function nextSerialNo(businessCode: string) {
   return request.post<{ serialNo: string }>(`${baseUrl}/next/${businessCode}`);
+}
+
+export function listSerialRecords(query: SerialNoRecordQuery) {
+  return request.get<any>(`${baseUrl}/records`, { params: query });
+}
+
+export function updateSerialRecordCode(data: { businessCode?: string; recordId?: string | number; serialNo?: string }) {
+  return request.post(`${baseUrl}/records/code`, data);
+}
+
+export function refreshSerialRecordCode(data: SerialNoRecordRefreshBody) {
+  return request.post<{ count: number }>(`${baseUrl}/records/refresh`, data);
 }
 
 export function getBizNoChain(no: string, intentId?: number | string) {

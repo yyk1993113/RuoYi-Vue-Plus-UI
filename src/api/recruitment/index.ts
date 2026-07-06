@@ -310,6 +310,7 @@ export interface InvoiceStatistics {
 
 export interface InvoiceVO {
   invoiceId?: number;
+  invoiceNo?: string;
   ledgerId?: number;
   companyId?: number;
   companyName?: string;
@@ -324,6 +325,7 @@ export interface InvoiceVO {
 // 金额 amount / 绑定台账号 ledgerOrderNo 派生自绑定台账 ledger；createByName 为上传人昵称。
 export interface InvoiceManageVO {
   invoiceId?: number;
+  invoiceNo?: string;
   ledgerId?: number;
   ledgerOrderNo?: string;
   companyId?: number;
@@ -1124,11 +1126,16 @@ export interface RecruitmentUserVO {
   city?: string;
   expectCity?: string;
   expectPosition?: string;
+  expectPositionId?: number | string;
+  positionId?: number | string;
+  positionName?: string;
   expectedDate?: string;
   expectedIndustry?: string;
   jobPreferenceRemark?: string;
   jobStatus?: string;
   jobStatusName?: string;
+  availableTimeSlots?: string;
+  weeklyHours?: number | string;
   education?: string;
   educationName?: string;
   workYears?: number;
@@ -1492,6 +1499,11 @@ const invoiceManageBaseUrl = '/admin/invoice-manage';
 // 分页查询发票（含金额/上传人/上传时间/绑定台账号）
 export function listInvoiceManage(query: InvoiceQuery) {
   return request.get<any>(`${invoiceManageBaseUrl}/list`, { params: query });
+}
+
+// 发票上传/改绑时使用的台账选择列表，权限随发票管理接口走
+export function listInvoiceLedgerOptions(query: LedgerQuery) {
+  return request.get<any>(`${invoiceManageBaseUrl}/ledger-options`, { params: query });
 }
 
 // 上传发票文件并关联台账，返回新发票ID

@@ -73,7 +73,11 @@
       </template>
 
       <el-table v-loading="loading" :data="tableData" border stripe>
-        <el-table-column label="发票ID" prop="invoiceId" width="180" align="center" />
+        <el-table-column label="发票编号" width="190" align="center">
+          <template #default="{ row }">
+            <span>{{ row.invoiceNo || row.invoiceId }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="企业ID" prop="companyId" width="100" align="center" />
         <el-table-column label="金额(元)" width="120" align="right">
           <template #default="{ row }">
@@ -135,7 +139,7 @@
     <!-- 发票详情对话框：详情走 getInvoice(/admin/recruitment/invoice/{id})，含企业名/备注等 -->
     <el-dialog v-model="detailVisible" title="发票详情" width="600px" append-to-body>
       <el-descriptions :column="2" border v-if="currentInvoice">
-        <el-descriptions-item label="发票ID">{{ currentInvoice.invoiceId }}</el-descriptions-item>
+        <el-descriptions-item label="发票编号">{{ currentInvoice.invoiceNo || currentInvoice.invoiceId }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="invoiceStatusMeta(currentInvoice.status).type">{{ invoiceStatusMeta(currentInvoice.status).label }}</el-tag>
         </el-descriptions-item>
@@ -186,14 +190,33 @@
             </template>
           </el-upload>
         </el-form-item>
-        <el-form-item label="关联台账ID" prop="ledgerId">
-          <el-input v-model="uploadForm.ledgerId" placeholder="可空，填写后金额/企业以台账为准" clearable style="width: 100%" />
+        <el-form-item label="关联台账" prop="ledgerId">
+          <el-select
+            v-model="uploadForm.ledgerId"
+            filterable
+            remote
+            clearable
+            reserve-keyword
+            :remote-method="loadLedgerOptions"
+            :loading="ledgerLoading"
+            placeholder="请选择台账"
+            style="width: 100%"
+            @visible-change="handleLedgerVisibleChange"
+            @change="handleUploadLedgerChange"
+          >
+            <el-option v-for="item in ledgerOptions" :key="item.ledgerId" :label="formatLedgerLabel(item)" :value="item.ledgerId">
+              <div class="ledger-option">
+                <span>{{ item.orderNo || '台账#' + item.ledgerId }}</span>
+                <span class="ledger-option-meta">企业ID {{ item.companyId || '-' }} / {{ item.amount != null ? formatMoney(item.amount) : '-' }} 元</span>
+              </div>
+            </el-option>
+          </el-select>
         </el-form-item>
         <el-form-item label="企业ID" prop="companyId">
-          <el-input v-model="uploadForm.companyId" placeholder="可空，绑定台账时自动派生" clearable style="width: 100%" />
+          <el-input v-model="uploadForm.companyId" placeholder="选择台账后自动带出" disabled style="width: 100%" />
         </el-form-item>
         <el-form-item label="金额(元)" prop="amount">
-          <el-input-number v-model="uploadForm.amount" :min="0" :precision="2" :controls="false" placeholder="可空" style="width: 100%" />
+          <el-input-number v-model="uploadForm.amount" :min="0" :precision="2" :controls="false" placeholder="选择台账后自动带出" disabled style="width: 100%" />
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-select v-model="uploadForm.status" placeholder="默认未开票" style="width: 100%">
@@ -218,8 +241,26 @@
         <el-form-item label="发票ID">
           <span>{{ bindForm.invoiceId }}</span>
         </el-form-item>
-        <el-form-item label="台账ID" prop="ledgerId">
-          <el-input v-model="bindForm.ledgerId" placeholder="请输入要绑定的台账ID" clearable style="width: 100%" />
+        <el-form-item label="台账" prop="ledgerId">
+          <el-select
+            v-model="bindForm.ledgerId"
+            filterable
+            remote
+            clearable
+            reserve-keyword
+            :remote-method="loadLedgerOptions"
+            :loading="ledgerLoading"
+            placeholder="请选择要绑定的台账"
+            style="width: 100%"
+            @visible-change="handleLedgerVisibleChange"
+          >
+            <el-option v-for="item in ledgerOptions" :key="item.ledgerId" :label="formatLedgerLabel(item)" :value="item.ledgerId">
+              <div class="ledger-option">
+                <span>{{ item.orderNo || '台账#' + item.ledgerId }}</span>
+                <span class="ledger-option-meta">企业ID {{ item.companyId || '-' }} / {{ item.amount != null ? formatMoney(item.amount) : '-' }} 元</span>
+              </div>
+            </el-option>
+          </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -231,19 +272,20 @@
 </template>
 
 <script setup name="InvoiceManagement" lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, UploadInstance, UploadProps, UploadUserFile } from 'element-plus';
 import { globalHeaders } from '@/utils/request';
 import {
   getInvoiceStatistics,
+  listInvoiceLedgerOptions,
   listInvoiceManage,
   uploadInvoiceManage,
   bindInvoiceManage,
   markInvoiceManageStatus
 } from '@/api/recruitment';
-import type { InvoiceManageVO, InvoiceUploadForm } from '@/api/recruitment';
+import type { InvoiceManageVO, InvoiceUploadForm, LedgerVO } from '@/api/recruitment';
 import { unwrapList, formatMoney } from './helpers';
 import { invoiceStatusMeta } from './constants';
 
@@ -255,6 +297,8 @@ const tableData = ref<InvoiceManageVO[]>([]);
 const detailVisible = ref(false);
 const currentInvoice = ref<any>(null);
 const queryFormRef = ref<FormInstance>();
+const ledgerOptions = ref<LedgerVO[]>([]);
+const ledgerLoading = ref(false);
 
 const queryParams = reactive({
   pageNum: 1,
@@ -296,13 +340,74 @@ const uploadRules = {
 // ===== 绑定台账对话框 =====
 const bindVisible = ref(false);
 const bindFormRef = ref<FormInstance>();
-const bindForm = reactive<{ invoiceId?: number; ledgerId?: string }>({
+const bindForm = reactive<{ invoiceId?: number; ledgerId?: number }>({
   invoiceId: undefined,
   ledgerId: undefined
 });
 const bindRules = {
-  ledgerId: [{ required: true, message: '请输入台账ID', trigger: 'blur' }]
+  ledgerId: [{ required: true, message: '请选择台账', trigger: 'change' }]
 };
+
+async function loadLedgerOptions(keyword = '') {
+  ledgerLoading.value = true;
+  try {
+    const res = await listInvoiceLedgerOptions({
+      pageNum: 1,
+      pageSize: 20,
+      orderNo: keyword || undefined
+    });
+    const list = unwrapList<LedgerVO>(res);
+    ledgerOptions.value = mergeLedgerOptions(ledgerOptions.value.filter(isSelectedLedger), list.rows);
+  } catch (error) {
+    console.error('加载台账列表失败:', error);
+  } finally {
+    ledgerLoading.value = false;
+  }
+}
+
+function handleLedgerVisibleChange(visible: boolean) {
+  if (visible) {
+    loadLedgerOptions();
+  }
+}
+
+function mergeLedgerOptions(left: LedgerVO[], right: LedgerVO[]) {
+  const map = new Map<number, LedgerVO>();
+  [...left, ...right].forEach((item) => {
+    if (item.ledgerId != null) {
+      map.set(Number(item.ledgerId), item);
+    }
+  });
+  return Array.from(map.values());
+}
+
+function isSelectedLedger(item: LedgerVO) {
+  return item.ledgerId === uploadForm.ledgerId || item.ledgerId === bindForm.ledgerId;
+}
+
+function formatLedgerLabel(item: LedgerVO) {
+  const orderNo = item.orderNo || `台账#${item.ledgerId}`;
+  const company = item.companyName || (item.companyId ? `企业ID ${item.companyId}` : '企业-');
+  const amount = item.amount != null ? `${formatMoney(item.amount)}元` : '金额-';
+  return `${orderNo} / ${company} / ${amount}`;
+}
+
+function findLedgerOption(ledgerId?: number | string) {
+  if (ledgerId == null || ledgerId === '') return undefined;
+  return ledgerOptions.value.find((item) => Number(item.ledgerId) === Number(ledgerId));
+}
+
+function handleUploadLedgerChange(ledgerId?: number | string) {
+  if (ledgerId == null || ledgerId === '') {
+    uploadForm.companyId = undefined;
+    uploadForm.amount = undefined;
+    return;
+  }
+  const ledger = findLedgerOption(ledgerId);
+  if (!ledger) return;
+  uploadForm.companyId = ledger.companyId;
+  uploadForm.amount = ledger.amount;
+}
 
 async function loadData() {
   loading.value = true;
@@ -367,6 +472,7 @@ function previewFile(filePath: string) {
 // ===== 上传发票流程 =====
 function handleUploadOpen() {
   uploadVisible.value = true;
+  loadLedgerOptions();
 }
 
 function resetUploadForm() {
@@ -451,8 +557,17 @@ async function submitUpload() {
 // ===== 绑定/改绑台账流程 =====
 function handleBindOpen(row: InvoiceManageVO) {
   bindForm.invoiceId = row.invoiceId;
-  bindForm.ledgerId = row.ledgerId != null ? String(row.ledgerId) : undefined;
+  bindForm.ledgerId = row.ledgerId;
+  if (row.ledgerId != null && !findLedgerOption(row.ledgerId)) {
+    ledgerOptions.value.unshift({
+      ledgerId: row.ledgerId,
+      orderNo: row.ledgerOrderNo,
+      companyId: row.companyId,
+      amount: row.amount
+    });
+  }
   bindVisible.value = true;
+  loadLedgerOptions();
 }
 
 function resetBindForm() {
@@ -469,7 +584,7 @@ async function submitBind() {
     try {
       await bindInvoiceManage({
         invoiceId: bindForm.invoiceId as number,
-        ledgerId: Number(bindForm.ledgerId)
+        ledgerId: bindForm.ledgerId as number
       });
       ElMessage.success('绑定成功');
       bindVisible.value = false;
@@ -562,6 +677,18 @@ onMounted(() => {
 }
 
 .text-secondary {
+  color: #909399;
+  font-size: 12px;
+}
+
+.ledger-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ledger-option-meta {
   color: #909399;
   font-size: 12px;
 }

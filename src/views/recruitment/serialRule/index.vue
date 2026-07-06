@@ -69,8 +69,9 @@
           </template>
         </el-table-column>
         <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
-        <el-table-column label="操作" width="250" align="center" fixed="right">
+        <el-table-column label="操作" width="330" align="center" fixed="right">
           <template #default="{ row }">
+            <el-button v-hasPermi="['recruitment:serialRule:query']" link type="primary" icon="Tickets" @click="openRecordDialog(row)">数据</el-button>
             <el-button v-hasPermi="['recruitment:serialRule:query']" link type="primary" icon="View" @click="handlePreview(row)">预览</el-button>
             <el-button v-hasPermi="['recruitment:serialRule:next']" link type="warning" icon="MagicStick" @click="handleNext(row)">生成</el-button>
             <el-button v-hasPermi="['recruitment:serialRule:edit']" link type="primary" icon="Edit" @click="handleUpdate(row)">修改</el-button>
@@ -142,6 +143,11 @@
               </el-radio-group>
             </el-form-item>
           </el-col>
+          <el-col v-if="form.ruleId" :span="12">
+            <el-form-item label="更新历史编码">
+              <el-switch v-model="syncHistoryOnSave" active-text="是" inactive-text="否" />
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <el-form-item label="备注" prop="remark">
               <el-input v-model="form.remark" type="textarea" :rows="3" maxlength="200" show-word-limit placeholder="请输入备注" />
@@ -153,6 +159,80 @@
         <div class="dialog-footer">
           <el-button @click="dialog.visible = false">取消</el-button>
           <el-button type="primary" :loading="submitLoading" @click="submitForm">确定</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="recordDialog.visible" :title="recordDialog.title" width="1080px" append-to-body>
+      <el-form :model="recordQuery" :inline="true" label-width="86px" class="mb-3">
+        <el-form-item label="关键字">
+          <el-input v-model="recordQuery.keyword" placeholder="编号 / ID / 名称" clearable style="width: 220px" @keyup.enter="handleRecordQuery" />
+        </el-form-item>
+        <el-form-item label="编号范围">
+          <el-select v-model="recordQuery.codeScope" style="width: 150px">
+            <el-option label="全部" value="all" />
+            <el-option label="最新规则" value="current" />
+            <el-option label="历史编码" value="history" />
+            <el-option label="未编号" value="empty" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="创建时间">
+          <el-date-picker
+            v-model="recordDateRange"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 360px"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" icon="Search" @click="handleRecordQuery">搜索</el-button>
+          <el-button icon="Refresh" @click="resetRecordQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
+      <el-row :gutter="10" class="mb-3">
+        <el-col :span="1.5">
+          <el-button v-hasPermi="['recruitment:serialRule:edit']" type="primary" plain icon="Refresh" @click="refreshRecordCodes(false)">补齐空编号</el-button>
+        </el-col>
+        <el-col :span="1.5">
+          <el-button v-hasPermi="['recruitment:serialRule:edit']" type="warning" plain icon="RefreshRight" @click="refreshRecordCodes(true)">更新历史编码</el-button>
+        </el-col>
+      </el-row>
+      <el-table v-loading="recordLoading" :data="recordList" border stripe max-height="460">
+        <el-table-column label="数据类型" width="110" align="center">
+          <template #default="{ row }">{{ recordTypeLabel(row.recordType) }}</template>
+        </el-table-column>
+        <el-table-column label="数据ID" prop="recordId" width="170" align="center" show-overflow-tooltip />
+        <el-table-column label="业务编号" prop="serialNo" min-width="190" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.serialNo || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="编号状态" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag :type="codeStatusType(row.codeStatus)" size="small">{{ codeStatusLabel(row.codeStatus) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="名称/摘要" prop="title" min-width="180" show-overflow-tooltip />
+        <el-table-column label="关联信息" prop="relatedInfo" min-width="170" show-overflow-tooltip />
+        <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
+        <el-table-column label="更新时间" prop="updateTime" width="170" align="center" />
+        <el-table-column label="操作" width="110" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button v-hasPermi="['recruitment:serialRule:edit']" link type="primary" icon="Edit" @click="handleEditRecordCode(row)">改编号</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <pagination
+        v-show="recordTotal > 0"
+        v-model:page="recordQuery.pageNum"
+        v-model:limit="recordQuery.pageSize"
+        :total="recordTotal"
+        @pagination="getRecordList"
+      />
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="recordDialog.visible = false">关闭</el-button>
         </div>
       </template>
     </el-dialog>
@@ -168,9 +248,14 @@ import {
   delSerialRule,
   getSerialRule,
   listSerialRule,
+  listSerialRecords,
   nextSerialNo,
   previewSerialRule,
+  refreshSerialRecordCode,
+  updateSerialRecordCode,
   updateSerialRule,
+  type SerialNoRecordQuery,
+  type SerialNoRecordVO,
   type SerialNoRuleQuery,
   type SerialNoRuleVO
 } from '@/api/recruitment/serialRule';
@@ -185,16 +270,27 @@ type DialogState = {
 
 const loading = ref(false);
 const submitLoading = ref(false);
+const recordLoading = ref(false);
 const total = ref(0);
+const recordTotal = ref(0);
 const ruleList = ref<SerialNoRuleVO[]>([]);
+const recordList = ref<SerialNoRecordVO[]>([]);
 const ids = ref<Array<string | number>>([]);
 const single = ref(true);
 const multiple = ref(true);
+const syncHistoryOnSave = ref(false);
+const recordDateRange = ref<string[]>([]);
+const currentRecordRule = ref<SerialNoRuleVO>();
 
 const queryFormRef = ref<FormInstance>();
 const ruleFormRef = ref<FormInstance>();
 
 const dialog = reactive<DialogState>({
+  visible: false,
+  title: ''
+});
+
+const recordDialog = reactive<DialogState>({
   visible: false,
   title: ''
 });
@@ -208,6 +304,16 @@ const defaultQuery: SerialNoRuleQuery = {
 };
 
 const queryParams = reactive<SerialNoRuleQuery>({ ...defaultQuery });
+
+const defaultRecordQuery: SerialNoRecordQuery = {
+  pageNum: 1,
+  pageSize: 10,
+  businessCode: '',
+  keyword: '',
+  codeScope: 'all'
+};
+
+const recordQuery = reactive<SerialNoRecordQuery>({ ...defaultRecordQuery });
 
 const form = reactive<SerialNoRuleVO>({
   ruleId: undefined,
@@ -247,6 +353,7 @@ const normalizeFormCodes = () => {
 };
 
 const resetForm = () => {
+  syncHistoryOnSave.value = false;
   Object.assign(form, {
     ruleId: undefined,
     businessCode: '',
@@ -303,6 +410,7 @@ const handleUpdate = async (row?: SerialNoRuleVO) => {
   if (!ruleId) return;
   const res = await getSerialRule(ruleId);
   Object.assign(form, res.data || res);
+  syncHistoryOnSave.value = false;
   dialog.title = '修改流水编号规则';
   dialog.visible = true;
 };
@@ -314,7 +422,12 @@ const submitForm = async () => {
   try {
     if (form.ruleId) {
       await updateSerialRule(form);
-      ElMessage.success('修改成功');
+      if (syncHistoryOnSave.value && form.businessCode) {
+        const refreshRes = await refreshSerialRecordCode({ businessCode: form.businessCode, updateExisting: true });
+        ElMessage.success(`修改成功，已更新 ${readCount(refreshRes)} 条历史数据`);
+      } else {
+        ElMessage.success('修改成功');
+      }
     } else {
       await addSerialRule(form);
       ElMessage.success('新增成功');
@@ -346,6 +459,7 @@ const handleStatusChange = async (row: SerialNoRuleVO) => {
 };
 
 const readSerialNo = (payload: any) => payload?.data?.serialNo || payload?.serialNo || '';
+const readCount = (payload: any) => Number(payload?.data?.count ?? payload?.count ?? 0);
 
 const handlePreview = async (row: SerialNoRuleVO) => {
   const res = await previewSerialRule(row);
@@ -357,6 +471,111 @@ const handleNext = async (row: SerialNoRuleVO) => {
   const res = await nextSerialNo(row.businessCode);
   ElMessageBox.alert(readSerialNo(res) || '-', '已生成编号', { confirmButtonText: '知道了' });
   getList();
+};
+
+const openRecordDialog = async (row: SerialNoRuleVO) => {
+  currentRecordRule.value = row;
+  recordDateRange.value = [];
+  Object.assign(recordQuery, {
+    ...defaultRecordQuery,
+    businessCode: row.businessCode || ''
+  });
+  recordDialog.title = `${row.businessName || row.businessCode || ''} 编号数据`;
+  recordDialog.visible = true;
+  await getRecordList();
+};
+
+const applyRecordDateRange = () => {
+  recordQuery.createTimeBegin = recordDateRange.value?.[0] || undefined;
+  recordQuery.createTimeEnd = recordDateRange.value?.[1] || undefined;
+};
+
+const getRecordList = async () => {
+  if (!recordQuery.businessCode) return;
+  applyRecordDateRange();
+  recordLoading.value = true;
+  try {
+    const res = await listSerialRecords(recordQuery);
+    recordList.value = res.rows || [];
+    recordTotal.value = Number(res.total || 0);
+  } finally {
+    recordLoading.value = false;
+  }
+};
+
+const handleRecordQuery = () => {
+  recordQuery.pageNum = 1;
+  getRecordList();
+};
+
+const resetRecordQuery = () => {
+  const businessCode = recordQuery.businessCode;
+  recordDateRange.value = [];
+  Object.assign(recordQuery, {
+    ...defaultRecordQuery,
+    businessCode
+  });
+  handleRecordQuery();
+};
+
+const refreshRecordCodes = async (updateExisting: boolean) => {
+  if (!recordQuery.businessCode) return;
+  const name = currentRecordRule.value?.businessName || currentRecordRule.value?.businessCode || recordQuery.businessCode;
+  const message = updateExisting
+    ? `确认按最新规则更新「${name}」的空编号和历史编码吗？`
+    : `确认按最新规则补齐「${name}」未编号的数据吗？`;
+  await ElMessageBox.confirm(message, '提示', { type: 'warning' });
+  const res = await refreshSerialRecordCode({ businessCode: recordQuery.businessCode, updateExisting });
+  ElMessage.success(`已处理 ${readCount(res)} 条数据`);
+  await getRecordList();
+  getList();
+};
+
+const handleEditRecordCode = async (row: SerialNoRecordVO) => {
+  const result = await ElMessageBox.prompt('请输入新的业务编号', '自定义修改编号', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputValue: row.serialNo || '',
+    inputValidator: (value) => {
+      const nextValue = value?.trim() || '';
+      return (!!nextValue && nextValue.length <= 64) || '请输入 1-64 位编号';
+    }
+  });
+  await updateSerialRecordCode({
+    businessCode: recordQuery.businessCode,
+    recordId: row.recordId,
+    serialNo: result.value.trim()
+  });
+  ElMessage.success('修改成功');
+  getRecordList();
+};
+
+const recordTypeLabel = (value?: string) => {
+  const map: Record<string, string> = {
+    COMPANY: '企业',
+    JOB: '岗位',
+    JOB_SEEKER: '求职人',
+    APPLY: '投递',
+    TASK: '履约任务',
+    ORDER: '台账订单',
+    INVOICE: '发票'
+  };
+  return value ? map[value] || value : '-';
+};
+
+const codeStatusLabel = (value?: string) => {
+  const map: Record<string, string> = {
+    current: '最新规则',
+    history: '历史编码',
+    empty: '未编号'
+  };
+  return value ? map[value] || value : '-';
+};
+
+const codeStatusType = (value?: string) => {
+  if (value === 'current') return 'success';
+  if (value === 'history') return 'warning';
+  return 'info';
 };
 
 onMounted(() => {

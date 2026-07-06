@@ -292,9 +292,11 @@
             <el-descriptions-item label="求职状态">{{ displayJobStatus(currentUser) }}</el-descriptions-item>
             <el-descriptions-item label="到岗时间">{{ currentUser.expectedDate || '-' }}</el-descriptions-item>
             <el-descriptions-item label="工作年限">{{ currentUser.workYears != null ? currentUser.workYears + '年' : '-' }}</el-descriptions-item>
+            <el-descriptions-item label="可工作时段">{{ displayAvailableTimeSlots(currentUser) }}</el-descriptions-item>
+            <el-descriptions-item label="每周可出勤">{{ displayWeeklyHours(currentUser) }}</el-descriptions-item>
             <el-descriptions-item label="期望薪资" :span="2">{{ displaySalary(currentUser) }}</el-descriptions-item>
-            <el-descriptions-item label="期望行业" :span="2">{{ currentUser.expectedIndustry || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="岗位偏好备注" :span="2">{{ currentUser.jobPreferenceRemark || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="期望行业" :span="2">{{ displayExpectedIndustry(currentUser) }}</el-descriptions-item>
+            <el-descriptions-item label="岗位偏好备注" :span="2">{{ displayJobPreferenceRemark(currentUser) }}</el-descriptions-item>
             <el-descriptions-item label="技能标签" :span="2">{{ currentUser.skills || '-' }}</el-descriptions-item>
             <el-descriptions-item label="个人总结" :span="2">{{ currentUser.summary || '-' }}</el-descriptions-item>
           </el-descriptions>
@@ -335,7 +337,14 @@
           <div class="resume-other-grid">
             <div v-for="row in resumeOtherRows(currentUser)" :key="row.label" class="resume-other-row">
               <span class="resume-other-label">{{ row.label }}</span>
-              <span class="resume-other-value">{{ row.value }}</span>
+              <span class="resume-other-value">
+                <template v-if="row.url">
+                  <span class="resume-other-link-text">{{ row.value }}</span>
+                  <el-button link type="primary" icon="View" @click="viewResumeExtra(row)">查看</el-button>
+                  <el-button link type="primary" icon="Download" @click="downloadResumeExtra(row)">下载</el-button>
+                </template>
+                <template v-else>{{ row.value }}</template>
+              </span>
             </div>
           </div>
         </div>
@@ -714,6 +723,8 @@ type ResumeSection = {
 type ResumeOtherRow = {
   label: string;
   value: string;
+  url?: string;
+  fileName?: string;
 };
 
 // 求职者展示字段统一从最新简历优先取值；账号字段只作为无简历或空值时的兜底。
@@ -796,6 +807,28 @@ function displaySalary(row: RecruitmentUserVO | null) {
   return `${min ?? max}${unit}`;
 }
 
+function displayAvailableTimeSlots(row: RecruitmentUserVO | null) {
+  if (!row?.resumeId) return '-';
+  return displayStoredValue(row.availableTimeSlots) || firstOtherInfoValue(row, ['availableTimeSlots', 'worktime', 'workTime', '可工作时段']) || '-';
+}
+
+function displayWeeklyHours(row: RecruitmentUserVO | null) {
+  if (!row?.resumeId) return '-';
+  const value = row.weeklyHours ?? firstOtherInfoValue(row, ['weeklyHours', 'weeklyHoursText', 'hours', '每周可出勤']);
+  const text = displayStoredValue(value);
+  return text ? (/\d$/.test(text) ? `${text}小时` : text) : '-';
+}
+
+function displayExpectedIndustry(row: RecruitmentUserVO | null) {
+  if (!row?.resumeId) return '-';
+  return displayStoredValue(row.expectedIndustry) || firstOtherInfoValue(row, ['expectedIndustry', 'industry', 'expectIndustry', '期望行业']) || '-';
+}
+
+function displayJobPreferenceRemark(row: RecruitmentUserVO | null) {
+  if (!row?.resumeId) return '-';
+  return displayStoredValue(row.jobPreferenceRemark) || firstOtherInfoValue(row, ['jobPreferenceRemark', 'preferenceRemark', 'positionPreferenceRemark', '岗位偏好备注']) || '-';
+}
+
 function displayEducationValue(value?: unknown) {
   const text = displayText(value);
   return educationMap[text] || text;
@@ -845,6 +878,15 @@ function displayStoredValue(value: unknown): string {
 function pickText(source: ResumeJsonRecord, keys: string[]) {
   for (const key of keys) {
     const value = displayText(source[key]);
+    if (value) return value;
+  }
+  return '';
+}
+
+function firstOtherInfoValue(row: RecruitmentUserVO | null, keys: string[]) {
+  if (!row?.otherInfo) return '';
+  for (const item of parseResumeList(row.otherInfo)) {
+    const value = pickText(item, keys);
     if (value) return value;
   }
   return '';
@@ -942,20 +984,30 @@ function resumeOtherRows(row: RecruitmentUserVO | null): ResumeOtherRow[] {
   const rows: ResumeOtherRow[] = [];
   const labelMap: Record<string, string> = {
     portfolio: '作品集',
+    portfolioUrl: '作品集',
     github: 'GitHub',
+    githubUrl: 'GitHub',
     volunteer: '志愿者',
-    honor: '荣誉'
+    volunteerExperience: '志愿者',
+    honor: '荣誉',
+    awards: '荣誉'
   };
-  const addRow = (label: string, value: unknown) => {
+  const skippedOtherKeys = new Set(['expectedIndustry', 'industry', 'expectIndustry', 'jobPreferenceRemark', 'preferenceRemark', 'positionPreferenceRemark']);
+  const addRow = (label: string, value: unknown, urlValue?: unknown) => {
     const text = displayStoredValue(value);
     if (!text || text === 'null' || text === 'undefined') return;
+    const urlText = displayStoredValue(urlValue ?? value);
+    const url = isLinkLikeValue(urlText) ? normalizeFileUrl(urlText) : undefined;
     if (!rows.some((rowItem) => rowItem.label === label && rowItem.value === text)) {
-      rows.push({ label, value: text });
+      rows.push({ label, value: text, url, fileName: url ? getAttachmentName(urlText) : undefined });
     }
   };
 
   parseResumeList(row.otherInfo).forEach((item) => {
-    Object.entries(item).forEach(([key, value]) => addRow(labelMap[key] || key, value));
+    Object.entries(item).forEach(([key, value]) => {
+      if (skippedOtherKeys.has(key)) return;
+      addRow(labelMap[key] || key, value);
+    });
   });
   addRow('作品集', row.portfolioUrl);
   addRow('GitHub', row.githubUrl);
@@ -1113,10 +1165,65 @@ function getAttachmentName(url?: string) {
 }
 
 function normalizeFileUrl(url: string) {
-  if (/^(https?:)?\/\//i.test(url) || url.startsWith('/') || url.startsWith('blob:') || url.startsWith('data:')) {
-    return url;
+  const trimmed = String(url || '').trim();
+  if (!trimmed) return '';
+  if (/^(https?:)?\/\//i.test(trimmed) || trimmed.startsWith('/') || trimmed.startsWith('blob:') || trimmed.startsWith('data:')) {
+    return trimmed;
   }
-  return `/${url}`;
+  if (/^www\./i.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return `/${trimmed}`;
+}
+
+function isLinkLikeValue(value?: string) {
+  return !!value && (/^(https?:)?\/\//i.test(value) || /^www\./i.test(value) || value.startsWith('/') || value.startsWith('blob:') || value.startsWith('data:'));
+}
+
+function getFileExtension(url?: string, name?: string) {
+  const source = (name || url || '').split('?')[0].split('#')[0];
+  const fileName = source.substring(source.lastIndexOf('/') + 1);
+  const dotIndex = fileName.lastIndexOf('.');
+  return dotIndex >= 0 ? fileName.substring(dotIndex + 1).toLowerCase() : '';
+}
+
+function isPreviewableFile(url?: string, name?: string) {
+  const ext = getFileExtension(url, name);
+  return !ext || ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'txt'].includes(ext);
+}
+
+function triggerDownload(url: string, fileName: string) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName || getAttachmentName(url);
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+async function downloadFileUrl(rawUrl: string, fileName?: string) {
+  const url = normalizeFileUrl(rawUrl);
+  const safeName = fileName || getAttachmentName(rawUrl);
+  try {
+    const response = await fetch(url, { credentials: url.startsWith('/') ? 'include' : 'omit' });
+    if (!response.ok) throw new Error('download failed');
+    const blobUrl = URL.createObjectURL(await response.blob());
+    triggerDownload(blobUrl, safeName);
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  } catch {
+    triggerDownload(url, safeName);
+  }
+}
+
+function viewFileUrl(rawUrl: string, fileName?: string) {
+  const url = normalizeFileUrl(rawUrl);
+  if (!isPreviewableFile(url, fileName)) {
+    void downloadFileUrl(rawUrl, fileName);
+    return;
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function viewResumeAttachment(row: RecruitmentUserVO | null) {
@@ -1124,7 +1231,7 @@ function viewResumeAttachment(row: RecruitmentUserVO | null) {
     ElMessage.warning('暂无简历附件');
     return;
   }
-  window.open(normalizeFileUrl(row.resumeAttachmentUrl), '_blank', 'noopener,noreferrer');
+  viewFileUrl(row.resumeAttachmentUrl, row.resumeAttachmentName || getAttachmentName(row.resumeAttachmentUrl));
 }
 
 function downloadResumeAttachment(row: RecruitmentUserVO | null) {
@@ -1132,14 +1239,17 @@ function downloadResumeAttachment(row: RecruitmentUserVO | null) {
     ElMessage.warning('暂无简历附件');
     return;
   }
-  const link = document.createElement('a');
-  link.href = normalizeFileUrl(row.resumeAttachmentUrl);
-  link.download = row.resumeAttachmentName || getAttachmentName(row.resumeAttachmentUrl);
-  link.target = '_blank';
-  link.rel = 'noopener noreferrer';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  void downloadFileUrl(row.resumeAttachmentUrl, row.resumeAttachmentName || getAttachmentName(row.resumeAttachmentUrl));
+}
+
+function viewResumeExtra(row: ResumeOtherRow) {
+  if (!row.url) return;
+  viewFileUrl(row.url, row.fileName || row.value);
+}
+
+function downloadResumeExtra(row: ResumeOtherRow) {
+  if (!row.url) return;
+  void downloadFileUrl(row.url, row.fileName || row.value);
 }
 
 function openSilence(row: RecruitmentUserVO) {
@@ -1784,6 +1894,9 @@ function closeImportDialog() {
   min-width: 0;
   overflow-wrap: anywhere;
   color: #303133;
+}
+.resume-other-link-text {
+  margin-right: 8px;
 }
 
 .text-muted {
