@@ -89,7 +89,8 @@ import TopBar from './TopBar';
 const appStore = useAppStore();
 const userStore = useUserStore();
 const settingsStore = useSettingsStore();
-const noticeStore = storeToRefs(useNoticeStore());
+const noticeStoreRaw = useNoticeStore();
+const noticeStore = storeToRefs(noticeStoreRaw);
 const newNotice = ref(<number>0);
 const adminTodoCount = ref(0);
 let adminTodoTimer: ReturnType<typeof setInterval> | undefined;
@@ -187,9 +188,16 @@ const refreshAdminTodoCount = async () => {
     const res = await getWorklist({ silent: true });
     const data = res.data || {};
     adminTodoCount.value = Number(data.pendingCompanies || 0) + Number(data.pendingJobs || 0);
+    noticeStoreRaw.normalizeTodoReadBaseline(adminTodoCount.value);
   } catch (error) {
     console.warn('刷新运营待办数量失败', error);
   }
+};
+
+const calcNoticeBadgeCount = () => {
+  const unreadNoticeCount = noticeStore.state.value.notices.filter((item: any) => !item.read).length;
+  const unreadTodoCount = Math.max(0, adminTodoCount.value - Number(noticeStore.state.value.todoReadBaseline || 0));
+  return unreadNoticeCount + unreadTodoCount;
 };
 
 onMounted(() => {
@@ -207,14 +215,21 @@ onUnmounted(() => {
 //用深度监听 消息
 watch(
   () => noticeStore.state.value.notices,
-  (newVal) => {
-    newNotice.value = newVal.filter((item: any) => !item.read).length + adminTodoCount.value;
+  () => {
+    newNotice.value = calcNoticeBadgeCount();
   },
   { deep: true }
 );
 
-watch(adminTodoCount, (count) => {
-  newNotice.value = noticeStore.state.value.notices.filter((item: any) => !item.read).length + count;
+watch(
+  () => noticeStore.state.value.todoReadBaseline,
+  () => {
+    newNotice.value = calcNoticeBadgeCount();
+  }
+);
+
+watch(adminTodoCount, () => {
+  newNotice.value = calcNoticeBadgeCount();
 });
 </script>
 

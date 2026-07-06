@@ -2,7 +2,7 @@
   <div v-loading="state.loading" class="layout-navbars-breadcrumb-user-news">
     <div class="head-box">
       <div class="head-box-title">运营待办<span v-if="todoTotal > 0">（{{ todoTotal }}）</span></div>
-      <div class="head-box-btn" @click="readAll">全部已读</div>
+      <div class="head-box-btn" @click="handleReadAll">全部已读</div>
     </div>
     <div v-loading="state.loading" class="content-box">
       <template v-if="todoItems.length > 0">
@@ -39,7 +39,6 @@ import { getWorklist } from '@/api/recruitment';
 import router from '@/router';
 
 const noticeStore = useNoticeStore();
-const { readAll } = useNoticeStore();
 
 // 定义变量内容
 const state = reactive({
@@ -97,6 +96,11 @@ const onNewsClick = (item: any) => {
 
 const goTodo = (path: string) => {
   router.push(path);
+};
+
+const handleReadAll = () => {
+  noticeStore.readAll(todoTotal.value);
+  newsList.value = noticeStore.state.notices;
 };
 
 onMounted(() => {

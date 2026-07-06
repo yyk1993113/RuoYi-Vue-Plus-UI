@@ -10,7 +10,8 @@ interface NoticeItem {
 
 export const useNoticeStore = defineStore('notice', () => {
   const state = reactive({
-    notices: [] as NoticeItem[]
+    notices: [] as NoticeItem[],
+    todoReadBaseline: 0
   });
 
   const addNotice = (notice: NoticeItem) => {
@@ -22,20 +23,30 @@ export const useNoticeStore = defineStore('notice', () => {
   };
 
   //实现全部已读
-  const readAll = () => {
+  const readAll = (todoTotal = 0) => {
     state.notices.forEach((item: any) => {
       item.read = true;
     });
+    state.todoReadBaseline = Math.max(state.todoReadBaseline, Number(todoTotal) || 0);
+  };
+
+  const normalizeTodoReadBaseline = (todoTotal = 0) => {
+    const total = Number(todoTotal) || 0;
+    if (total < state.todoReadBaseline) {
+      state.todoReadBaseline = total;
+    }
   };
 
   const clearNotice = () => {
     state.notices = [];
+    state.todoReadBaseline = 0;
   };
   return {
     state,
     addNotice,
     removeNotice,
     readAll,
+    normalizeTodoReadBaseline,
     clearNotice
   };
 });

@@ -931,21 +931,11 @@ function handleImport() {
 }
 
 function downloadExcelTemplate() {
-  downloadStaticTemplate('recruitment_user_import_template.xlsx', `求职者导入模板_${new Date().getTime()}.xlsx`);
+  download('/admin/recruitment/user/importTemplate', {}, `求职者导入模板_${new Date().getTime()}.xlsx`);
 }
 
 function downloadWordTemplate() {
-  downloadStaticTemplate('recruitment_user_import_template.docx', `求职者Word导入模板_${new Date().getTime()}.docx`);
-}
-
-function downloadStaticTemplate(filePath: string, fileName: string) {
-  const baseUrl = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
-  const link = document.createElement('a');
-  link.href = `${baseUrl}templates/recruitment/${filePath}`;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  download('/admin/recruitment/user/importTemplate/word', {}, `求职者Word导入模板_${new Date().getTime()}.doc`);
 }
 
 function resetUploadState() {
