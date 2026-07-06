@@ -644,16 +644,22 @@ const baseUrl = '/admin/recruitment';
 
 export interface PromoterVO {
   promoterId?: string | number;
+  ownerUserId?: string | number;
   name?: string;
   phonenumber?: string;
   promotionCode?: string;
   promotionPage?: string;
   promotionLink?: string;
+  sourceType?: string;
   identityType?: string;
   roleName?: string;
   companyCount?: number;
   jobSeekerCount?: number;
   status?: string;
+  auditStatus?: string;
+  auditStatusName?: string;
+  auditTime?: string;
+  auditRemark?: string;
   remark?: string;
   createTime?: string;
 }
@@ -664,8 +670,10 @@ export interface PromoterQuery {
   name?: string;
   phonenumber?: string;
   identityType?: string;
+  sourceType?: string;
   roleName?: string;
   status?: string;
+  auditStatus?: string;
   params?: Record<string, any>;
 }
 
@@ -1007,6 +1015,81 @@ export function listPromoterWorkbenchDetail(query: PromotionAttributionQuery & {
   return request.get<any>(`${baseUrl}/promoter/workbench/detail/list`, { params: query });
 }
 
+// ---------- 推广奖励 ----------
+
+export interface PromotionRewardRuleVO {
+  ruleId?: string | number;
+  eventType?: string;
+  eventName?: string;
+  rewardAmount?: number;
+  status?: string;
+  remark?: string;
+  createTime?: string;
+  updateTime?: string;
+}
+
+export interface PromotionRewardVO {
+  rewardId?: string | number;
+  promoterId?: string | number;
+  promoterName?: string;
+  promoterPhone?: string;
+  eventType?: string;
+  eventName?: string;
+  rewardAmount?: number;
+  status?: string;
+  statusName?: string;
+  targetName?: string;
+  maskedPhone?: string;
+  createTime?: string;
+  settleTime?: string;
+  settleRemark?: string;
+}
+
+export interface PromotionRewardQuery {
+  pageNum?: number;
+  pageSize?: number;
+  promoterId?: string | number;
+  keyword?: string;
+  eventType?: string;
+  status?: string;
+  beginTime?: string;
+  endTime?: string;
+}
+
+export interface PromotionRewardSettleForm {
+  rewardIds: Array<string | number>;
+  status: '1' | '2';
+  remark?: string;
+}
+
+export interface PromotionPromoterAuditForm {
+  promoterId: string | number;
+  auditStatus: '1' | '2';
+  auditRemark?: string;
+}
+
+export function listPromotionRewardRules() {
+  return request.get<PromotionRewardRuleVO[]>(`${baseUrl}/promotion/rule/list`);
+}
+
+export function savePromotionRewardRule(data: PromotionRewardRuleVO) {
+  return data.ruleId
+    ? request.put<PromotionRewardRuleVO>(`${baseUrl}/promotion/rule`, data)
+    : request.post<PromotionRewardRuleVO>(`${baseUrl}/promotion/rule`, data);
+}
+
+export function listPromotionRewards(query: PromotionRewardQuery) {
+  return request.get<any>(`${baseUrl}/promotion/reward/list`, { params: query });
+}
+
+export function settlePromotionRewards(data: PromotionRewardSettleForm) {
+  return request.post(`${baseUrl}/promotion/reward/settle`, data);
+}
+
+export function auditPromotionPromoter(data: PromotionPromoterAuditForm) {
+  return request.post(`${baseUrl}/promotion/promoter/audit`, data);
+}
+
 // ---------- 企业管理 ----------
 
 export function listCompany(query: CompanyQuery) {
@@ -1318,6 +1401,10 @@ export interface ApplyDetailJobSeeker {
   userName?: string;
   nickName?: string;
   realName?: string;
+  avatar?: string;
+  avatarUrl?: string;
+  resumeAvatarOssId?: number | string;
+  resumeAvatarUrl?: string;
   phonenumber?: string;
   email?: string;
   sex?: string;

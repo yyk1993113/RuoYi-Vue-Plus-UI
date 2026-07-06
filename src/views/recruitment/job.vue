@@ -767,7 +767,7 @@
         <el-table-column label="求职者信息" min-width="160">
           <template #default="{ row }">
             <div class="user-cell">
-              <el-avatar :size="34" :src="row.avatarUrl || row.avatar" style="background: #2b7fff; flex-shrink: 0">
+              <el-avatar :size="34" :src="candidateAvatarSrc(row)" style="background: #2b7fff; flex-shrink: 0">
                 {{ (row.userName || 'U').charAt(0) }}
               </el-avatar>
               <div class="user-detail">
@@ -1952,6 +1952,16 @@ function handleSelectApplyUsers(row: any) {
 
 function displayPhone(row: any): string {
   return row?.phone || '-';
+}
+
+function imageUrl(value?: string | number): string {
+  const url = String(value || '').trim();
+  return /^(https?:\/\/|\/)/.test(url) ? url : '';
+}
+
+// 投递人员头像使用后端可访问 URL；旧头像 ID 不是图片地址，必须保留文字兜底。
+function candidateAvatarSrc(row: any): string {
+  return imageUrl(row?.resumeAvatarUrl || row?.avatarUrl || row?.avatar);
 }
 
 async function submitAudit() {

@@ -150,7 +150,7 @@
         <el-table-column label="求职者信息" min-width="160">
           <template #default="{ row }">
             <div class="user-cell">
-              <el-avatar :size="34" :src="row.avatarUrl || row.avatar" style="background: #2b7fff; flex-shrink: 0">
+              <el-avatar :size="34" :src="candidateAvatarSrc(row)" style="background: #2b7fff; flex-shrink: 0">
                 {{ (row.userName || 'U').charAt(0) }}
               </el-avatar>
               <div class="user-detail">
@@ -214,7 +214,7 @@
         <!-- 头部概览：求职者 + 岗位 + 当前状态 -->
         <div class="header-section">
           <div class="header-left">
-            <el-avatar :size="70" class="user-avatar">
+            <el-avatar :size="70" :src="candidateAvatarSrc(seeker)" class="user-avatar">
               {{ (seeker.realName || seeker.userName || 'U').charAt(0) }}
             </el-avatar>
             <div class="user-info">
@@ -527,6 +527,16 @@ const job = computed(() => detail.value?.job || ({} as NonNullable<ApplyDetailVO
 
 function displayPhone(row?: { phone?: string }) {
   return row?.phone || '-';
+}
+
+function imageUrl(value?: string | number) {
+  const url = String(value || '').trim();
+  return /^(https?:\/\/|\/)/.test(url) ? url : '';
+}
+
+// 候选人头像优先使用后端签好的 URL；过滤历史数字 OSS ID，避免 Element Avatar 发起无效请求。
+function candidateAvatarSrc(row?: { resumeAvatarUrl?: string; avatarUrl?: string; avatar?: string | number }) {
+  return imageUrl(row?.resumeAvatarUrl || row?.avatarUrl || row?.avatar);
 }
 
 async function loadData() {

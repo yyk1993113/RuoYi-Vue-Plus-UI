@@ -10,7 +10,7 @@
       <!-- 头部概览：求职者 + 岗位 + 当前状态 -->
       <div class="header-section">
         <div class="header-left">
-          <el-avatar :size="70" class="user-avatar">
+          <el-avatar :size="70" :src="candidateAvatarSrc(seeker)" class="user-avatar">
             {{ (seeker.realName || seeker.userName || 'U').charAt(0) }}
           </el-avatar>
           <div class="user-info">
@@ -260,6 +260,16 @@ const job = computed(() => detail.value?.job || ({} as NonNullable<ApplyDetailVO
 
 function displayPhone(row?: { phone?: string }) {
   return row?.phone || '-';
+}
+
+function imageUrl(value?: string | number) {
+  const url = String(value || '').trim();
+  return /^(https?:\/\/|\/)/.test(url) ? url : '';
+}
+
+// 详情头像来自 apply2/detail 的 jobSeeker 聚合字段，过滤旧数字 ID 保持文字兜底可用。
+function candidateAvatarSrc(row?: { resumeAvatarUrl?: string; avatarUrl?: string; avatar?: string | number }) {
+  return imageUrl(row?.resumeAvatarUrl || row?.avatarUrl || row?.avatar);
 }
 
 /** 对外暴露：按 applyId 打开并加载详情 */
