@@ -139,12 +139,13 @@
         <el-table-column label="用户信息" min-width="190">
           <template #default="{ row }">
             <div class="user-info">
-              <el-avatar :src="row.avatarUrl" :size="40" fit="cover">
-                {{ (row.nickName || row.userName || '?').charAt(0) }}
+              <el-avatar :src="displayAvatar(row)" :size="40" fit="cover">
+                {{ avatarInitial(row) }}
               </el-avatar>
               <div class="user-detail">
                 <div class="name">
-                  {{ row.nickName || row.userName || '-' }}
+                  {{ displayUserName(row) }}
+                  <el-tag v-if="!row.resumeId" type="info" size="small" style="margin-left: 4px">暂无简历</el-tag>
                   <el-tag v-if="row.status === '1'" type="danger" size="small" style="margin-left: 4px">停用</el-tag>
                 </div>
                 <div class="sub">账号: {{ row.userName || '-' }}</div>
@@ -159,7 +160,10 @@
             <div class="contact-info">
               <div class="contact-item">
                 <el-icon><Phone /></el-icon>
-                <span>{{ row.phone || row.phonenumber || '-' }}</span>
+                <span>{{ displayPrimaryPhone(row) }}</span>
+              </div>
+              <div v-if="displayAccountPhone(row) !== displayPrimaryPhone(row) && displayAccountPhone(row) !== '-'" class="contact-item muted">
+                <span>授权: {{ displayAccountPhone(row) }}</span>
               </div>
               <div class="contact-item" v-if="row.email">
                 <el-icon><Message /></el-icon>
@@ -173,8 +177,7 @@
              双重身份用户的 userType 可在详情弹窗查看） -->
         <el-table-column label="性别" width="70" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.sex === '0'" size="small" plain>男</el-tag>
-            <el-tag v-else-if="row.sex === '1'" size="small" plain>女</el-tag>
+            <el-tag v-if="displayPrimarySex(row) !== '-'" size="small" plain>{{ displayPrimarySex(row) }}</el-tag>
             <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
@@ -253,62 +256,134 @@
     </el-card>
 
     <!-- ========== 区块四：详情对话框 ========== -->
-    <el-dialog v-model="detailVisible" title="求职者详情" width="720px" append-to-body>
-      <el-descriptions :column="2" border v-if="currentUser">
-        <el-descriptions-item label="用户ID">{{ currentUser.userId }}</el-descriptions-item>
-        <el-descriptions-item label="用户类型">
-          <!-- C/B 是招聘业务对求职者/企业的标记;app_user/sys_user 是 RuoYi 框架自带的 sys_user.user_type 值。
-               本页是求职者管理,app端注册用户(app_user)本质即求职者,与 C 统一显示「求职者」;sys_user 为后台系统用户 -->
-          <el-tag v-if="currentUser.userType === 'C' || currentUser.userType === 'app_user'" type="success">求职者</el-tag>
-          <el-tag v-else-if="currentUser.userType === 'B'" type="warning">企业</el-tag>
-          <el-tag v-else-if="currentUser.userType === 'sys_user'" type="info">系统用户</el-tag>
-          <el-tag v-else>{{ currentUser.userType || '-' }}</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="昵称">{{ currentUser.nickName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="账号">{{ currentUser.userName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="性别">
-          <span v-if="currentUser.sex === '0'">男</span>
-          <span v-else-if="currentUser.sex === '1'">女</span>
-          <span v-else>-</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="账号状态">
-          <el-tag v-if="currentUser.status === '0'" type="success">正常</el-tag>
-          <el-tag v-else type="danger">停用</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="手机号" :span="2">{{ currentUser.phone || currentUser.phonenumber || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="邮箱" :span="2">{{ currentUser.email || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="登录IP">{{ currentUser.loginIp || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="最后登录">{{ currentUser.loginDate || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="注册时间" :span="2">{{ currentUser.createTime || '-' }}</el-descriptions-item>
+    <el-dialog v-model="detailVisible" title="求职者详情" width="880px" append-to-body>
+      <template v-if="currentUser">
+        <div class="detail-section">
+          <div class="detail-section-title">最新简历</div>
+          <div class="resume-profile-header">
+            <el-avatar :src="displayAvatar(currentUser)" :size="64" fit="cover">
+              {{ avatarInitial(currentUser) }}
+            </el-avatar>
+            <div class="resume-profile-main">
+              <div class="resume-profile-name">{{ currentUser.realName || displayUserName(currentUser) }}</div>
+              <div class="resume-profile-meta">{{ currentUser.jobSeekerNo || currentUser.userId || '-' }}</div>
+            </div>
+            <el-tag :type="resumeCompletenessType(currentUser)" size="small">{{ displayResumeCompleteness(currentUser) }}</el-tag>
+          </div>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="姓名">{{ currentUser.realName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="性别">{{ displayResumeSex(currentUser) }}</el-descriptions-item>
+            <el-descriptions-item label="简历手机号">{{ currentUser.resumePhone || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="微信号">{{ currentUser.wechat || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="最高学历">{{ displayEducation(currentUser) }}</el-descriptions-item>
+            <el-descriptions-item label="所在城市">{{ currentUser.city || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="出生日期">{{ currentUser.birthDate || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="年龄">{{ currentUser.age != null ? currentUser.age : '-' }}</el-descriptions-item>
+            <el-descriptions-item label="电子邮箱" :span="2">{{ currentUser.resumeEmail || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
 
-        <!-- 投递统计（汇总行） -->
-        <el-descriptions-item label="投递统计" :span="2">
-          <div class="detail-stats">
+        <div class="detail-section">
+          <div class="detail-section-title">求职意向</div>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="求职意向">{{ currentUser.expectPosition || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="期望城市">{{ currentUser.expectCity || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="求职类型">{{ displayJobType(currentUser) }}</el-descriptions-item>
+            <el-descriptions-item label="求职状态">{{ displayJobStatus(currentUser) }}</el-descriptions-item>
+            <el-descriptions-item label="到岗时间">{{ currentUser.expectedDate || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="工作年限">{{ currentUser.workYears != null ? currentUser.workYears + '年' : '-' }}</el-descriptions-item>
+            <el-descriptions-item label="期望薪资" :span="2">{{ displaySalary(currentUser) }}</el-descriptions-item>
+            <el-descriptions-item label="期望行业" :span="2">{{ currentUser.expectedIndustry || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="岗位偏好备注" :span="2">{{ currentUser.jobPreferenceRemark || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="技能标签" :span="2">{{ currentUser.skills || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="个人总结" :span="2">{{ currentUser.summary || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-title">简历附件</div>
+          <div v-if="currentUser.resumeAttachmentUrl" class="resume-attachment resume-attachment-box">
+            <el-icon><Document /></el-icon>
+            <span class="resume-file-name">{{ currentUser.resumeAttachmentName || getAttachmentName(currentUser.resumeAttachmentUrl) }}</span>
+            <el-button link type="primary" icon="View" @click="viewResumeAttachment(currentUser)">查看</el-button>
+            <el-button link type="primary" icon="Download" @click="downloadResumeAttachment(currentUser)">下载</el-button>
+          </div>
+          <span v-else class="text-muted">-</span>
+        </div>
+
+        <div v-for="section in resumeListSections(currentUser)" :key="section.title" class="detail-section">
+          <div class="detail-section-title">{{ section.title }}</div>
+          <div class="resume-list">
+            <div v-for="(item, index) in section.items" :key="index" class="resume-list-item">
+              <div class="resume-item-title">{{ item.title }}</div>
+              <div v-if="item.meta" class="resume-item-meta">{{ item.meta }}</div>
+              <div v-if="item.desc" class="resume-item-desc">{{ item.desc }}</div>
+              <div v-if="item.extra" class="resume-item-extra">{{ item.extra }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="resumeCertificateTags(currentUser).length" class="detail-section">
+          <div class="detail-section-title">技能证书</div>
+          <div class="resume-tags">
+            <el-tag v-for="tag in resumeCertificateTags(currentUser)" :key="tag" type="info" effect="plain">{{ tag }}</el-tag>
+          </div>
+        </div>
+
+        <div v-if="resumeOtherRows(currentUser).length" class="detail-section">
+          <div class="detail-section-title">其他补充</div>
+          <div class="resume-other-grid">
+            <div v-for="row in resumeOtherRows(currentUser)" :key="row.label" class="resume-other-row">
+              <span class="resume-other-label">{{ row.label }}</span>
+              <span class="resume-other-value">{{ row.value }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-title">账号信息</div>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="用户ID">{{ currentUser.userId }}</el-descriptions-item>
+            <el-descriptions-item label="用户类型">
+              <!-- C/B 是招聘业务对求职者/企业的标记;app_user/sys_user 是 RuoYi 框架自带的 sys_user.user_type 值。
+                   本页是求职者管理,app端注册用户(app_user)本质即求职者,与 C 统一显示「求职者」;sys_user 为后台系统用户 -->
+              <el-tag v-if="currentUser.userType === 'C' || currentUser.userType === 'app_user'" type="success">求职者</el-tag>
+              <el-tag v-else-if="currentUser.userType === 'B'" type="warning">企业</el-tag>
+              <el-tag v-else-if="currentUser.userType === 'sys_user'" type="info">系统用户</el-tag>
+              <el-tag v-else>{{ currentUser.userType || '-' }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="昵称">{{ currentUser.nickName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="账号">{{ currentUser.userName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="账号状态">
+              <el-tag v-if="currentUser.status === '0'" type="success">正常</el-tag>
+              <el-tag v-else type="danger">停用</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="授权手机号">{{ displayAccountPhone(currentUser) }}</el-descriptions-item>
+            <el-descriptions-item label="登录IP">{{ currentUser.loginIp || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="最后登录">{{ currentUser.loginDate || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="注册时间" :span="2">{{ currentUser.createTime || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="禁言状态">
+              <el-tag v-if="currentUser.isRecruitmentSilenced === '1'" type="danger">已禁言</el-tag>
+              <el-tag v-else type="success">正常</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="禁言原因">{{ currentUser.silenceReason || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="禁言时间">{{ currentUser.silenceTime || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="备注" :span="2">{{ currentUser.remark || '暂无' }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <!-- 投递统计仍按账号 userId 聚合；简历资料与账号信息分开展示，避免来源混淆。 -->
+        <div class="detail-section">
+          <div class="detail-section-title">投递统计</div>
+          <div class="detail-stats detail-stats-standalone">
             <span class="detail-stat-chip total" @click="handleViewApplies(currentUser)">投递 {{ currentUser.totalApplies || 0 }}</span>
             <span class="detail-stat-chip pending" @click="handleViewApplies(currentUser, '0')">待处理 {{ currentUser.pendingApplies || 0 }}</span>
             <span class="detail-stat-chip interview" @click="handleViewApplies(currentUser, '1')">面试 {{ currentUser.interviewApplies || 0 }}</span>
             <span class="detail-stat-chip hired" @click="handleViewApplies(currentUser, '2')">录用 {{ currentUser.hiredApplies || 0 }}</span>
             <span class="detail-stat-chip rejected" @click="handleViewApplies(currentUser, '3')">拒绝 {{ currentUser.rejectedApplies || 0 }}</span>
           </div>
-        </el-descriptions-item>
-        <el-descriptions-item label="简历附件" :span="2">
-          <div v-if="currentUser.resumeAttachmentUrl" class="resume-attachment">
-            <el-icon><Document /></el-icon>
-            <span class="resume-file-name">{{ currentUser.resumeAttachmentName || getAttachmentName(currentUser.resumeAttachmentUrl) }}</span>
-            <el-button link type="primary" icon="View" @click="viewResumeAttachment(currentUser)">查看</el-button>
-            <el-button link type="primary" icon="Download" @click="downloadResumeAttachment(currentUser)">下载</el-button>
-          </div>
-          <span v-else>-</span>
-        </el-descriptions-item>
-
-        <el-descriptions-item label="禁言状态">
-          <el-tag v-if="currentUser.isRecruitmentSilenced === '1'" type="danger">已禁言</el-tag>
-          <el-tag v-else type="success">正常</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="禁言原因">{{ currentUser.silenceReason || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="禁言时间">{{ currentUser.silenceTime || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="备注" :span="2">{{ currentUser.remark || '暂无' }}</el-descriptions-item>
-      </el-descriptions>
+        </div>
+      </template>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
         <el-button type="danger" @click="openSilence(currentUser)" v-if="currentUser?.isRecruitmentSilenced !== '1'"> 禁言该用户 </el-button>
@@ -594,8 +669,303 @@ const stats = reactive({
 // 全局累计面试数（来自表格数据）
 const totalInterviews = computed(() => tableData.value.reduce((sum, u) => sum + (u.interviewApplies || 0), 0));
 
+const salaryUnitMap: Record<string, string> = {
+  '1': '/月',
+  '2': '/次',
+  '3': '/小时',
+  '0': '/天'
+};
+
+const educationMap: Record<string, string> = {
+  '0': '学历不限',
+  '1': '初中',
+  '2': '高中',
+  '3': '中专',
+  '4': '大专',
+  '5': '本科',
+  '6': '硕士',
+  '7': '博士'
+};
+
+const jobTypeMap: Record<string, string> = {
+  '0': '全职',
+  '1': '兼职',
+  '2': '临时工',
+  '3': '项目制'
+};
+
+const jobStatusMap: Record<string, string> = {
+  '0': '随时到岗',
+  '1': '考虑新机会',
+  '2': '在职看机会'
+};
+
+type ResumeJsonRecord = Record<string, unknown>;
+type ResumeListItem = {
+  title: string;
+  meta?: string;
+  desc?: string;
+  extra?: string;
+};
+type ResumeSection = {
+  title: string;
+  items: ResumeListItem[];
+};
+type ResumeOtherRow = {
+  label: string;
+  value: string;
+};
+
+// 求职者展示字段统一从最新简历优先取值；账号字段只作为无简历或空值时的兜底。
+function displayUserName(row: RecruitmentUserVO | null) {
+  return row?.realName || row?.nickName || row?.userName || '-';
+}
+
+function displayAvatar(row: RecruitmentUserVO | null) {
+  return row?.resumeAvatarUrl || row?.avatarUrl || '';
+}
+
+function avatarInitial(row: RecruitmentUserVO | null) {
+  const name = displayUserName(row);
+  return name === '-' ? '?' : name.charAt(0);
+}
+
+function displayAccountPhone(row: RecruitmentUserVO | null) {
+  return row?.accountPhone || row?.phonenumber || row?.phone || '-';
+}
+
+function displayPrimaryPhone(row: RecruitmentUserVO | null) {
+  return row?.resumePhone || displayAccountPhone(row);
+}
+
+function normalizeSexName(value?: string) {
+  if (value === 'M' || value === '0') return '男';
+  if (value === 'F' || value === '1') return '女';
+  if (value === '2') return '未知';
+  return '-';
+}
+
+function displayPrimarySex(row: RecruitmentUserVO | null) {
+  return row?.resumeSexName && row.resumeSexName !== '-' ? row.resumeSexName : row?.sexName || normalizeSexName(row?.sex);
+}
+
+function displayResumeSex(row: RecruitmentUserVO | null) {
+  if (!row?.resumeId) return '-';
+  return row.resumeSexName && row.resumeSexName !== '-' ? row.resumeSexName : normalizeSexName(row.resumeSex);
+}
+
+function displayResumeCompleteness(row: RecruitmentUserVO | null) {
+  if (!row?.resumeId) return '暂无简历';
+  const value = Number(row.resumeCompleteness);
+  return Number.isFinite(value) ? `${value}%` : '-';
+}
+
+function resumeCompletenessType(row: RecruitmentUserVO | null): 'success' | 'warning' | 'info' {
+  if (!row?.resumeId) return 'info';
+  const value = Number(row.resumeCompleteness || 0);
+  if (value >= 100) return 'success';
+  if (value >= 80) return 'warning';
+  return 'info';
+}
+
+function displayEducation(row: RecruitmentUserVO | null) {
+  if (!row?.resumeId) return '-';
+  const rawEducation = displayEducationValue(row.education);
+  if (row.educationName && row.educationName !== '学历不限') return row.educationName;
+  return rawEducation || row.educationName || '-';
+}
+
+function displayJobType(row: RecruitmentUserVO | null) {
+  if (!row?.resumeId) return '-';
+  if (row.jobTypeName) return row.jobTypeName;
+  return jobTypeMap[String(row.jobType ?? '0')] || String(row.jobType || '-');
+}
+
+function displayJobStatus(row: RecruitmentUserVO | null) {
+  if (!row?.resumeId) return '-';
+  return row.jobStatusName || jobStatusMap[String(row.jobStatus ?? '')] || '-';
+}
+
+function displaySalary(row: RecruitmentUserVO | null) {
+  if (!row?.resumeId) return '-';
+  const min = row.salaryMin;
+  const max = row.salaryMax;
+  if (min == null && max == null) return '-';
+  const unit = salaryUnitMap[String(row.salaryUnit ?? '0')] || '/天';
+  if (min != null && max != null) return `${min}-${max}${unit}`;
+  return `${min ?? max}${unit}`;
+}
+
+function displayEducationValue(value?: unknown) {
+  const text = displayText(value);
+  return educationMap[text] || text;
+}
+
+function displayText(value: unknown): string {
+  if (value == null) return '';
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => displayText(item))
+      .filter(Boolean)
+      .join('、');
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+  return String(value).trim();
+}
+
+function parseJsonValue(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return trimmed;
+  }
+}
+
+// C 端简历的经历/证书/补充信息以 JSON 字符串保存；运营端只读展示，解析失败时保持空模块。
+function parseResumeList(value: unknown): ResumeJsonRecord[] {
+  const parsed = parseJsonValue(value);
+  if (Array.isArray(parsed)) {
+    return parsed.filter((item): item is ResumeJsonRecord => !!item && typeof item === 'object' && !Array.isArray(item));
+  }
+  if (parsed && typeof parsed === 'object') {
+    return [parsed as ResumeJsonRecord];
+  }
+  return [];
+}
+
+function displayStoredValue(value: unknown): string {
+  return displayText(parseJsonValue(value));
+}
+
+function pickText(source: ResumeJsonRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = displayText(source[key]);
+    if (value) return value;
+  }
+  return '';
+}
+
+function labelText(label: string, value: string) {
+  return value ? `${label}：${value}` : '';
+}
+
+function joinParts(parts: string[], separator = ' · ') {
+  return parts.filter(Boolean).join(separator);
+}
+
+function formatItemRange(item: ResumeJsonRecord) {
+  const period = pickText(item, ['period', 'range', 'time']);
+  if (period) return period;
+  const start = pickText(item, ['startDate', 'startTime', 'beginDate']);
+  const end = pickText(item, ['endDate', 'endTime', 'finishDate']);
+  if (start && end) return `${start}-${end}`;
+  if (start) return `${start}-至今`;
+  return end;
+}
+
+function hasResumeItemContent(item: ResumeListItem) {
+  return Boolean(item.title || item.meta || item.desc || item.extra);
+}
+
+function mapEducationItem(item: ResumeJsonRecord): ResumeListItem {
+  const school = pickText(item, ['school', 'schoolName', 'name']);
+  const level = displayEducationValue(pickText(item, ['level', 'education', 'degree', 'edu']));
+  const major = pickText(item, ['major', 'profession']);
+  const courses = pickText(item, ['courses', 'course', 'mainCourse']);
+  const gpa = pickText(item, ['gpa']);
+  return {
+    title: joinParts([school || '院校', level]),
+    meta: joinParts([major, formatItemRange(item)]),
+    desc: joinParts([labelText('主修', courses), labelText('GPA', gpa)], '；')
+  };
+}
+
+function mapWorkItem(item: ResumeJsonRecord): ResumeListItem {
+  const company = pickText(item, ['company', 'companyName', 'name']);
+  const role = pickText(item, ['role', 'position', 'jobTitle']);
+  const salary = pickText(item, ['salary']);
+  const dept = pickText(item, ['dept', 'department']);
+  const duty = pickText(item, ['duty', 'description', 'desc', 'content']);
+  const perf = pickText(item, ['perf', 'result', 'achievement']);
+  return {
+    title: joinParts([company || '公司', role]),
+    meta: joinParts([formatItemRange(item), salary ? `在职薪水 ${salary}` : '', dept]),
+    desc: duty,
+    extra: labelText('业绩', perf)
+  };
+}
+
+function mapProjectItem(item: ResumeJsonRecord): ResumeListItem {
+  const name = pickText(item, ['name', 'projectName', 'title']);
+  const role = pickText(item, ['role', 'position']);
+  const tech = pickText(item, ['tech', 'technology']);
+  const desc = pickText(item, ['desc', 'description', 'content']);
+  const result = pickText(item, ['result', 'achievement']);
+  return {
+    title: joinParts([name || '项目', role]),
+    meta: joinParts([formatItemRange(item), tech]),
+    desc,
+    extra: labelText('成果', result)
+  };
+}
+
+function resumeListSections(row: RecruitmentUserVO | null): ResumeSection[] {
+  if (!row?.resumeId) return [];
+  const sections: ResumeSection[] = [];
+  const educationItems = parseResumeList(row.educationExperience).map(mapEducationItem).filter(hasResumeItemContent);
+  const workItems = parseResumeList(row.workExperience).map(mapWorkItem).filter(hasResumeItemContent);
+  const projectItems = parseResumeList(row.projectExperience).map(mapProjectItem).filter(hasResumeItemContent);
+  if (educationItems.length) sections.push({ title: '教育经历', items: educationItems });
+  if (workItems.length) sections.push({ title: '工作经历', items: workItems });
+  if (projectItems.length) sections.push({ title: '项目经历', items: projectItems });
+  return sections;
+}
+
+function resumeCertificateTags(row: RecruitmentUserVO | null) {
+  if (!row?.resumeId) return [];
+  const tags = parseResumeList(row.certificates).flatMap((item) => {
+    const skill = pickText(item, ['skill', 'name', 'title']);
+    const cert = pickText(item, ['cert', 'certName', 'certificate']);
+    const lang = pickText(item, ['lang', 'language']);
+    return [skill, cert ? `证书：${cert}` : '', lang ? `语言：${lang}` : ''].filter(Boolean);
+  });
+  return Array.from(new Set(tags));
+}
+
+function resumeOtherRows(row: RecruitmentUserVO | null): ResumeOtherRow[] {
+  if (!row?.resumeId) return [];
+  const rows: ResumeOtherRow[] = [];
+  const labelMap: Record<string, string> = {
+    portfolio: '作品集',
+    github: 'GitHub',
+    volunteer: '志愿者',
+    honor: '荣誉'
+  };
+  const addRow = (label: string, value: unknown) => {
+    const text = displayStoredValue(value);
+    if (!text || text === 'null' || text === 'undefined') return;
+    if (!rows.some((rowItem) => rowItem.label === label && rowItem.value === text)) {
+      rows.push({ label, value: text });
+    }
+  };
+
+  parseResumeList(row.otherInfo).forEach((item) => {
+    Object.entries(item).forEach(([key, value]) => addRow(labelMap[key] || key, value));
+  });
+  addRow('作品集', row.portfolioUrl);
+  addRow('GitHub', row.githubUrl);
+  addRow('志愿者', row.volunteerExperience);
+  addRow('荣誉', row.awards);
+  return rows;
+}
+
 const applyDialogTitle = computed(() => {
-  const userName = applyDialogUser.value?.nickName || applyDialogUser.value?.userName || '求职者';
+  const userName = applyDialogUser.value ? displayUserName(applyDialogUser.value) : '求职者';
   const statusText = applyQueryParams.status ? ` - ${applyStatusMeta(applyQueryParams.status).label}` : '';
   return `${userName}的投递记录${statusText}`;
 });
@@ -647,11 +1017,12 @@ async function loadData() {
     // 这里兼容两种形态：R 包则取 res.data，直返则取 res，避免列表恒空。
     // 安全：不要打印整包响应，避免把求职者手机号/邮箱/登录IP 等 PII 暴露到浏览器控制台
     const list = unwrapList<RecruitmentUserVO>((res as any)?.data ?? res);
-    // 后端新老接口在手机号字段上存在 phone / phonenumber 两种返回，这里统一归一化避免页面空列。
+    // 账号手机号与简历手机号分线展示；旧 phone/phonenumber 字段保留为账号兜底，避免历史接口空列。
     tableData.value = list.rows.map((item) => ({
       ...item,
       phone: item.phone || item.phonenumber || '',
-      phonenumber: item.phonenumber || item.phone || ''
+      phonenumber: item.phonenumber || item.phone || '',
+      accountPhone: item.accountPhone || item.phonenumber || item.phone || ''
     }));
     total.value = list.total;
   } catch (e) {
@@ -1199,6 +1570,11 @@ function closeImportDialog() {
   font-size: 13px;
   color: #606266;
 }
+.contact-item.muted {
+  padding-left: 21px;
+  font-size: 12px;
+  color: #909399;
+}
 .email-text {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1257,11 +1633,53 @@ function closeImportDialog() {
   color: #f56c6c;
 }
 
+/* ---------- 详情弹窗：求职者简历与账号信息分区 ---------- */
+.detail-section {
+  margin-bottom: 14px;
+}
+.detail-section-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #303133;
+}
+
+.resume-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #fafafa;
+}
+.resume-profile-main {
+  flex: 1;
+  min-width: 0;
+}
+.resume-profile-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #303133;
+}
+.resume-profile-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
+}
+
 /* ---------- 详情统计 ---------- */
 .detail-stats {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+.detail-stats-standalone {
+  padding: 10px 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #fafafa;
 }
 .detail-stat-chip {
   padding: 3px 10px;
@@ -1300,11 +1718,72 @@ function closeImportDialog() {
   align-items: center;
   gap: 8px;
 }
+.resume-attachment-box {
+  padding: 10px 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #fafafa;
+}
 .resume-file-name {
   max-width: 420px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.resume-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.resume-list-item {
+  padding: 10px 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #fff;
+}
+.resume-item-title {
+  font-weight: 700;
+  color: #303133;
+}
+.resume-item-meta,
+.resume-item-desc,
+.resume-item-extra {
+  margin-top: 5px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #606266;
+}
+.resume-item-meta {
+  color: #909399;
+}
+.resume-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.resume-other-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+.resume-other-row {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #fafafa;
+}
+.resume-other-label {
+  flex: 0 0 76px;
+  color: #909399;
+}
+.resume-other-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #303133;
 }
 
 .text-muted {

@@ -1097,11 +1097,59 @@ export interface RecruitmentUserVO {
   /** 后端列表接口当前返回 phone；保留 phonenumber 兼容历史页面字段。 */
   phone: string;
   phonenumber?: string;
+  /** 授权登录手机号，来自账号表 sys_user.phonenumber。 */
+  accountPhone?: string;
   email: string;
   sex: string;
   sexName: string;
+  /** 账号性别原始码：0男 / 1女 / 2未知。 */
+  accountSex?: string;
+  accountSexName?: string;
+  /** 最新简历性别原始码：M男 / F女。 */
+  resumeSex?: string;
+  resumeSexName?: string;
   avatar: number;
   avatarUrl: string;
+  /** 最新简历头像 OSS ID；后端据此返回可访问的 resumeAvatarUrl。 */
+  resumeAvatarOssId?: number | string;
+  resumeAvatarUrl?: string;
+  resumeId?: number | string;
+  realName?: string;
+  resumePhone?: string;
+  /** 简历邮箱，区别于账号邮箱 email。 */
+  resumeEmail?: string;
+  wechat?: string;
+  birthDate?: string;
+  age?: number;
+  city?: string;
+  expectCity?: string;
+  expectPosition?: string;
+  expectedDate?: string;
+  expectedIndustry?: string;
+  jobPreferenceRemark?: string;
+  jobStatus?: string;
+  jobStatusName?: string;
+  education?: string;
+  educationName?: string;
+  workYears?: number;
+  resumeCompleteness?: number;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryUnit?: string;
+  jobType?: string;
+  jobTypeName?: string;
+  skills?: string;
+  summary?: string;
+  /** C 端在线简历扩展模块，均为后端原样透传的 JSON 字符串。 */
+  educationExperience?: string;
+  workExperience?: string;
+  projectExperience?: string;
+  certificates?: string;
+  otherInfo?: string;
+  portfolioUrl?: string;
+  githubUrl?: string;
+  volunteerExperience?: string;
+  awards?: string;
   status: string;
   statusName: string;
   isRecruitmentSilenced: string;
