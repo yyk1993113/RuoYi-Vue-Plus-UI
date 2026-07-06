@@ -92,6 +92,12 @@
             <el-tag v-else-if="col.type === 'targetType'" :type="formatNoticeTarget(row[col.prop]).tagType">
               {{ formatNoticeTarget(row[col.prop]).label }}
             </el-tag>
+            <el-tag v-else-if="col.type === 'featured'" :type="row[col.prop] === '1' ? 'success' : 'info'">
+              {{ row[col.prop] === '1' ? '精选' : '普通' }}
+            </el-tag>
+            <el-tag v-else-if="col.type === 'video'" :type="row.videoOssId ? 'success' : 'info'">
+              {{ row.videoOssId ? '已上传' : '未上传' }}
+            </el-tag>
             <!-- 首页展示：公告首页最多 3 条，由后端最终校验，避免多端绕过前端限制。 -->
             <template v-else-if="col.type === 'homeVisible'">
               <el-switch
@@ -149,7 +155,9 @@
         <template v-for="field in currentConfig.fields" :key="field.prop">
           <el-form-item :label="field.label" :prop="field.prop">
             <!-- 图片上传 -->
-            <image-upload v-if="field.type === 'image'" v-model="form[field.prop]" :limit="1" value-type="url" />
+            <image-upload v-if="field.type === 'image'" v-model="form[field.prop]" :limit="1" :value-type="field.valueType || 'url'" />
+            <!-- 课程视频：PC 端直传 OSS，表单只保存 videoOssId，播放 URL 由后端读取时签发。 -->
+            <content-video-upload v-else-if="field.type === 'video'" v-model="form[field.prop]" @uploaded="handleVideoUploaded" />
             <!-- 招聘会海报专用:上传后固定裁切成 3:1 横幅,保证小程序卡片铺满且不裁主体。 -->
             <fair-poster-crop-upload v-else-if="field.type === 'fairPoster'" v-model="form[field.prop]" />
             <!-- 数字 -->
@@ -202,6 +210,15 @@
               inactive-value="0"
               :active-text="currentConfig.statusOnText"
               :inactive-text="currentConfig.statusOffText"
+              inline-prompt
+            />
+            <el-switch
+              v-else-if="field.type === 'switch'"
+              v-model="form[field.prop]"
+              active-value="1"
+              inactive-value="0"
+              :active-text="field.activeText || '是'"
+              :inactive-text="field.inactiveText || '否'"
               inline-prompt
             />
             <!-- 普通文本输入 -->
@@ -276,6 +293,7 @@ import {
 } from '@/api/recruitment/content';
 import { unwrapList, splitToArray } from './helpers';
 import FairPosterCropUpload from './components/FairPosterCropUpload.vue';
+import ContentVideoUpload from './components/ContentVideoUpload.vue';
 
 // 列定义：type 决定单元格渲染方式（image/price/tags/status/text/缺省纯文本）
 interface ColumnDef {
@@ -284,7 +302,7 @@ interface ColumnDef {
   width?: number | string;
   minWidth?: number | string;
   align?: string;
-  type?: 'image' | 'price' | 'tags' | 'noticeType' | 'targetType' | 'homeVisible' | 'status' | 'id' | 'text';
+  type?: 'image' | 'price' | 'tags' | 'noticeType' | 'targetType' | 'featured' | 'video' | 'homeVisible' | 'status' | 'id' | 'text';
 }
 // 下拉选项定义：value 是后端稳定枚举，label 是后台展示文案
 interface FieldOption {
@@ -295,7 +313,8 @@ interface FieldOption {
 interface FieldDef {
   prop: string;
   label: string;
-  type?: 'image' | 'fairPoster' | 'number' | 'textarea' | 'editor' | 'select' | 'datetime' | 'status' | 'text';
+  type?: 'image' | 'fairPoster' | 'video' | 'number' | 'textarea' | 'editor' | 'select' | 'datetime' | 'status' | 'switch' | 'text';
+  valueType?: 'ossId' | 'url';
   placeholder?: string;
   maxlength?: number;
   min?: number;
@@ -304,6 +323,8 @@ interface FieldDef {
   height?: number;
   minHeight?: number;
   tip?: string;
+  activeText?: string;
+  inactiveText?: string;
   options?: FieldOption[];
 }
 // 单个 tab 的全量配置：主键名 / 查询关键字字段 / 列 / 表单字段 / 校验 / 状态文案 / 六个 API 方法
@@ -543,29 +564,37 @@ const tabConfigs: TabConfig[] = [
       { prop: 'courseId', label: 'ID', width: 80 },
       { prop: 'title', label: '标题', minWidth: 160, align: 'left' },
       { prop: 'coverUrl', label: '封面', width: 90, type: 'image' },
+      { prop: 'videoOssId', label: '视频', width: 90, type: 'video' },
       { prop: 'tags', label: '标签', minWidth: 140, align: 'left', type: 'tags' },
       { prop: 'lessonCount', label: '节数', width: 70 },
       { prop: 'studyCount', label: '学习人数', width: 90 },
       { prop: 'price', label: '价格', width: 90, type: 'price' },
+      { prop: 'featured', label: '精选', width: 80, type: 'featured' },
+      { prop: 'featuredSort', label: '精选排序', width: 90 },
+      { prop: 'viewCount', label: '观看', width: 80 },
       sortColumn,
       statusColumn
     ],
     fields: [
       { prop: 'title', label: '标题', maxlength: 50 },
-      { prop: 'coverUrl', label: '封面图', type: 'image', tip: '建议尺寸 4:3' },
+      { prop: 'summary', label: '摘要', type: 'textarea', maxlength: 300 },
+      { prop: 'coverOssId', label: '封面图', type: 'image', valueType: 'ossId', tip: '建议尺寸 4:3' },
+      { prop: 'videoOssId', label: '课程视频', type: 'video', tip: '精选课程必须上传视频' },
       { prop: 'tags', label: '标签', placeholder: '多个标签用英文逗号分隔' },
       { prop: 'lessonCount', label: '节数', type: 'number' },
       { prop: 'studyCount', label: '学习人数', type: 'number' },
       { prop: 'price', label: '价格(元)', type: 'number', precision: 2, step: 1, tip: '0 表示免费' },
       { prop: 'content', label: '课程内容', type: 'textarea', maxlength: 2000 },
+      { prop: 'featured', label: '精选展示', type: 'switch', activeText: '精选', inactiveText: '普通', tip: '首页最多展示 3 个精选课程' },
+      { prop: 'featuredSort', label: '精选排序', type: 'number', tip: '精选列表内值越小越靠前' },
       sortField,
       statusField
     ],
     rules: {
       title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
-      coverUrl: [{ required: true, message: '请上传封面图', trigger: 'change' }]
+      coverOssId: [{ required: true, message: '请上传封面图', trigger: 'change' }]
     },
-    defaults: { sort: 0, status: '1', lessonCount: 0, studyCount: 0, price: 0 },
+    defaults: { sort: 0, status: '1', featured: '0', featuredSort: 0, lessonCount: 0, studyCount: 0, price: 0, viewCount: 0 },
     api: { list: listCourse, get: getCourse, add: addCourse, update: updateCourse, del: delCourse, changeStatus: changeCourseStatus }
   },
   // ---------- 求职干货 ----------
@@ -583,15 +612,20 @@ const tabConfigs: TabConfig[] = [
       { prop: 'coverUrl', label: '封面', width: 90, type: 'image' },
       { prop: 'tags', label: '标签', minWidth: 140, align: 'left', type: 'tags' },
       { prop: 'readCount', label: '阅读数', width: 90 },
+      { prop: 'featured', label: '精选', width: 80, type: 'featured' },
+      { prop: 'featuredSort', label: '精选排序', width: 90 },
       sortColumn,
       statusColumn
     ],
     fields: [
       { prop: 'title', label: '标题', maxlength: 60 },
-      { prop: 'coverUrl', label: '封面图', type: 'image', tip: '建议尺寸 16:9' },
+      { prop: 'summary', label: '摘要', type: 'textarea', maxlength: 300 },
+      { prop: 'coverOssId', label: '封面图', type: 'image', valueType: 'ossId', tip: '建议尺寸 16:9' },
       { prop: 'tags', label: '标签', placeholder: '多个标签用英文逗号分隔' },
       { prop: 'readCount', label: '阅读数', type: 'number' },
-      { prop: 'content', label: '正文内容', type: 'textarea', maxlength: 5000 },
+      { prop: 'content', label: '正文内容', type: 'editor', height: 320, minHeight: 260 },
+      { prop: 'featured', label: '精选展示', type: 'switch', activeText: '精选', inactiveText: '普通', tip: '首页最多展示 3 篇精选文章' },
+      { prop: 'featuredSort', label: '精选排序', type: 'number', tip: '精选列表内值越小越靠前' },
       sortField,
       statusField
     ],
@@ -599,7 +633,7 @@ const tabConfigs: TabConfig[] = [
       title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
       content: [{ required: true, message: '请输入正文内容', trigger: 'blur' }]
     },
-    defaults: { sort: 0, status: '1', readCount: 0 },
+    defaults: { sort: 0, status: '1', featured: '0', featuredSort: 0, readCount: 0 },
     api: { list: listArticle, get: getArticle, add: addArticle, update: updateArticle, del: delArticle, changeStatus: changeArticleStatus }
   },
   // ---------- 求职服务 ----------
@@ -801,6 +835,7 @@ async function handleEdit(row: any) {
   } catch (e) {
     Object.assign(form, row);
   }
+  hydrateLegacyMediaFields();
   dialogVisible.value = true;
 }
 
@@ -813,11 +848,12 @@ async function submitForm() {
   submitting.value = true;
   try {
     const cfg = currentConfig.value;
+    const payload = buildSubmitPayload();
     if (isEdit.value) {
-      await cfg.api.update({ ...form });
+      await cfg.api.update(payload);
       ElMessage.success('修改成功');
     } else {
-      await cfg.api.add({ ...form });
+      await cfg.api.add(payload);
       ElMessage.success('新增成功');
     }
     dialogVisible.value = false;
@@ -827,6 +863,33 @@ async function submitForm() {
   } finally {
     submitting.value = false;
   }
+}
+
+function isDirectUrlValue(value: any) {
+  return typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/'));
+}
+
+// 历史内容可能只有 coverUrl，没有 coverOssId；编辑时用旧 URL 预览，提交时再拆回 coverUrl 兼容。
+function hydrateLegacyMediaFields() {
+  if ((activeTab.value === 'course' || activeTab.value === 'article') && !form.coverOssId && form.coverUrl) {
+    form.coverOssId = form.coverUrl;
+  }
+}
+
+function buildSubmitPayload() {
+  const payload = { ...form };
+  if ((activeTab.value === 'course' || activeTab.value === 'article') && isDirectUrlValue(payload.coverOssId)) {
+    payload.coverUrl = payload.coverOssId;
+    delete payload.coverOssId;
+  }
+  if (payload.coverOssId === '') delete payload.coverOssId;
+  if (payload.videoOssId === '') delete payload.videoOssId;
+  return payload;
+}
+
+function handleVideoUploaded(file: { fileSize?: number; contentType?: string }) {
+  form.videoSize = file.fileSize;
+  form.videoContentType = file.contentType || 'video/mp4';
 }
 
 // 上下架/显隐开关：调用对应 changeStatus，失败时回滚（重新拉表）

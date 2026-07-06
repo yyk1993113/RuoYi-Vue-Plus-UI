@@ -105,8 +105,8 @@ watch(
       let list: Array<OssVO | string> = [];
       if (Array.isArray(val)) {
         list = val as OssVO[];
-      } else if (props.valueType === 'url' && isDirectUrlValue(val)) {
-        // 内容管理保存 URL 时不再反查 OSS；历史数字 id 仍走 listByIds，保证编辑旧数据能正常预览。
+      } else if (isDirectUrlValue(val)) {
+        // 内容管理历史数据可能保存 URL；新契约保存 ossId，但旧 URL 仍要能正常预览。
         list = val
           .split(',')
           .map((item) => item.trim())

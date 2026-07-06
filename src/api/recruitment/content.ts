@@ -80,11 +80,21 @@ export interface CourseVO {
   courseId?: number;
   title?: string; // 标题
   coverUrl?: string; // 封面图URL
+  coverOssId?: string | number; // 封面图OSS ID
+  summary?: string; // 课程摘要
   tags?: string; // 标签（多个用逗号分隔）
   lessonCount?: number; // 节数
   studyCount?: number; // 学习人数
   price?: number; // 价格（元，0 表示免费）
   content?: string; // 课程内容/详情
+  videoOssId?: string | number; // 主视频OSS ID
+  videoUrl?: string; // 主视频播放URL
+  videoDuration?: number; // 视频时长（秒）
+  videoSize?: number; // 视频大小（字节）
+  videoContentType?: string; // 视频 MIME 类型
+  featured?: string; // 是否精选 0:否 1:是
+  featuredSort?: number; // 精选排序
+  viewCount?: number; // 浏览/观看次数
   sort?: number;
   status?: string; // 状态 0:下架 1:上架
   createTime?: string;
@@ -96,9 +106,13 @@ export interface ArticleVO {
   articleId?: number;
   title?: string; // 标题
   coverUrl?: string; // 封面图URL
+  coverOssId?: string | number; // 封面图OSS ID
+  summary?: string; // 文章摘要
   tags?: string; // 标签（多个用逗号分隔）
   readCount?: number; // 阅读数
   content?: string; // 正文内容
+  featured?: string; // 是否精选 0:否 1:是
+  featuredSort?: number; // 精选排序
   sort?: number;
   status?: string; // 状态 0:下架 1:上架
   createTime?: string;
@@ -260,6 +274,17 @@ export function delCourse(courseIds: number | number[]) {
 
 export function changeCourseStatus(data: { courseId: number; status: string }) {
   return request.post(`${contentUrl}/course/changeStatus`, data);
+}
+
+export interface ContentMediaPresignRequest {
+  mediaType: 'image' | 'video';
+  fileName: string;
+  contentType?: string;
+  fileSize: number;
+}
+
+export function presignContentMedia(data: ContentMediaPresignRequest) {
+  return request.post(`${contentUrl}/media/presign`, data);
 }
 
 // ---------- 求职干货 Article ----------
