@@ -214,7 +214,7 @@
         </el-table-column>
         <el-table-column label="意向结算" width="190" align="center">
           <template #default="{ row }">
-            <div v-if="canShowSettlementIntent(row) && row.settlementIntentId" class="job-settlement-cell">
+            <div v-if="canShowSettlementIntent(row)" class="job-settlement-cell">
               <el-button link type="primary" @click="handleSettlementIntent(row)">意向结算</el-button>
               <div class="job-settlement-tags">
                 <el-tag :type="settlementIntentMeta(row.settlementIntentType).type" size="small" effect="plain">
@@ -1048,8 +1048,19 @@ function isPendingSettlementLead(row: any) {
   return !!row?.settlementIntentId && String(row?.settlementFollowStatus || '') === '0';
 }
 
+function hasSettlementIntentValue(value: unknown) {
+  return value !== undefined && value !== null && String(value) !== '';
+}
+
 function canShowSettlementIntent(row: any) {
-  return String(row?.status || '') === '1' && ['1', '2', '3'].includes(String(row?.jobType || ''));
+  return [
+    row?.settlementIntentId,
+    row?.settlementIntentType,
+    row?.settlementNeedFollowUp,
+    row?.settlementFollowStatus,
+    row?.settlementFollowRemark,
+    row?.settlementCreateTime
+  ].some(hasSettlementIntentValue);
 }
 
 function jobRowClassName({ row }: { row: any }) {

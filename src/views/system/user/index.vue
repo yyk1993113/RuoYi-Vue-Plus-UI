@@ -455,11 +455,19 @@ const getList = async () => {
 /** 查询部门下拉树结构 */
 const getDeptTree = async () => {
   const res = await api.deptTreeSelect();
-  deptOptions.value = res.data;
+  deptOptions.value = renameRootDeptToAll(res.data || []);
   enabledDeptOptions.value = filterDisabledDept(res.data);
 };
 
 /** 过滤禁用的部门 */
+const renameRootDeptToAll = (deptList: DeptTreeVO[], isRoot = true) => {
+  return deptList.map((dept, index) => ({
+    ...dept,
+    label: isRoot && index === 0 ? '全部' : dept.label,
+    children: dept.children ? renameRootDeptToAll(dept.children, false) : dept.children
+  }));
+};
+
 const filterDisabledDept = (deptList: DeptTreeVO[]) => {
   return deptList.filter((dept) => {
     if (dept.disabled) {
