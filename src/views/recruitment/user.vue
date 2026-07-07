@@ -430,7 +430,7 @@
     <!-- ========== 区块六：投递记录弹窗 ========== -->
     <el-dialog v-model="applyDialogVisible" :title="applyDialogTitle" width="1180px" append-to-body>
       <el-form :model="applyQueryParams" :inline="true" class="apply-dialog-query">
-        <el-form-item label="投递编号">
+        <el-form-item label="投递ID">
           <el-input
             v-model="applyQueryParams.applyId"
             placeholder="精确投递编号"
@@ -439,7 +439,7 @@
             @keyup.enter="handleApplyDialogQuery"
           />
         </el-form-item>
-        <el-form-item label="企业编号">
+        <el-form-item label="企业ID">
           <el-input
             v-model="applyQueryParams.companyId"
             placeholder="精确企业编号"
@@ -732,8 +732,14 @@ function displayUserName(row: RecruitmentUserVO | null) {
   return row?.realName || row?.nickName || row?.userName || '-';
 }
 
+function imageUrl(value?: string | number) {
+  const url = String(value || '').trim();
+  return /^(https?:\/\/|\/)/.test(url) ? url : '';
+}
+
 function displayAvatar(row: RecruitmentUserVO | null) {
-  return row?.resumeAvatarUrl || row?.avatarUrl || '';
+  // 用户管理页头像同样只接收后端签名 URL，旧数字头像 ID 继续走文字兜底。
+  return imageUrl(row?.resumeAvatarUrl || row?.avatarUrl || row?.avatar);
 }
 
 function avatarInitial(row: RecruitmentUserVO | null) {
@@ -833,7 +839,11 @@ function displayExpectedIndustry(row: RecruitmentUserVO | null) {
 
 function displayJobPreferenceRemark(row: RecruitmentUserVO | null) {
   if (!row?.resumeId) return '-';
-  return displayStoredValue(row.jobPreferenceRemark) || firstOtherInfoValue(row, ['jobPreferenceRemark', 'preferenceRemark', 'positionPreferenceRemark', '岗位偏好备注']) || '-';
+  return (
+    displayStoredValue(row.jobPreferenceRemark) ||
+    firstOtherInfoValue(row, ['jobPreferenceRemark', 'preferenceRemark', 'positionPreferenceRemark', '岗位偏好备注']) ||
+    '-'
+  );
 }
 
 function displayEducationValue(value?: unknown) {
@@ -999,7 +1009,14 @@ function resumeOtherRows(row: RecruitmentUserVO | null): ResumeOtherRow[] {
     honor: '荣誉',
     awards: '荣誉'
   };
-  const skippedOtherKeys = new Set(['expectedIndustry', 'industry', 'expectIndustry', 'jobPreferenceRemark', 'preferenceRemark', 'positionPreferenceRemark']);
+  const skippedOtherKeys = new Set([
+    'expectedIndustry',
+    'industry',
+    'expectIndustry',
+    'jobPreferenceRemark',
+    'preferenceRemark',
+    'positionPreferenceRemark'
+  ]);
   const addRow = (label: string, value: unknown, urlValue?: unknown) => {
     const text = displayStoredValue(value);
     if (!text || text === 'null' || text === 'undefined') return;
@@ -1184,7 +1201,10 @@ function normalizeFileUrl(url: string) {
 }
 
 function isLinkLikeValue(value?: string) {
-  return !!value && (/^(https?:)?\/\//i.test(value) || /^www\./i.test(value) || value.startsWith('/') || value.startsWith('blob:') || value.startsWith('data:'));
+  return (
+    !!value &&
+    (/^(https?:)?\/\//i.test(value) || /^www\./i.test(value) || value.startsWith('/') || value.startsWith('blob:') || value.startsWith('data:'))
+  );
 }
 
 function getFileExtension(url?: string, name?: string) {

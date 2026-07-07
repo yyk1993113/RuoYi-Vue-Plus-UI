@@ -168,6 +168,13 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         name: 'RecruitmentSerialRule',
         permissions: ['recruitment:serialRule:list'],
         meta: { title: '流水编号规则', icon: 'dict' }
+      },
+      {
+        path: 'promotion-reward',
+        component: () => import('@/views/recruitment/promotion-reward.vue'),
+        name: 'RecruitmentPromotionReward',
+        permissions: ['recruitment:promotionReward:list'],
+        meta: { title: '推广奖励', icon: 'money' }
       }
     ]
   }
