@@ -430,7 +430,7 @@
     <!-- ========== 区块六：投递记录弹窗 ========== -->
     <el-dialog v-model="applyDialogVisible" :title="applyDialogTitle" width="1180px" append-to-body>
       <el-form :model="applyQueryParams" :inline="true" class="apply-dialog-query">
-        <el-form-item label="投递编号">
+        <el-form-item label="投递ID">
           <el-input
             v-model="applyQueryParams.applyId"
             placeholder="精确投递ID"
@@ -439,7 +439,7 @@
             @keyup.enter="handleApplyDialogQuery"
           />
         </el-form-item>
-        <el-form-item label="企业编号">
+        <el-form-item label="企业ID">
           <el-input
             v-model="applyQueryParams.companyId"
             placeholder="精确企业ID"

@@ -244,9 +244,9 @@
           <el-button v-if="currentLedger.jobId" link type="primary" @click="openRelatedJob(currentLedger)">查看岗位详情</el-button>
           <span v-else>-</span>
         </el-descriptions-item>
-        <el-descriptions-item label="投递编号">{{ currentLedger.applyId ?? '-' }}</el-descriptions-item>
+        <el-descriptions-item label="投递编号">{{ currentLedger.applyNo || currentLedger.applyId || '-' }}</el-descriptions-item>
         <el-descriptions-item label="企业">{{ currentLedger.companyName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="用户">{{ currentLedger.userName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="求职者编号">{{ currentLedger.jobSeekerNo || currentLedger.userId || '-' }}</el-descriptions-item>
         <el-descriptions-item label="结算金额">
           <span class="amount-lg">¥{{ formatMoney(currentLedger.amount) }}</span>
         </el-descriptions-item>
@@ -258,7 +258,7 @@
             ledgerInvoiceStatusMeta(currentLedger.invoiceStatus).label
           }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="任务ID">{{ currentLedger.taskId }}</el-descriptions-item>
+        <el-descriptions-item label="履约编号">{{ currentLedger.taskNo || currentLedger.taskId || '-' }}</el-descriptions-item>
         <el-descriptions-item label="结算时间">{{ currentLedger.settleTime || '-' }}</el-descriptions-item>
         <el-descriptions-item label="结算备注" :span="2">{{ currentLedger.settleRemark || '-' }}</el-descriptions-item>
         <el-descriptions-item label="不可篡改时间" :span="2">{{ currentLedger.timestamp }}</el-descriptions-item>

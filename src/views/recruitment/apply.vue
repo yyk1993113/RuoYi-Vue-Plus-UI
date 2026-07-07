@@ -58,16 +58,16 @@
     <!--
       数据来源说明（双模式，避免改后端）：
       - 默认「常规检索」：岗位/求职者/企业名称等模糊条件 → GET /admin/recruitment/apply/list（带联表展示字段）。
-      - 一旦填入「投递编号 / 企业编号 / 投递时间范围」任一精确条件 → 切到
-        GET /admin/recruitment/apply2/list（原始 Apply 实体、按编号与时间区间精确过滤，不含联表名称）。
+      - 一旦填入「投递ID / 企业ID / 投递时间范围」任一精确条件 → 切到
+        GET /admin/recruitment/apply2/list（原始 Apply 实体、按内部 ID 与时间区间精确过滤，不含联表名称）。
       两套结果共用同一张表与分页；精确模式下名称列以编号兜底展示。
     -->
     <el-card shadow="hover" class="mb-4">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
-        <el-form-item label="投递编号" prop="applyId">
+        <el-form-item label="投递ID" prop="applyId">
           <el-input v-model="queryParams.applyId" placeholder="精确投递ID" clearable style="width: 150px" @keyup.enter="handleQuery" />
         </el-form-item>
-        <el-form-item label="企业编号" prop="companyId">
+        <el-form-item label="企业ID" prop="companyId">
           <el-input v-model="queryParams.companyId" placeholder="精确企业ID" clearable style="width: 150px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item label="投递时间" prop="dateRange">
@@ -135,7 +135,7 @@
       <!-- 精确模式提示：明确当前命中的是 apply2 精确检索，名称列以编号兜底 -->
       <div v-if="isPreciseMode" class="precise-tip">
         <el-icon><InfoFilled /></el-icon>
-        当前为「精确检索」模式（投递编号 / 企业编号 / 时间范围），结果按编号与投递时间过滤，名称列以编号兜底；名称模糊条件已暂时禁用。
+        当前为「精确检索」模式（投递ID / 企业ID / 时间范围），结果按内部 ID 与投递时间过滤，名称列以 ID 兜底；名称模糊条件已暂时禁用。
       </div>
     </el-card>
 
@@ -450,7 +450,7 @@
  * 运营台·投递查询增强页
  * 数据来源：
  *  - 列表（常规模糊）：GET /admin/recruitment/apply/list（listApply，带联表展示字段）。
- *  - 列表（精确）：GET /admin/recruitment/apply2/list（listApply2，投递编号/企业编号/时间区间精确过滤）。
+ *  - 列表（精确）：GET /admin/recruitment/apply2/list（listApply2，投递ID/企业ID/时间区间精确过滤）。
  *  - 统计卡片：GET /admin/recruitment/apply/statistics（getApplyStatistics）。
  *  - 详情弹窗：GET /admin/recruitment/apply2/detail（getApply2Detail），返回状态流水/面试/交换/选用聚合 VO。
  * 副作用：详情按 applyId 拉取全景数据；导出复用既有 /apply/export。
@@ -515,7 +515,7 @@ const statistics = reactive({
   unreadCount: 0
 });
 
-// 是否命中精确检索模式：填了投递编号 / 企业编号 / 时间范围任一即为 true
+// 是否命中精确检索模式：填了投递ID / 企业ID / 时间范围任一即为 true
 const isPreciseMode = computed(() => {
   return !!(queryParams.applyId || queryParams.companyId || (dateRange.value && dateRange.value.length === 2));
 });

@@ -277,10 +277,14 @@ export interface LedgerStatistics {
 export interface LedgerVO {
   ledgerId?: number;
   taskId?: number;
-  // 岗位编号（后端 Ledger.jobId），台账列表展示用
+  // 岗位ID（后端 Ledger.jobId），操作/跳转用；展示编号优先用 jobNo
   jobId?: number;
-  // 投递编号（后端 Ledger.applyId），台账列表展示用
+  jobNo?: string;
+  // 投递ID（后端 Ledger.applyId），操作/跳转用；展示编号优先用 applyNo
   applyId?: number;
+  applyNo?: string;
+  taskNo?: string;
+  jobSeekerNo?: string;
   companyId?: number;
   companyName?: string;
   userId?: number;
@@ -1382,12 +1386,12 @@ export function getApplyStatistics() {
 // 责任：在不动既有 /apply/** 的前提下，提供「多条件精确检索」与「单条投递全景详情」。
 // 与 /apply/list 区别：apply2/list 返回原始 Apply 实体（不含联表展示名），按编号/时间区间精确过滤。
 
-// 多条件精确检索入参（投递编号/企业编号/时间区间等，均可选）
+// 多条件精确检索入参（投递ID/企业ID/时间区间等，均可选）
 export interface Apply2Query {
   pageNum?: number;
   pageSize?: number;
-  applyId?: number; // 投递编号
-  companyId?: number; // 企业编号
+  applyId?: number; // 投递ID
+  companyId?: number; // 企业ID
   userId?: number;
   jobId?: number;
   status?: string;
@@ -1505,7 +1509,7 @@ export interface ApplyDetailVO {
   selection?: ApplySelectionResult;
 }
 
-// 多条件精确分页查询（投递编号/企业编号/时间区间）→ TableDataInfo<Apply> 原始实体
+// 多条件精确分页查询（投递ID/企业ID/时间区间）→ TableDataInfo<Apply> 原始实体
 export function listApply2(query: Apply2Query) {
   return request.get<any>(`${baseUrl}/apply2/list`, { params: query });
 }
