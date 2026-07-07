@@ -14,7 +14,7 @@
 
       <!-- 查询 + 操作条 -->
       <el-form ref="queryFormRef" :model="queryParams" :inline="true" class="mb-2">
-        <el-form-item :label="currentConfig.nameLabel" prop="keyword">
+        <el-form-item v-if="currentConfig.keywordField" :label="currentConfig.nameLabel" prop="keyword">
           <el-input
             v-model="queryParams.keyword"
             :placeholder="`请输入${currentConfig.nameLabel}`"
@@ -332,7 +332,7 @@ interface TabConfig {
   key: string;
   label: string;
   idKey: string; // 主键字段名，如 bannerId
-  keywordField: 'title' | 'name'; // 列表查询时关键字写入的实体字段
+  keywordField?: 'title' | 'name'; // 列表查询时关键字写入的实体字段；Banner 图片已自带文案，不再做标题检索
   nameLabel: string; // 查询框/默认标题用的名称标签
   statusOnText: string; // status=1 文案（显示/上架）
   statusOffText: string; // status=0 文案（隐藏/下架）
@@ -390,13 +390,11 @@ const tabConfigs: TabConfig[] = [
     key: 'banner',
     label: 'Banner',
     idKey: 'bannerId',
-    keywordField: 'title',
-    nameLabel: '标题',
+    nameLabel: 'Banner',
     statusOnText: '显示',
     statusOffText: '隐藏',
     columns: [
       { prop: 'bannerId', label: 'ID', width: 80 },
-      { prop: 'title', label: '标题', minWidth: 160, align: 'left' },
       { prop: 'imageUrl', label: '图片', width: 90, type: 'image' },
       { prop: 'linkUrl', label: '跳转链接', minWidth: 180, align: 'left', type: 'text' },
       sortColumn,
@@ -404,14 +402,12 @@ const tabConfigs: TabConfig[] = [
       createTimeColumn
     ],
     fields: [
-      { prop: 'title', label: '标题', maxlength: 50 },
       { prop: 'imageUrl', label: '图片', type: 'image', tip: '建议尺寸 750×300' },
       { prop: 'linkUrl', label: '跳转链接', placeholder: '页面路由或外部 URL，可留空' },
       sortField,
       statusField
     ],
     rules: {
-      title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
       imageUrl: [{ required: true, message: '请上传图片', trigger: 'change' }]
     },
     defaults: { sort: 0, status: '1' },
@@ -709,7 +705,7 @@ function buildQuery(cfg = currentConfig.value) {
     pageSize: queryParams.pageSize,
     status: queryParams.status || undefined
   };
-  if (queryParams.keyword) {
+  if (cfg.keywordField && queryParams.keyword) {
     params[cfg.keywordField] = queryParams.keyword;
   }
   return params;
