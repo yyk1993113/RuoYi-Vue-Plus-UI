@@ -374,7 +374,6 @@ const tabConfigs: TabConfig[] = [
     statusOnText: '显示',
     statusOffText: '隐藏',
     columns: [
-      { prop: 'bannerId', label: 'ID', width: 80 },
       { prop: 'title', label: '标题', minWidth: 160, align: 'left' },
       { prop: 'imageUrl', label: '图片', width: 90, type: 'image' },
       { prop: 'linkUrl', label: '跳转链接', minWidth: 180, align: 'left', type: 'text' },
@@ -442,7 +441,6 @@ const tabConfigs: TabConfig[] = [
     statusOnText: '显示',
     statusOffText: '隐藏',
     columns: [
-      { prop: 'noticeId', label: 'ID', width: 180, type: 'id' },
       { prop: 'noticeType', label: '类型', width: 90, type: 'noticeType' },
       { prop: 'title', label: '标题', minWidth: 180, align: 'left', type: 'text' },
       { prop: 'summary', label: '摘要', minWidth: 220, align: 'left', type: 'text' },
@@ -491,7 +489,6 @@ const tabConfigs: TabConfig[] = [
     statusOnText: '上架',
     statusOffText: '下架',
     columns: [
-      { prop: 'fairId', label: 'ID', width: 180, type: 'id' },
       { prop: 'title', label: '标题', minWidth: 180, align: 'left', type: 'text' },
       { prop: 'posterUrl', label: '海报', width: 90, type: 'image' },
       { prop: 'startTime', label: '开始时间', width: 165 },
@@ -540,7 +537,6 @@ const tabConfigs: TabConfig[] = [
     statusOnText: '上架',
     statusOffText: '下架',
     columns: [
-      { prop: 'courseId', label: 'ID', width: 80 },
       { prop: 'title', label: '标题', minWidth: 160, align: 'left' },
       { prop: 'coverUrl', label: '封面', width: 90, type: 'image' },
       { prop: 'tags', label: '标签', minWidth: 140, align: 'left', type: 'tags' },
@@ -578,7 +574,6 @@ const tabConfigs: TabConfig[] = [
     statusOnText: '上架',
     statusOffText: '下架',
     columns: [
-      { prop: 'articleId', label: 'ID', width: 80 },
       { prop: 'title', label: '标题', minWidth: 180, align: 'left' },
       { prop: 'coverUrl', label: '封面', width: 90, type: 'image' },
       { prop: 'tags', label: '标签', minWidth: 140, align: 'left', type: 'tags' },
@@ -612,7 +607,6 @@ const tabConfigs: TabConfig[] = [
     statusOnText: '显示',
     statusOffText: '隐藏',
     columns: [
-      { prop: 'serviceId', label: 'ID', width: 80 },
       { prop: 'name', label: '名称', width: 140, align: 'left' },
       { prop: 'description', label: '描述', minWidth: 200, align: 'left', type: 'text' },
       { prop: 'iconUrl', label: '图标', width: 80, type: 'image' },

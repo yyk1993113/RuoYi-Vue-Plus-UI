@@ -15,7 +15,7 @@
           </el-avatar>
           <div class="user-info">
             <div class="top">
-              <span class="name">{{ seeker.realName || seeker.nickName || seeker.userName || '用户#' + (detail.userId || '') }}</span>
+              <span class="name">{{ seeker.realName || seeker.nickName || seeker.userName || '未知用户' }}</span>
               <el-tag v-if="seeker.education" size="small" effect="plain" class="edu-tag">{{ seeker.education }}</el-tag>
               <el-tag v-if="seeker.isRecruitmentSilenced === '1'" size="small" type="danger" effect="dark">已禁言</el-tag>
             </div>
@@ -265,7 +265,7 @@ function displayPhone(row?: { phone?: string }) {
 /** 对外暴露：按 applyId 打开并加载详情 */
 const open = async (applyId?: number) => {
   if (!applyId) {
-    ElMessage.warning('缺少投递ID，无法查看详情');
+    ElMessage.warning('缺少投递信息，无法查看详情');
     return;
   }
   detail.value = null;

@@ -9,6 +9,23 @@
           <el-form-item label="用户名称" prop="userName">
             <el-input v-model="queryParams.userName" placeholder="请输入用户名称" clearable @keyup.enter="handleQuery" />
           </el-form-item>
+          <el-form-item label="设备类型" prop="deviceType">
+            <el-select v-model="queryParams.deviceType" placeholder="全部设备" clearable style="width: 130px">
+              <el-option v-for="item in onlineDeviceOptions" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="所属部门" prop="deptId">
+            <el-tree-select
+              v-model="queryParams.deptId"
+              :data="deptOptions"
+              :props="{ label: 'label', children: 'children', value: 'id' }"
+              check-strictly
+              clearable
+              filterable
+              placeholder="全部部门"
+              style="width: 180px"
+            />
+          </el-form-item>
           <el-form-item>
             <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
             <el-button icon="Refresh" @click="resetQuery">重置</el-button>
@@ -33,7 +50,7 @@
         <el-table-column label="客户端" align="center" prop="clientKey" :show-overflow-tooltip="true" />
         <el-table-column label="设备类型" align="center">
           <template #default="scope">
-            <dict-tag :options="sys_device_type" :value="scope.row.deviceType" />
+            <span>{{ formatDeviceType(scope.row) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="所属部门" align="center" prop="deptName" :show-overflow-tooltip="true" />
@@ -64,30 +81,67 @@
 <script setup name="Online" lang="ts">
 import { forceLogout, list as initData } from '@/api/monitor/online';
 import { OnlineQuery, OnlineVO } from '@/api/monitor/online/types';
-import api from '@/api/system/user';
+import { deptTreeSelect } from '@/api/system/user';
+import type { DeptTreeVO } from '@/api/system/dept/types';
 import { to } from 'await-to-js';
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
-const { sys_device_type } = toRefs<any>(proxy?.useDict('sys_device_type'));
 
 const onlineList = ref<OnlineVO[]>([]);
 const loading = ref(true);
 const total = ref(0);
+const deptOptions = ref<DeptTreeVO[]>([]);
 
 const queryFormRef = ref<ElFormInstance>();
+
+const onlineDeviceOptions = [
+  { label: 'PC', value: 'pc' },
+  { label: '手机', value: 'mobile' }
+];
 
 const queryParams = ref<OnlineQuery>({
   pageNum: 1,
   pageSize: 10,
   ipaddr: '',
-  userName: ''
+  userName: '',
+  deviceType: '',
+  deptId: undefined
 });
+
+const normalizeText = (value?: string | number | null) => String(value ?? '').trim();
+
+const joinDeviceText = (row: OnlineVO) =>
+  [row.deviceType, row.clientKey, row.browser, row.os].map((item) => normalizeText(item)).join(' ').toLowerCase();
+
+const isMobileOnline = (row: OnlineVO) => {
+  const rowText = joinDeviceText(row);
+  return ['android', 'ios', 'iphone', 'ipad', 'mobile', 'phone', 'mini', 'xcx', 'micromessenger', 'wechat'].some((keyword) =>
+    rowText.includes(keyword)
+  );
+};
+
+const formatDeviceType = (row: OnlineVO) => {
+  const deviceType = normalizeText(row.deviceType).toLowerCase();
+  if (isMobileOnline(row)) return '手机';
+  if (deviceType === 'pc') return 'PC';
+  return normalizeText(row.deviceType) || 'PC';
+};
+
+const getLoginTimeValue = (row: OnlineVO) => Number(row.loginTime || 0);
+
+const sortByLatestLogin = (list: OnlineVO[]) => [...list].sort((a, b) => getLoginTimeValue(b) - getLoginTimeValue(a));
+
+const getDeptTree = async () => {
+  const res = await deptTreeSelect();
+  deptOptions.value = res.data || [];
+};
 
 /** 查询登录日志列表 */
 const getList = async () => {
   loading.value = true;
   const res = await initData(queryParams.value);
-  onlineList.value = res.rows;
+  // 在线会话来自 Redis，前端按登录时间倒序兜底，保证最近登录排在最前。
+  onlineList.value = sortByLatestLogin(res.rows || []);
   total.value = res.total;
   loading.value = false;
 };
@@ -112,6 +166,7 @@ const handleForceLogout = async (row: OnlineVO) => {
 };
 
 onMounted(() => {
+  getDeptTree();
   getList();
 });
 </script>

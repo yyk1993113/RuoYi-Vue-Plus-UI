@@ -1145,6 +1145,8 @@ export interface RecruitmentUserVO {
   salaryUnit?: string;
   jobType?: string;
   jobTypeName?: string;
+  employmentType?: string;
+  employmentTypeName?: string;
   skills?: string;
   summary?: string;
   /** C 端在线简历扩展模块，均为后端原样透传的 JSON 字符串。 */
@@ -1516,7 +1518,7 @@ export function bindInvoiceManage(data: { invoiceId: number; ledgerId: number })
   return request.post<any>(`${invoiceManageBaseUrl}/bind`, data);
 }
 
-// 变更发票开票状态（0未开票/1已开票/2已作废）
+// 变更发票开票状态（0未开票/1已开票/2已作废/3红冲）
 export function markInvoiceManageStatus(data: { invoiceId: number; status: string }) {
   return request.post<any>(`${invoiceManageBaseUrl}/markStatus`, data);
 }

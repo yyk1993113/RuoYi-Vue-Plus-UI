@@ -166,7 +166,7 @@
     <el-dialog v-model="recordDialog.visible" :title="recordDialog.title" width="1080px" append-to-body>
       <el-form :model="recordQuery" :inline="true" label-width="86px" class="mb-3">
         <el-form-item label="关键字">
-          <el-input v-model="recordQuery.keyword" placeholder="编号 / ID / 名称" clearable style="width: 220px" @keyup.enter="handleRecordQuery" />
+          <el-input v-model="recordQuery.keyword" placeholder="编号 / 名称" clearable style="width: 220px" @keyup.enter="handleRecordQuery" />
         </el-form-item>
         <el-form-item label="编号范围">
           <el-select v-model="recordQuery.codeScope" style="width: 150px">
@@ -204,7 +204,6 @@
         <el-table-column label="数据类型" width="110" align="center">
           <template #default="{ row }">{{ recordTypeLabel(row.recordType) }}</template>
         </el-table-column>
-        <el-table-column label="数据ID" prop="recordId" width="170" align="center" show-overflow-tooltip />
         <el-table-column label="业务编号" prop="serialNo" min-width="190" show-overflow-tooltip>
           <template #default="{ row }">{{ row.serialNo || '-' }}</template>
         </el-table-column>

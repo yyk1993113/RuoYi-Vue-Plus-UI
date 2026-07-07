@@ -210,7 +210,6 @@
 
     <el-dialog v-model="jobVisible" :title="jobTitle" width="980px" append-to-body destroy-on-close>
       <el-table v-loading="jobLoading" :data="jobList" border stripe>
-        <el-table-column label="岗位ID" prop="jobId" width="110" align="center" />
         <el-table-column label="岗位名称" prop="jobName" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">{{ row.jobName || '-' }}</template>
         </el-table-column>

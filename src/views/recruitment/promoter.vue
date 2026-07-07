@@ -1495,10 +1495,10 @@
         <el-table-column label="时间" prop="createTime" width="160" />
         <el-table-column label="动作" prop="actionName" width="110" />
         <el-table-column label="原推广人" min-width="120">
-          <template #default="{ row }">{{ row.fromPromoterName || (row.fromPromoterId ? row.fromPromoterId : '-') }}</template>
+          <template #default="{ row }">{{ row.fromPromoterName || '-' }}</template>
         </el-table-column>
         <el-table-column label="新推广人/协作人" min-width="120">
-          <template #default="{ row }">{{ row.toPromoterName || (row.toPromoterId ? row.toPromoterId : '-') }}</template>
+          <template #default="{ row }">{{ row.toPromoterName || '-' }}</template>
         </el-table-column>
         <el-table-column label="操作人" prop="operatorName" width="110" />
         <el-table-column label="备注" prop="remark" min-width="120" show-overflow-tooltip />
@@ -4112,7 +4112,7 @@ function openAdjustAttribution(row: PromotionAttributionDetailVO, context: 'deta
   adjustContext.value = context;
   adjustForm.objectType = row.objectType;
   adjustForm.objectId = row.objectId;
-  adjustForm.objectName = `${row.objectTypeName || detailObjectTypeName.value}：${row.objectName || row.objectId}`;
+  adjustForm.objectName = `${row.objectTypeName || detailObjectTypeName.value}：${row.objectName || '-'}`;
   adjustForm.promoterId = row.promoterId || undefined;
   // 回填已有协作人（后端明细已带出 collaborators）
   adjustForm.collaboratorIds = (row.collaborators || []).map((c) => c.promoterId!).filter((id) => id != null);
@@ -4136,7 +4136,7 @@ async function submitAdjustAttribution() {
   // 二次确认：是否绑定到所选推广人（未选则为清空归因）
   const picked = allPromoters.value.find((p) => String(p.promoterId) === String(adjustForm.promoterId));
   const confirmText = adjustForm.promoterId
-    ? `确认将「${adjustForm.objectName}」绑定到推广人「${picked?.name || adjustForm.promoterId}（${picked?.phonenumber || '-'}）」？`
+    ? `确认将「${adjustForm.objectName}」绑定到推广人「${picked?.name || '未命名推广人'}（${picked?.phonenumber || '-'}）」？`
     : `确认清空「${adjustForm.objectName}」的推广归因，转为自然流量？`;
   try {
     await ElMessageBox.confirm(confirmText, adjustForm.promoterId ? '绑定推广人' : '清空归因', {
@@ -4178,7 +4178,7 @@ const collaboratorCandidates = computed<PromoterVO[]>(() =>
 // 由推广人ID取展示label（姓名（手机号）），用于协作人转正列表
 function promoterLabel(promoterId: string | number) {
   const p = allPromoters.value.find((x) => String(x.promoterId) === String(promoterId));
-  return p ? `${p.name || '-'}（${p.phonenumber || '-'}）` : String(promoterId);
+  return p ? `${p.name || '-'}（${p.phonenumber || '-'}）` : '-';
 }
 
 // 协作人转正为主推广人（离职交接）：二次确认后调用归因接口的转正语义，成功后回刷
@@ -4316,7 +4316,7 @@ function buildPromotionLink(row: PromoterVO) {
   if (row.promotionLink) {
     return row.promotionLink;
   }
-  const code = row.promotionCode || (row.promoterId ? String(row.promoterId) : '');
+  const code = row.promotionCode || '';
   if (!code) {
     return '';
   }
@@ -4349,7 +4349,7 @@ function handleDownloadQrCode(row: PromoterVO) {
     ElMessage.warning('请先保存推广员');
     return;
   }
-  const fileName = `推广二维码_${row.name || row.promoterId}.jpg`;
+  const fileName = `推广二维码_${row.name || '推广员'}.jpg`;
   download(`/admin/recruitment/promoter/${row.promoterId}/qrcode/download`, {}, fileName);
 }
 

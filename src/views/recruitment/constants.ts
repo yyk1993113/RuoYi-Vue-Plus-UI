@@ -29,12 +29,13 @@ const TASK_STATUS: Record<string, StatusMeta> = {
 };
 export const taskStatusMeta = (status?: string | null): StatusMeta => resolve(TASK_STATUS, status, { label: '未知', type: 'info' });
 
-// ========== 发票状态 invoice：0未开票 / 1已开票 / 2已作废 ==========
-// 来源：invoice.vue 表格列与详情弹窗的 el-tag 阶梯；原 v-else 兜底为「已作废 / danger」。
+// ========== 发票状态 invoice：0未开票 / 1已开票 / 2已作废 / 3红冲 ==========
+// 来源：invoice.vue 表格列与详情弹窗的 el-tag 阶梯；红冲为运营上传发票弹窗新增常用状态。
 const INVOICE_STATUS: Record<string, StatusMeta> = {
   '0': { label: '未开票', type: 'warning' },
   '1': { label: '已开票', type: 'success' },
-  '2': { label: '已作废', type: 'danger' }
+  '2': { label: '已作废', type: 'danger' },
+  '3': { label: '红冲', type: 'danger' }
 };
 export const invoiceStatusMeta = (status?: string | null): StatusMeta => resolve(INVOICE_STATUS, status, INVOICE_STATUS['2']);
 

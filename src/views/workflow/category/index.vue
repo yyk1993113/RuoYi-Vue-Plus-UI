@@ -129,7 +129,7 @@ const data = reactive<PageData<CategoryForm, CategoryQuery>>({
     categoryName: undefined
   },
   rules: {
-    categoryId: [{ required: true, message: '流程分类ID不能为空', trigger: 'blur' }],
+    categoryId: [{ required: true, message: '流程分类不能为空', trigger: 'blur' }],
     parentId: [{ required: true, message: '请选择上级分类', trigger: 'change' }],
     categoryName: [{ required: true, message: '请输入分类名称', trigger: 'blur' }]
   }

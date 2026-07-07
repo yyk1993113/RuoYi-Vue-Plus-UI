@@ -828,7 +828,7 @@ function restoreLocalDraft() {
     lastAutoSavedText.value = '已恢复上次未提交的草稿';
     // 恢复企业名以便选择器回显
     if (form.companyId) {
-      companyOptions.value = [{ companyId: form.companyId, companyName: saved.__companyName || `企业#${form.companyId}` }];
+      companyOptions.value = [{ companyId: form.companyId, companyName: saved.__companyName || '已选企业' }];
     }
   } catch {
     /* ignore */
@@ -852,7 +852,7 @@ async function loadCopyFrom(jobId: string) {
     const res = await getJobFullDetail(jobId as any);
     const d: any = res.data || {};
     form.companyId = d.companyId ?? undefined;
-    if (d.companyId) companyOptions.value = [{ companyId: d.companyId, companyName: d.companyName || `企业#${d.companyId}` }];
+    if (d.companyId) companyOptions.value = [{ companyId: d.companyId, companyName: d.companyName || '已选企业' }];
     form.jobName = d.jobName || d.positionName || '';
     form.jobType = d.jobType != null ? String(d.jobType) : '0';
     applyPositionSnapshot(d.positionId, d.positionName, d.categoryId, d.categoryName || d.category);

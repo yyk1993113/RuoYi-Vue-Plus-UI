@@ -65,10 +65,10 @@
     <el-card shadow="hover" class="mb-4">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item label="投递编号" prop="applyId">
-          <el-input v-model="queryParams.applyId" placeholder="精确投递ID" clearable style="width: 150px" @keyup.enter="handleQuery" />
+          <el-input v-model="queryParams.applyId" placeholder="精确投递编号" clearable style="width: 150px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item label="企业编号" prop="companyId">
-          <el-input v-model="queryParams.companyId" placeholder="精确企业ID" clearable style="width: 150px" @keyup.enter="handleQuery" />
+          <el-input v-model="queryParams.companyId" placeholder="精确企业编号" clearable style="width: 150px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item label="投递时间" prop="dateRange">
           <el-date-picker
@@ -144,7 +144,7 @@
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column label="投递编码" prop="applyNo" width="190" align="center" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.applyNo || row.applyId || '-' }}
+            {{ row.applyNo || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="求职者信息" min-width="160">
@@ -154,7 +154,7 @@
                 {{ (row.userName || 'U').charAt(0) }}
               </el-avatar>
               <div class="user-detail">
-                <div class="name">{{ row.userName || (row.userId ? '用户#' + row.userId : '未知用户') }}</div>
+                <div class="name">{{ row.userName || '未知用户' }}</div>
                 <div class="phone">{{ displayPhone(row) }}</div>
               </div>
             </div>
@@ -163,14 +163,14 @@
         <el-table-column label="岗位信息" min-width="180">
           <template #default="{ row }">
             <div class="job-cell">
-              <div class="job-name">{{ row.jobName || (row.jobId ? '岗位#' + row.jobId : '-') }}</div>
+              <div class="job-name">{{ row.jobName || '-' }}</div>
               <div class="salary">{{ formatSalary(row.salaryMin, row.salaryMax, row.salaryUnit) }}</div>
             </div>
           </template>
         </el-table-column>
         <el-table-column label="企业" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.companyName || (row.companyId ? '企业#' + row.companyId : '-') }}
+            {{ row.companyName || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="投递时间" prop="applyTime" width="160" align="center" />
@@ -219,12 +219,12 @@
             </el-avatar>
             <div class="user-info">
               <div class="top">
-                <span class="name">{{ seeker.realName || seeker.nickName || seeker.userName || '用户#' + (detail.userId || '') }}</span>
+                <span class="name">{{ seeker.realName || seeker.nickName || seeker.userName || '未知用户' }}</span>
                 <el-tag v-if="seeker.education" size="small" effect="plain" class="edu-tag">{{ seeker.education }}</el-tag>
                 <el-tag v-if="seeker.isRecruitmentSilenced === '1'" size="small" type="danger" effect="dark">已禁言</el-tag>
               </div>
-              <div class="job-title">{{ job.jobName || '岗位#' + (detail.jobId || '') }}</div>
-              <div class="company-sub">{{ company.companyName || '企业#' + (detail.companyId || '') }}</div>
+              <div class="job-title">{{ job.jobName || '-' }}</div>
+              <div class="company-sub">{{ company.companyName || '-' }}</div>
             </div>
           </div>
           <div class="header-right">
@@ -361,14 +361,6 @@
                 <div class="block-title mt-6">流转信息</div>
                 <ul class="meta-info">
                   <li>
-                    <span class="label">投递ID</span>
-                    <span class="value">#{{ detail.applyId }}</span>
-                  </li>
-                  <li>
-                    <span class="label">企业ID</span>
-                    <span class="value">#{{ detail.companyId || '-' }}</span>
-                  </li>
-                  <li>
                     <span class="label">已读状态</span>
                     <span class="value">
                       <el-tag size="small" :type="detail.isRead === '1' ? 'success' : 'warning'">
@@ -414,7 +406,7 @@
                   <div v-if="detail.fulfillment && detail.fulfillment.tasks && detail.fulfillment.tasks.length" class="task-list">
                     <div v-for="t in detail.fulfillment.tasks" :key="t.taskId" class="task-item">
                       <div class="task-head">
-                        <span>任务 #{{ t.taskId }}</span>
+                        <span>{{ t.taskNo || t.platformServiceName || '履约任务' }}</span>
                         <el-tag size="small" :type="taskTagType(t.status)">{{ t.statusName || t.status }}</el-tag>
                       </div>
                       <div class="task-meta">

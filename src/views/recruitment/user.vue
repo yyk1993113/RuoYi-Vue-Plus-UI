@@ -129,10 +129,10 @@
       </template>
 
       <el-table v-loading="loading" :data="tableData" border stripe>
-        <!-- 求职者编码来自最新简历；历史无简历用户兜底展示用户ID，避免老数据空白。 -->
+        <!-- 求职者编码来自最新简历；历史无简历用户不展示内部主键。 -->
         <el-table-column label="求职者编码" prop="jobSeekerNo" width="180" align="center" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.jobSeekerNo || row.userId || '-' }}
+            {{ row.jobSeekerNo || '-' }}
           </template>
         </el-table-column>
 
@@ -266,7 +266,7 @@
             </el-avatar>
             <div class="resume-profile-main">
               <div class="resume-profile-name">{{ currentUser.realName || displayUserName(currentUser) }}</div>
-              <div class="resume-profile-meta">{{ currentUser.jobSeekerNo || currentUser.userId || '-' }}</div>
+              <div class="resume-profile-meta">{{ currentUser.jobSeekerNo || '-' }}</div>
             </div>
             <el-tag :type="resumeCompletenessType(currentUser)" size="small">{{ displayResumeCompleteness(currentUser) }}</el-tag>
           </div>
@@ -289,6 +289,7 @@
             <el-descriptions-item label="求职意向">{{ currentUser.expectPosition || '-' }}</el-descriptions-item>
             <el-descriptions-item label="期望城市">{{ currentUser.expectCity || '-' }}</el-descriptions-item>
             <el-descriptions-item label="求职类型">{{ displayJobType(currentUser) }}</el-descriptions-item>
+            <el-descriptions-item label="工作性质">{{ displayEmploymentType(currentUser) }}</el-descriptions-item>
             <el-descriptions-item label="求职状态">{{ displayJobStatus(currentUser) }}</el-descriptions-item>
             <el-descriptions-item label="到岗时间">{{ currentUser.expectedDate || '-' }}</el-descriptions-item>
             <el-descriptions-item label="工作年限">{{ currentUser.workYears != null ? currentUser.workYears + '年' : '-' }}</el-descriptions-item>
@@ -352,7 +353,6 @@
         <div class="detail-section">
           <div class="detail-section-title">账号信息</div>
           <el-descriptions :column="2" border>
-            <el-descriptions-item label="用户ID">{{ currentUser.userId }}</el-descriptions-item>
             <el-descriptions-item label="用户类型">
               <!-- C/B 是招聘业务对求职者/企业的标记;app_user/sys_user 是 RuoYi 框架自带的 sys_user.user_type 值。
                    本页是求职者管理,app端注册用户(app_user)本质即求职者,与 C 统一显示「求职者」;sys_user 为后台系统用户 -->
@@ -433,7 +433,7 @@
         <el-form-item label="投递编号">
           <el-input
             v-model="applyQueryParams.applyId"
-            placeholder="精确投递ID"
+            placeholder="精确投递编号"
             clearable
             style="width: 150px"
             @keyup.enter="handleApplyDialogQuery"
@@ -442,7 +442,7 @@
         <el-form-item label="企业编号">
           <el-input
             v-model="applyQueryParams.companyId"
-            placeholder="精确企业ID"
+            placeholder="精确企业编号"
             clearable
             style="width: 150px"
             @keyup.enter="handleApplyDialogQuery"
@@ -510,7 +510,7 @@
       <el-table v-loading="applyDialogLoading" :data="applyDialogData" border stripe max-height="460">
         <el-table-column label="投递编码" prop="applyNo" width="150" align="center" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.applyNo || row.applyId || '-' }}
+            {{ row.applyNo || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="岗位名称" prop="jobName" min-width="170" show-overflow-tooltip />
@@ -790,6 +790,13 @@ function displayJobType(row: RecruitmentUserVO | null) {
   if (!row?.resumeId) return '-';
   if (row.jobTypeName) return row.jobTypeName;
   return jobTypeMap[String(row.jobType ?? '0')] || String(row.jobType || '-');
+}
+
+function displayEmploymentType(row: RecruitmentUserVO | null) {
+  if (!row?.resumeId) return '-';
+  if (row.employmentTypeName) return row.employmentTypeName;
+  if (row.employmentType) return jobTypeMap[String(row.employmentType)] || String(row.employmentType);
+  return displayJobType(row);
 }
 
 function displayJobStatus(row: RecruitmentUserVO | null) {
@@ -1301,7 +1308,7 @@ async function handleUnsilence(row: RecruitmentUserVO | null) {
 
 function handleViewApplies(row: RecruitmentUserVO | null, status?: string) {
   if (!row?.userId) {
-    ElMessage.warning('缺少求职者用户ID，无法查询投递记录');
+    ElMessage.warning('缺少求职者信息，无法查询投递记录');
     return;
   }
   applyDialogUser.value = row;

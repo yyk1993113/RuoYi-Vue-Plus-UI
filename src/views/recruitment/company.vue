@@ -351,7 +351,6 @@
           <el-descriptions-item label="联系人">{{ currentCompany.contactPerson || '-' }}</el-descriptions-item>
           <el-descriptions-item label="联系电话">{{ currentCompany.contactPhone || '-' }}</el-descriptions-item>
           <el-descriptions-item label="联系微信">{{ currentCompany.contactWechat || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="创建人ID">{{ currentCompany.userId || '-' }}</el-descriptions-item>
           <el-descriptions-item label="职位数量">{{ currentCompany.jobCount || 0 }}</el-descriptions-item>
           <el-descriptions-item label="投递总数">{{ currentCompany.applyCount || 0 }}</el-descriptions-item>
           <el-descriptions-item label="禁言状态">
@@ -817,7 +816,7 @@
           <div class="company-chain-summary">
             <div>
               <div class="summary-title">{{ chainCascade.company.companyName || '-' }}</div>
-              <div class="summary-subtitle">{{ chainCascade.company.companyNo || chainCascade.company.companyId || '-' }}</div>
+              <div class="summary-subtitle">{{ chainCascade.company.companyNo || '-' }}</div>
             </div>
             <el-tag v-if="chainCascade.ledgers.length" type="success" effect="plain">已形成台账</el-tag>
             <el-tag v-else type="warning" effect="plain">线索跟进中</el-tag>
@@ -846,7 +845,6 @@
           <div v-else class="company-chain-detail">
             <div class="chain-detail-title">{{ activeChainTitle }}</div>
             <el-descriptions v-if="chainActiveNode === 'company'" :column="2" border>
-              <el-descriptions-item label="企业ID">{{ chainCascade.company.companyId || '-' }}</el-descriptions-item>
               <el-descriptions-item label="企业编码">{{ chainCascade.company.companyNo || '-' }}</el-descriptions-item>
               <el-descriptions-item label="企业名称">{{ chainCascade.company.companyName || '-' }}</el-descriptions-item>
               <el-descriptions-item label="联系人">{{ chainCascade.company.contactPerson || '-' }}</el-descriptions-item>
@@ -856,7 +854,6 @@
             </el-descriptions>
 
             <el-table v-else-if="chainActiveNode === 'job'" :data="chainCascade.jobs" border height="360" @row-click="selectChainJob">
-              <el-table-column prop="jobId" label="岗位ID" width="170" show-overflow-tooltip />
               <el-table-column prop="jobName" label="岗位名称" min-width="180" show-overflow-tooltip />
               <el-table-column label="用工性质" width="110">
                 <template #default="{ row }">{{ jobTypeMeta(row.jobType).label }}</template>
@@ -870,7 +867,6 @@
             </el-table>
 
             <el-table v-else-if="chainActiveNode === 'apply'" :data="chainCascade.applies" border height="360" @row-click="selectChainApply">
-              <el-table-column prop="applyId" label="投递ID" width="170" show-overflow-tooltip />
               <el-table-column prop="userName" label="求职人" width="130" show-overflow-tooltip />
               <el-table-column prop="phone" label="手机号" width="140" show-overflow-tooltip />
               <el-table-column label="状态" width="110">
@@ -880,14 +876,12 @@
             </el-table>
 
             <el-table v-else-if="chainActiveNode === 'user'" :data="chainCascade.users" border height="360" @row-click="selectChainUser">
-              <el-table-column prop="userId" label="求职人ID" width="170" show-overflow-tooltip />
               <el-table-column prop="userName" label="姓名" min-width="160" show-overflow-tooltip />
               <el-table-column prop="phone" label="手机号" width="150" show-overflow-tooltip />
               <el-table-column prop="applyCount" label="投递数" width="100" />
             </el-table>
 
             <el-table v-else-if="chainActiveNode === 'task'" :data="chainCascade.tasks" border height="360" @row-click="selectChainTask">
-              <el-table-column prop="taskId" label="履约ID" width="170" show-overflow-tooltip />
               <el-table-column prop="workerName" label="求职人" width="130" show-overflow-tooltip />
               <el-table-column prop="jobName" label="岗位" min-width="170" show-overflow-tooltip />
               <el-table-column prop="statusName" label="状态" width="110" show-overflow-tooltip />
@@ -903,7 +897,6 @@
               height="360"
               @row-click="(row) => (chainCascade.selectedLedger = row)"
             >
-              <el-table-column prop="ledgerId" label="台账ID" width="170" show-overflow-tooltip />
               <el-table-column prop="orderNo" label="台账编号" min-width="180" show-overflow-tooltip />
               <el-table-column label="金额" width="120">
                 <template #default="{ row }">¥{{ formatMoney(row.amount) }}</template>
@@ -1175,7 +1168,7 @@ const companyChainSteps = computed<CompanyChainStep[]>(() => {
   const company = chainCascade.company;
   if (!company) return [];
   return [
-    { kind: 'company', label: '企业', code: company.companyNo || String(company.companyId || '-'), desc: company.companyName },
+    { kind: 'company', label: '企业', code: company.companyNo || company.companyName || '-', desc: company.companyName },
     { kind: 'job', label: '岗位', code: `${chainCascade.jobs.length} 条`, desc: chainCascade.selectedJob?.jobName },
     { kind: 'apply', label: '投递', code: `${chainCascade.applies.length} 条`, desc: chainCascade.selectedApply?.userName },
     { kind: 'user', label: '求职人', code: `${chainCascade.users.length} 人`, desc: chainCascade.selectedUser?.userName },
@@ -1810,7 +1803,7 @@ async function handleStatusChange(row: any, status: string) {
 async function handleSettlementContacted(row: any) {
   const intentId = getSettlementIntentId(row);
   if (!intentId) {
-    ElMessage.warning('缺少结算意向ID，无法标记已联系');
+    ElMessage.warning('缺少结算意向信息，无法标记已联系');
     return;
   }
   try {
@@ -1830,7 +1823,7 @@ function getRowCompanyId(row: any) {
 async function openCompanyChain(row: any) {
   const companyId = getRowCompanyId(row);
   if (!companyId || companyId === '0') {
-    ElMessage.warning('该企业暂无企业ID，无法查询链路');
+    ElMessage.warning('该企业暂无可用信息，无法查询链路');
     return;
   }
   chainDrawerVisible.value = true;
@@ -2143,7 +2136,7 @@ const handleDraft = async () => {
  */
 const handleSave = async () => {
   if (!(form.value as any).companyId) {
-    ElMessage.warning('缺少企业ID，无法保存修改');
+    ElMessage.warning('缺少企业信息，无法保存修改');
     return;
   }
   formRef.value?.validate(async (valid: boolean) => {
