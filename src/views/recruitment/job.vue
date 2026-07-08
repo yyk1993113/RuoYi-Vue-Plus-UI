@@ -976,6 +976,11 @@ function cleanDetailText(value: unknown): string {
   return String(value ?? '').trim();
 }
 
+function normalizeDisplayText(value: unknown): string {
+  const text = cleanDetailText(value);
+  return text && !['-', '暂无', '未知', 'null', 'undefined'].includes(text) ? text : '';
+}
+
 function normalizeDateTimeText(value: unknown): string {
   return String(value ?? '').trim();
 }
@@ -989,9 +994,14 @@ function mergeJobDetail(row: Partial<JobFullVO>, detail?: Partial<JobFullVO> | n
 }
 
 function jobCategoryText(job?: JobFullVO | null): string {
-  const category = cleanDetailText(job?.categoryName || job?.category);
-  const position = cleanDetailText(job?.positionName);
-  const parts = [category, position].filter((item, index, arr) => item && arr.indexOf(item) === index);
+  const category = normalizeDisplayText(job?.categoryName) || normalizeDisplayText(job?.category);
+  const position = normalizeDisplayText(job?.positionName);
+  const seen = new Set<string>();
+  const parts = [category, position].filter((item) => {
+    if (!item || seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
   return parts.join(' / ') || '-';
 }
 

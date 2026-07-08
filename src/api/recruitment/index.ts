@@ -344,6 +344,7 @@ export interface InvoiceManageVO {
 // 运营台-发票上传请求体（对应后端 InvoiceUploadRequest）。
 // filePath 必填；其余可空，绑定台账时金额与归属企业以台账为准。
 export interface InvoiceUploadForm {
+  invoiceNo?: string;
   filePath?: string;
   ledgerId?: number;
   companyId?: number;

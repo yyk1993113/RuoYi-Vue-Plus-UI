@@ -172,6 +172,14 @@
       @closed="resetUploadForm"
     >
       <el-form ref="uploadFormRef" :model="uploadForm" :rules="uploadRules" label-width="104px" status-icon>
+        <el-form-item label="发票编码" prop="invoiceNo">
+          <el-input v-model="uploadForm.invoiceNo" placeholder="由 code 管理自动生成" readonly>
+            <template #append>
+              <el-button :loading="invoiceNoLoading" @click="generateInvoiceNo">换一个</el-button>
+            </template>
+          </el-input>
+          <div class="invoice-upload-tip">发票编码来自流水编号配置 INVOICE，提交时随发票一并保存。</div>
+        </el-form-item>
         <el-form-item label="发票文件" prop="filePath">
           <el-upload
             ref="invoiceUploadRef"
@@ -242,15 +250,20 @@
               >
                 <el-option v-for="item in ledgerOptions" :key="item.ledgerId" :label="formatLedgerShortLabel(item)" :value="item.ledgerId">
                   <div class="ledger-option">
-                    <span>{{ item.orderNo || '未编号台账' }}</span>
+                    <span class="ledger-option-main">
+                      <span>{{ item.orderNo || '未编号台账' }}</span>
+                      <el-tag size="small" :type="ledgerStatusMeta(item.status).type">{{ ledgerStatusMeta(item.status).label }}</el-tag>
+                    </span>
                     <span class="ledger-option-meta">{{ item.companyName || '企业-' }} / {{ item.amount != null ? formatMoney(item.amount) : '-' }} 元</span>
                   </div>
                 </el-option>
               </el-select>
             </el-tooltip>
             <div v-if="selectedUploadLedger" class="selected-ledger-meta">
-              已选 {{ formatLedgerShortLabel(selectedUploadLedger) }}，台账金额
+              已选 {{ formatLedgerShortLabel(selectedUploadLedger) }}，
+              {{ ledgerStatusMeta(selectedUploadLedger.status).label }}，台账金额
               {{ selectedUploadLedger.amount != null ? formatMoney(selectedUploadLedger.amount) : '-' }} 元
+              <el-button link type="primary" size="small" @click="openLedgerDetail(selectedUploadLedger)">查看详情</el-button>
             </div>
           </div>
         </el-form-item>
@@ -316,16 +329,48 @@
           >
             <el-option v-for="item in ledgerOptions" :key="item.ledgerId" :label="formatLedgerShortLabel(item)" :value="item.ledgerId">
               <div class="ledger-option">
-                <span>{{ item.orderNo || '未编号台账' }}</span>
+                <span class="ledger-option-main">
+                  <span>{{ item.orderNo || '未编号台账' }}</span>
+                  <el-tag size="small" :type="ledgerStatusMeta(item.status).type">{{ ledgerStatusMeta(item.status).label }}</el-tag>
+                </span>
                 <span class="ledger-option-meta">{{ item.companyName || '企业-' }} / {{ item.amount != null ? formatMoney(item.amount) : '-' }} 元</span>
               </div>
             </el-option>
           </el-select>
+          <div v-if="selectedBindLedger" class="selected-ledger-meta">
+            {{ selectedBindLedger.companyName || '企业-' }} / {{ ledgerStatusMeta(selectedBindLedger.status).label }} /
+            {{ selectedBindLedger.amount != null ? formatMoney(selectedBindLedger.amount) : '-' }} 元
+            <el-button link type="primary" size="small" @click="openLedgerDetail(selectedBindLedger)">查看详情</el-button>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="bindVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitting" @click="submitBind">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 关联台账详情：用于上传/改绑时核对已结算、待结算台账的企业、金额与发票绑定状态。 -->
+    <el-dialog v-model="ledgerDetailVisible" title="台账详情" width="640px" append-to-body>
+      <el-skeleton v-if="ledgerDetailLoading" :rows="5" animated />
+      <el-descriptions v-else-if="currentLedger" :column="2" border>
+        <el-descriptions-item label="台账编号" :span="2">{{ currentLedger.orderNo || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="企业">{{ currentLedger.companyName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="求职人">{{ currentLedger.userName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="结算金额">{{ currentLedger.amount != null ? formatMoney(currentLedger.amount) : '-' }} 元</el-descriptions-item>
+        <el-descriptions-item label="结算状态">
+          <el-tag :type="ledgerStatusMeta(currentLedger.status).type">{{ ledgerStatusMeta(currentLedger.status).label }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="发票状态">
+          <el-tag :type="ledgerInvoiceStatusMeta(currentLedger.invoiceStatus).type">{{ ledgerInvoiceStatusMeta(currentLedger.invoiceStatus).label }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="结算时间">{{ currentLedger.settleTime || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="创建时间">{{ currentLedger.createTime || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="结算备注" :span="2">{{ currentLedger.settleRemark || '暂无' }}</el-descriptions-item>
+      </el-descriptions>
+      <el-empty v-else description="暂无台账详情" />
+      <template #footer>
+        <el-button @click="ledgerDetailVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
@@ -339,6 +384,7 @@ import type { FormInstance, FormRules, UploadInstance, UploadProps } from 'eleme
 import { globalHeaders } from '@/utils/request';
 import {
   getInvoiceStatistics,
+  getLedger,
   listInvoiceLedgerOptions,
   listInvoiceManage,
   uploadInvoiceManage,
@@ -346,8 +392,9 @@ import {
   markInvoiceManageStatus
 } from '@/api/recruitment';
 import type { InvoiceManageVO, InvoiceUploadForm, LedgerVO } from '@/api/recruitment';
+import { nextSerialNo } from '@/api/recruitment/serialRule';
 import { unwrapList, formatMoney } from './helpers';
-import { invoiceStatusMeta } from './constants';
+import { invoiceStatusMeta, ledgerInvoiceStatusMeta, ledgerStatusMeta } from './constants';
 
 interface InvoiceFileMeta {
   name: string;
@@ -357,6 +404,7 @@ interface InvoiceFileMeta {
 }
 
 type InvoiceUploadDialogForm = Omit<InvoiceUploadForm, 'filePath' | 'companyId' | 'amount' | 'status' | 'remark'> & {
+  invoiceNo: string;
   filePath: string;
   companyId?: number | string;
   amount: string;
@@ -374,6 +422,10 @@ const currentInvoice = ref<any>(null);
 const queryFormRef = ref<FormInstance>();
 const ledgerOptions = ref<LedgerVO[]>([]);
 const ledgerLoading = ref(false);
+const invoiceNoLoading = ref(false);
+const ledgerDetailVisible = ref(false);
+const ledgerDetailLoading = ref(false);
+const currentLedger = ref<LedgerVO | null>(null);
 
 const queryParams = reactive({
   pageNum: 1,
@@ -407,6 +459,7 @@ const invoiceFileMeta = reactive<InvoiceFileMeta>({
   url: ''
 });
 const uploadForm = reactive<InvoiceUploadDialogForm>({
+  invoiceNo: '',
   filePath: '',
   ledgerId: undefined,
   companyId: undefined,
@@ -415,6 +468,7 @@ const uploadForm = reactive<InvoiceUploadDialogForm>({
   remark: ''
 });
 const uploadRules: FormRules<InvoiceUploadDialogForm> = {
+  invoiceNo: [{ required: true, message: '请先生成发票编码', trigger: 'change' }],
   filePath: [{ required: true, message: '请先上传发票文件', trigger: 'change' }],
   amount: [
     { required: true, message: '请输入发票金额', trigger: 'blur' },
@@ -431,7 +485,9 @@ const isAmountOverLedger = computed(() => {
   const invoiceAmount = Number(uploadForm.amount);
   return Number.isFinite(ledgerAmount) && Number.isFinite(invoiceAmount) && invoiceAmount > ledgerAmount;
 });
-const canSubmitUpload = computed(() => Boolean(uploadForm.filePath && isValidInvoiceAmount(uploadForm.amount) && !invoiceUploading.value && !submitting.value));
+const canSubmitUpload = computed(() =>
+  Boolean(uploadForm.invoiceNo && uploadForm.filePath && isValidInvoiceAmount(uploadForm.amount) && !invoiceUploading.value && !submitting.value)
+);
 
 // ===== 绑定台账对话框 =====
 const bindVisible = ref(false);
@@ -443,6 +499,7 @@ const bindForm = reactive<{ invoiceId?: number; ledgerId?: number }>({
 const bindRules = {
   ledgerId: [{ required: true, message: '请选择台账', trigger: 'change' }]
 };
+const selectedBindLedger = computed(() => findLedgerOption(bindForm.ledgerId));
 
 function validateInvoiceAmount(_: unknown, value: string, callback: (error?: Error) => void) {
   if (!value) {
@@ -509,21 +566,25 @@ async function loadLedgerOptions(keyword = '') {
   ledgerLoading.value = true;
   try {
     const trimmedKeyword = keyword.trim();
-    const orderNoQuery = listInvoiceLedgerOptions({
-      pageNum: 1,
-      pageSize: 20,
-      orderNo: trimmedKeyword || undefined
-    });
+    const buildLedgerQueries = (baseParams: Record<string, unknown>) =>
+      ['0', '1'].map((status) =>
+        listInvoiceLedgerOptions({
+          pageNum: 1,
+          pageSize: 20,
+          status,
+          ...baseParams
+        })
+      );
+    const orderNoQueries = buildLedgerQueries({ orderNo: trimmedKeyword || undefined });
     // 台账选择同时承担“按台账号”和“按企业ID”找台账，避免运营复制长台账号。
-    const companyIdQuery =
+    const companyIdQueries =
       trimmedKeyword && /^\d+$/.test(trimmedKeyword)
-        ? listInvoiceLedgerOptions({
-            pageNum: 1,
-            pageSize: 20,
+        ? buildLedgerQueries({
             companyId: trimmedKeyword
           })
-        : null;
-    const responses = await Promise.all(companyIdQuery ? [orderNoQuery, companyIdQuery] : [orderNoQuery]);
+        : [];
+    // 发票关联台账需要同时露出待结算与已结算，便于财务按实际开票节奏先绑后结或结后补票。
+    const responses = await Promise.all([...orderNoQueries, ...companyIdQueries]);
     const rows = responses.flatMap((res) => unwrapList<LedgerVO>(res).rows);
     ledgerOptions.value = mergeLedgerOptions(ledgerOptions.value.filter(isSelectedLedger), rows);
   } catch (error) {
@@ -546,7 +607,18 @@ function mergeLedgerOptions(left: LedgerVO[], right: LedgerVO[]) {
       map.set(Number(item.ledgerId), item);
     }
   });
-  return Array.from(map.values());
+  return Array.from(map.values()).sort(compareInvoiceLedgerOption);
+}
+
+function compareInvoiceLedgerOption(a: LedgerVO, b: LedgerVO) {
+  const statusWeight = (status?: string | null) => {
+    if (String(status) === '1') return 0;
+    if (String(status) === '0') return 1;
+    return 2;
+  };
+  const statusDiff = statusWeight(a.status) - statusWeight(b.status);
+  if (statusDiff !== 0) return statusDiff;
+  return String(b.createTime || b.orderNo || '').localeCompare(String(a.createTime || a.orderNo || ''));
 }
 
 function isSelectedLedger(item: LedgerVO) {
@@ -562,7 +634,7 @@ function formatLedgerLabel(item: LedgerVO) {
   const orderNo = formatLedgerShortLabel(item);
   const company = item.companyName || '企业-';
   const amount = item.amount != null ? `${formatMoney(item.amount)}元` : '金额-';
-  return `${orderNo} / ${company} / ${amount}`;
+  return `${orderNo} / ${ledgerStatusMeta(item.status).label} / ${company} / ${amount}`;
 }
 
 function formatLedgerTooltip(item?: LedgerVO | null) {
@@ -647,15 +719,51 @@ function previewFile(filePath: string) {
   window.open(filePath, '_blank');
 }
 
+function readSerialNo(payload: any) {
+  return payload?.data?.serialNo || payload?.serialNo || '';
+}
+
+async function generateInvoiceNo() {
+  invoiceNoLoading.value = true;
+  try {
+    const res = await nextSerialNo('INVOICE');
+    uploadForm.invoiceNo = readSerialNo(res);
+    uploadFormRef.value?.validateField('invoiceNo');
+  } catch (error) {
+    console.error('生成发票编码失败:', error);
+    ElMessage.error('生成发票编码失败，请检查 code 管理中的 INVOICE 规则');
+  } finally {
+    invoiceNoLoading.value = false;
+  }
+}
+
+async function openLedgerDetail(row?: LedgerVO | null) {
+  if (!row?.ledgerId) return;
+  ledgerDetailVisible.value = true;
+  ledgerDetailLoading.value = true;
+  currentLedger.value = row;
+  try {
+    const res = await getLedger(Number(row.ledgerId));
+    currentLedger.value = res.data || row;
+  } catch (error) {
+    console.error('加载台账详情失败:', error);
+    ElMessage.error('加载台账详情失败');
+  } finally {
+    ledgerDetailLoading.value = false;
+  }
+}
+
 // ===== 上传发票流程 =====
 function handleUploadOpen() {
   uploadVisible.value = true;
+  generateInvoiceNo();
   loadLedgerOptions();
 }
 
 function resetUploadForm() {
   uploadFormRef.value?.resetFields();
   invoiceUploadRef.value?.clearFiles();
+  uploadForm.invoiceNo = '';
   uploadForm.filePath = '';
   uploadForm.ledgerId = undefined;
   uploadForm.companyId = undefined;
@@ -794,6 +902,7 @@ async function submitUpload() {
   try {
     // 组装请求体：文件 URL 来自 OSS；台账/企业/金额按当前表单快照提交，便于后端写审计。
     const payload: InvoiceUploadForm = {
+      invoiceNo: uploadForm.invoiceNo,
       filePath: uploadForm.filePath,
       status: uploadForm.status
     };
@@ -946,6 +1055,13 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.ledger-option-main {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
 }
 
 .ledger-option-meta {
