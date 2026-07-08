@@ -254,14 +254,15 @@
                       <span>{{ item.orderNo || '未编号台账' }}</span>
                       <el-tag size="small" :type="ledgerStatusMeta(item.status).type">{{ ledgerStatusMeta(item.status).label }}</el-tag>
                     </span>
-                    <span class="ledger-option-meta">{{ item.companyName || '企业-' }} / {{ item.amount != null ? formatMoney(item.amount) : '-' }} 元</span>
+                    <span class="ledger-option-meta"
+                      >{{ item.companyName || '企业-' }} / {{ item.amount != null ? formatMoney(item.amount) : '-' }} 元</span
+                    >
                   </div>
                 </el-option>
               </el-select>
             </el-tooltip>
             <div v-if="selectedUploadLedger" class="selected-ledger-meta">
-              已选 {{ formatLedgerShortLabel(selectedUploadLedger) }}，
-              {{ ledgerStatusMeta(selectedUploadLedger.status).label }}，台账金额
+              已选 {{ formatLedgerShortLabel(selectedUploadLedger) }}， {{ ledgerStatusMeta(selectedUploadLedger.status).label }}，台账金额
               {{ selectedUploadLedger.amount != null ? formatMoney(selectedUploadLedger.amount) : '-' }} 元
               <el-button link type="primary" size="small" @click="openLedgerDetail(selectedUploadLedger)">查看详情</el-button>
             </div>
@@ -333,7 +334,9 @@
                   <span>{{ item.orderNo || '未编号台账' }}</span>
                   <el-tag size="small" :type="ledgerStatusMeta(item.status).type">{{ ledgerStatusMeta(item.status).label }}</el-tag>
                 </span>
-                <span class="ledger-option-meta">{{ item.companyName || '企业-' }} / {{ item.amount != null ? formatMoney(item.amount) : '-' }} 元</span>
+                <span class="ledger-option-meta"
+                  >{{ item.companyName || '企业-' }} / {{ item.amount != null ? formatMoney(item.amount) : '-' }} 元</span
+                >
               </div>
             </el-option>
           </el-select>
@@ -362,7 +365,9 @@
           <el-tag :type="ledgerStatusMeta(currentLedger.status).type">{{ ledgerStatusMeta(currentLedger.status).label }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="发票状态">
-          <el-tag :type="ledgerInvoiceStatusMeta(currentLedger.invoiceStatus).type">{{ ledgerInvoiceStatusMeta(currentLedger.invoiceStatus).label }}</el-tag>
+          <el-tag :type="ledgerInvoiceStatusMeta(currentLedger.invoiceStatus).type">{{
+            ledgerInvoiceStatusMeta(currentLedger.invoiceStatus).label
+          }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="结算时间">{{ currentLedger.settleTime || '-' }}</el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ currentLedger.createTime || '-' }}</el-descriptions-item>
@@ -411,6 +416,7 @@ type InvoiceUploadDialogForm = Omit<InvoiceUploadForm, 'filePath' | 'companyId' 
   status: string;
   remark: string;
 };
+type SnowflakeId = number | string;
 
 const loading = ref(false);
 const router = useRouter();
@@ -492,7 +498,7 @@ const canSubmitUpload = computed(() =>
 // ===== 绑定台账对话框 =====
 const bindVisible = ref(false);
 const bindFormRef = ref<FormInstance>();
-const bindForm = reactive<{ invoiceId?: number; ledgerId?: number }>({
+const bindForm = reactive<{ invoiceId?: SnowflakeId; ledgerId?: SnowflakeId }>({
   invoiceId: undefined,
   ledgerId: undefined
 });
@@ -522,6 +528,16 @@ function isValidInvoiceAmount(value?: string) {
 function toAmountText(amount?: number | string | null) {
   if (amount == null || amount === '' || isNaN(Number(amount))) return '';
   return Number(amount).toFixed(2);
+}
+
+function idKey(value?: SnowflakeId | null) {
+  return value == null || value === '' ? undefined : String(value);
+}
+
+function isSameId(left?: SnowflakeId | null, right?: SnowflakeId | null) {
+  const leftId = idKey(left);
+  const rightId = idKey(right);
+  return Boolean(leftId && rightId && leftId === rightId);
 }
 
 function sanitizeAmountInput(value: string | number) {
@@ -601,10 +617,11 @@ function handleLedgerVisibleChange(visible: boolean) {
 }
 
 function mergeLedgerOptions(left: LedgerVO[], right: LedgerVO[]) {
-  const map = new Map<number, LedgerVO>();
+  const map = new Map<string, LedgerVO>();
   [...left, ...right].forEach((item) => {
-    if (item.ledgerId != null) {
-      map.set(Number(item.ledgerId), item);
+    const ledgerId = idKey(item.ledgerId);
+    if (ledgerId) {
+      map.set(ledgerId, item);
     }
   });
   return Array.from(map.values()).sort(compareInvoiceLedgerOption);
@@ -622,7 +639,7 @@ function compareInvoiceLedgerOption(a: LedgerVO, b: LedgerVO) {
 }
 
 function isSelectedLedger(item: LedgerVO) {
-  return item.ledgerId === uploadForm.ledgerId || item.ledgerId === bindForm.ledgerId;
+  return isSameId(item.ledgerId, uploadForm.ledgerId) || isSameId(item.ledgerId, bindForm.ledgerId);
 }
 
 function formatLedgerShortLabel(item?: LedgerVO | null) {
@@ -642,8 +659,9 @@ function formatLedgerTooltip(item?: LedgerVO | null) {
 }
 
 function findLedgerOption(ledgerId?: number | string) {
-  if (ledgerId == null || ledgerId === '') return undefined;
-  return ledgerOptions.value.find((item) => Number(item.ledgerId) === Number(ledgerId));
+  const targetId = idKey(ledgerId);
+  if (!targetId) return undefined;
+  return ledgerOptions.value.find((item) => idKey(item.ledgerId) === targetId);
 }
 
 function handleUploadLedgerChange(ledgerId?: number | string) {
@@ -738,12 +756,13 @@ async function generateInvoiceNo() {
 }
 
 async function openLedgerDetail(row?: LedgerVO | null) {
-  if (!row?.ledgerId) return;
+  const ledgerId = idKey(row?.ledgerId);
+  if (!ledgerId) return;
   ledgerDetailVisible.value = true;
   ledgerDetailLoading.value = true;
   currentLedger.value = row;
   try {
-    const res = await getLedger(Number(row.ledgerId));
+    const res = await getLedger(ledgerId);
     currentLedger.value = res.data || row;
   } catch (error) {
     console.error('加载台账详情失败:', error);
@@ -906,8 +925,10 @@ async function submitUpload() {
       filePath: uploadForm.filePath,
       status: uploadForm.status
     };
-    if (uploadForm.ledgerId) payload.ledgerId = Number(uploadForm.ledgerId);
-    if (uploadForm.companyId) payload.companyId = Number(uploadForm.companyId);
+    const ledgerId = idKey(uploadForm.ledgerId);
+    const companyId = idKey(uploadForm.companyId);
+    if (ledgerId) payload.ledgerId = ledgerId;
+    if (companyId) payload.companyId = companyId;
     if (uploadForm.amount) payload.amount = Number(uploadForm.amount);
     if (uploadForm.remark) payload.remark = uploadForm.remark.trim();
     await uploadInvoiceManage(payload);
@@ -949,11 +970,14 @@ async function submitBind() {
   if (!bindFormRef.value) return;
   await bindFormRef.value.validate(async (valid) => {
     if (!valid) return;
+    const invoiceId = idKey(bindForm.invoiceId);
+    const ledgerId = idKey(bindForm.ledgerId);
+    if (!invoiceId || !ledgerId) return;
     submitting.value = true;
     try {
       await bindInvoiceManage({
-        invoiceId: bindForm.invoiceId as number,
-        ledgerId: bindForm.ledgerId as number
+        invoiceId,
+        ledgerId
       });
       ElMessage.success('绑定成功');
       bindVisible.value = false;
@@ -969,13 +993,15 @@ async function submitBind() {
 // ===== 标记开票状态：走 markInvoiceManageStatus(/admin/invoice-manage/markStatus) =====
 async function handleStatusChange(row: InvoiceManageVO, status: string) {
   const statusText = invoiceStatusMeta(status).label;
+  const invoiceId = idKey(row.invoiceId);
+  if (!invoiceId) return;
   try {
     await ElMessageBox.confirm(`确认要将该发票标记为"${statusText}"吗？`, '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
     });
-    await markInvoiceManageStatus({ invoiceId: row.invoiceId as number, status });
+    await markInvoiceManageStatus({ invoiceId, status });
     ElMessage.success('更新成功');
     loadData();
     loadStatistics();

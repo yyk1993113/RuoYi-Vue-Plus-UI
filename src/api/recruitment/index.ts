@@ -275,7 +275,7 @@ export interface LedgerStatistics {
 }
 
 export interface LedgerVO {
-  ledgerId?: number;
+  ledgerId?: number | string;
   taskId?: number;
   // 岗位ID（后端 Ledger.jobId），操作/跳转用；展示编号优先用 jobNo
   jobId?: number;
@@ -285,7 +285,7 @@ export interface LedgerVO {
   applyNo?: string;
   taskNo?: string;
   jobSeekerNo?: string;
-  companyId?: number;
+  companyId?: number | string;
   companyName?: string;
   userId?: number;
   userName?: string;
@@ -313,10 +313,10 @@ export interface InvoiceStatistics {
 }
 
 export interface InvoiceVO {
-  invoiceId?: number;
+  invoiceId?: number | string;
   invoiceNo?: string;
-  ledgerId?: number;
-  companyId?: number;
+  ledgerId?: number | string;
+  companyId?: number | string;
   companyName?: string;
   filePath?: string;
   status?: string;
@@ -328,11 +328,11 @@ export interface InvoiceVO {
 // 运营台-发票上传/绑定管理列表 VO（对应后端 InvoiceManageVO）。
 // 金额 amount / 绑定台账号 ledgerOrderNo 派生自绑定台账 ledger；createByName 为上传人昵称。
 export interface InvoiceManageVO {
-  invoiceId?: number;
+  invoiceId?: number | string;
   invoiceNo?: string;
-  ledgerId?: number;
+  ledgerId?: number | string;
   ledgerOrderNo?: string;
-  companyId?: number;
+  companyId?: number | string;
   filePath?: string;
   status?: string;
   amount?: number;
@@ -346,8 +346,8 @@ export interface InvoiceManageVO {
 export interface InvoiceUploadForm {
   invoiceNo?: string;
   filePath?: string;
-  ledgerId?: number;
-  companyId?: number;
+  ledgerId?: number | string;
+  companyId?: number | string;
   amount?: number;
   status?: string;
   remark?: string;
@@ -1553,7 +1553,7 @@ export function listLedger(query: LedgerQuery) {
   return request.get<any>(`${baseUrl}/ledger/list`, { params: query });
 }
 
-export function getLedger(ledgerId: number) {
+export function getLedger(ledgerId: number | string) {
   return request.get<any>(`${baseUrl}/ledger/${ledgerId}`);
 }
 
@@ -1562,7 +1562,7 @@ export function getLedgerStatistics() {
 }
 
 // 标记台账已结算（单条/批量）：后端仅对「待结算」生效、限财务/超管、写审计
-export function settleLedger(data: { ledgerIds: number[]; remark?: string }) {
+export function settleLedger(data: { ledgerIds: Array<number | string>; remark?: string }) {
   return request.post(`${baseUrl}/ledger/settle`, data);
 }
 
@@ -1572,11 +1572,11 @@ export function listInvoice(query: InvoiceQuery) {
   return request.get<any>(`${baseUrl}/invoice/list`, { params: query });
 }
 
-export function getInvoice(invoiceId: number) {
+export function getInvoice(invoiceId: number | string) {
   return request.get<any>(`${baseUrl}/invoice/${invoiceId}`);
 }
 
-export function updateInvoiceStatus(data: { invoiceId: number; status: string }) {
+export function updateInvoiceStatus(data: { invoiceId: number | string; status: string }) {
   return request.post(`${baseUrl}/invoice/updateStatus`, data);
 }
 
@@ -1606,12 +1606,12 @@ export function uploadInvoiceManage(data: InvoiceUploadForm) {
 }
 
 // 绑定（或改绑）发票到台账
-export function bindInvoiceManage(data: { invoiceId: number; ledgerId: number }) {
+export function bindInvoiceManage(data: { invoiceId: number | string; ledgerId: number | string }) {
   return request.post<any>(`${invoiceManageBaseUrl}/bind`, data);
 }
 
 // 变更发票开票状态（0未开票/1已开票/2已作废/3红冲）
-export function markInvoiceManageStatus(data: { invoiceId: number; status: string }) {
+export function markInvoiceManageStatus(data: { invoiceId: number | string; status: string }) {
   return request.post<any>(`${invoiceManageBaseUrl}/markStatus`, data);
 }
 
