@@ -57,6 +57,8 @@ const CONTENT_IMAGE_PATH = '/api/content/oss/image/';
 const contentImagePathPattern = /^(?:https?:\/\/[^/]+)?(?:\/(?:dev-api|prod-api))?(\/api\/content\/oss\/image\/[^"'<\s]+)$/i;
 const uploadedPreviewUrlMap = new Map<string, string>();
 const uploadedPortableUrlMap = new Map<string, string>();
+const resolvedPortableUrlMap = new Map<string, string>();
+let modelSyncSeq = 0;
 
 const options = ref<any>({
   theme: 'snow',
@@ -121,10 +123,45 @@ const extractPortableContentImagePath = (url: string) => {
   return matched ? matched[1] : '';
 };
 
+const extractPortableContentImageId = (portablePath: string) => {
+  const id = portablePath.startsWith(CONTENT_IMAGE_PATH) ? portablePath.slice(CONTENT_IMAGE_PATH.length) : '';
+  return /^\d+$/.test(id) ? id : '';
+};
+
+const collectPortableContentImageIds = (html: string) => {
+  const ids = new Set<string>();
+  String(html || '').replace(/<img\b[^>]*?\bsrc\s*=\s*(["'])(.*?)\1/gi, (_match, _quote, src) => {
+    const portablePath = extractPortableContentImagePath(src);
+    const id = extractPortableContentImageId(portablePath);
+    if (id && !uploadedPortableUrlMap.has(portablePath) && !resolvedPortableUrlMap.has(portablePath)) {
+      ids.add(id);
+    }
+    return _match;
+  });
+  return Array.from(ids);
+};
+
+const resolvePortableContentImageUrls = async (html: string) => {
+  const ids = collectPortableContentImageIds(html);
+  if (!ids.length) return;
+  try {
+    const res: any = await request.get(`/resource/oss/listByIds/${ids.join(',')}`);
+    (res?.data || []).forEach((oss: any) => {
+      if (oss?.ossId && oss?.url) {
+        resolvedPortableUrlMap.set(buildPortableContentImageUrl(oss.ossId), oss.url);
+      }
+    });
+  } catch {
+    // 签名失败时保留原业务路径兜底，不影响内容编辑和保存。
+  }
+};
+
 const normalizeContentImageUrl = (url: string, mode: 'preview' | 'portable') => {
   const portablePath = extractPortableContentImagePath(url);
   if (portablePath) {
-    return mode === 'preview' ? uploadedPortableUrlMap.get(portablePath) || buildPreviewContentImageUrl(portablePath) : portablePath;
+    return mode === 'preview'
+      ? uploadedPortableUrlMap.get(portablePath) || resolvedPortableUrlMap.get(portablePath) || buildPreviewContentImageUrl(portablePath)
+      : portablePath;
   }
   if (mode === 'portable') {
     const decodedUrl = decodeHtmlAttribute(url);
@@ -148,7 +185,14 @@ const toModelContent = (html: string) => (props.type === 'url' ? rewriteContentI
 
 watch(
   () => props.modelValue,
-  (v: string) => {
+  async (v: string) => {
+    const seq = ++modelSyncSeq;
+    if (props.type === 'url') {
+      await resolvePortableContentImageUrls(v || '');
+    }
+    if (seq !== modelSyncSeq) {
+      return;
+    }
     const next = toEditorContent(v || '<p></p>');
     if (next !== content.value) {
       content.value = next;
