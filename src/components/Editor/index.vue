@@ -56,6 +56,7 @@ const uploadRef = ref<HTMLDivElement>();
 const CONTENT_IMAGE_PATH = '/api/content/oss/image/';
 const contentImagePathPattern = /^(?:https?:\/\/[^/]+)?(?:\/(?:dev-api|prod-api))?(\/api\/content\/oss\/image\/[^"'<\s]+)$/i;
 const uploadedPreviewUrlMap = new Map<string, string>();
+const uploadedPortableUrlMap = new Map<string, string>();
 
 const options = ref<any>({
   theme: 'snow',
@@ -123,7 +124,7 @@ const extractPortableContentImagePath = (url: string) => {
 const normalizeContentImageUrl = (url: string, mode: 'preview' | 'portable') => {
   const portablePath = extractPortableContentImagePath(url);
   if (portablePath) {
-    return mode === 'preview' ? buildPreviewContentImageUrl(portablePath) : portablePath;
+    return mode === 'preview' ? uploadedPortableUrlMap.get(portablePath) || buildPreviewContentImageUrl(portablePath) : portablePath;
   }
   if (mode === 'portable') {
     const decodedUrl = decodeHtmlAttribute(url);
@@ -204,15 +205,22 @@ const handleUploadRequest: UploadRequestHandler = (options: UploadRequestOptions
         .then((res: any) => {
           const ossId = res?.data?.ossId;
           const previewUrl = res?.data?.url;
-          if (!previewUrl) {
+          if (!previewUrl && !ossId) {
             throw new Error('empty image url');
           }
+          const portableUrl = ossId ? buildPortableContentImageUrl(ossId) : previewUrl;
+          // 私有 OSS 图片展示优先复用上传接口返回的临时签名 URL；保存时仍写稳定业务路径。
+          const editorImageUrl = previewUrl || (ossId ? buildPreviewContentImageUrl(portableUrl) : previewUrl);
           if (ossId) {
-            uploadedPreviewUrlMap.set(previewUrl, buildPortableContentImageUrl(ossId));
+            if (previewUrl) {
+              uploadedPreviewUrlMap.set(previewUrl, portableUrl);
+            }
+            uploadedPreviewUrlMap.set(editorImageUrl, portableUrl);
+            uploadedPortableUrlMap.set(portableUrl, editorImageUrl);
           }
-          insertImageToEditor(previewUrl);
+          insertImageToEditor(editorImageUrl);
           proxy?.$modal.closeLoading();
-          options.onSuccess?.({ url: previewUrl });
+          options.onSuccess?.({ url: editorImageUrl });
           resolve();
         })
         .catch((err: any) => {

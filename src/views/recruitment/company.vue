@@ -205,13 +205,7 @@
         </el-row>
       </template>
 
-      <el-table
-        v-loading="loading"
-        :data="tableData"
-        border
-        stripe
-        @selection-change="handleSelectionChange"
-      >
+      <el-table v-loading="loading" :data="tableData" border stripe @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="50" align="center" />
         <el-table-column label="企业编码" prop="companyNo" width="180" align="center" show-overflow-tooltip>
           <template #default="{ row }">{{ row.companyNo || '-' }}</template>
@@ -890,13 +884,7 @@
               </el-table-column>
             </el-table>
 
-            <el-table
-              v-else-if="chainActiveNode === 'ledger'"
-              :data="chainCascade.ledgers"
-              border
-              height="360"
-              @row-click="(row) => (chainCascade.selectedLedger = row)"
-            >
+            <el-table v-else-if="chainActiveNode === 'ledger'" :data="chainCascade.ledgers" border height="360" @row-click="selectChainLedger">
               <el-table-column prop="orderNo" label="台账编号" min-width="180" show-overflow-tooltip />
               <el-table-column label="金额" width="120">
                 <template #default="{ row }">¥{{ formatMoney(row.amount) }}</template>
@@ -907,6 +895,18 @@
               <el-table-column label="发票状态" width="110">
                 <template #default="{ row }">{{ ledgerInvoiceStatusMeta(row.invoiceStatus).label }}</template>
               </el-table-column>
+            </el-table>
+
+            <el-table v-else-if="chainActiveNode === 'invoice'" :data="chainCascade.invoices" border height="360">
+              <el-table-column prop="invoiceNo" label="发票编号" min-width="180" show-overflow-tooltip />
+              <el-table-column label="金额" width="120">
+                <template #default="{ row }">{{ row.amount != null ? `¥${formatMoney(row.amount)}` : '-' }}</template>
+              </el-table-column>
+              <el-table-column label="状态" width="110">
+                <template #default="{ row }">{{ invoiceStatusMeta(row.status).label }}</template>
+              </el-table-column>
+              <el-table-column prop="ledgerOrderNo" label="绑定台账" min-width="180" show-overflow-tooltip />
+              <el-table-column prop="createTime" label="上传时间" min-width="160" show-overflow-tooltip />
             </el-table>
 
             <el-empty v-else description="暂无详情" />
@@ -938,9 +938,11 @@ import {
   listJob,
   listTask,
   listLedger,
+  listInvoiceManage,
   markCompanySettlementIntentContacted,
   type CompanyAuditHistoryVO,
   type CompanyCertVO,
+  type InvoiceManageVO,
   type JobVO,
   addOrUpdate,
   delCompany,
@@ -958,7 +960,8 @@ import {
   jobStatusMeta,
   jobTypeMeta,
   ledgerStatusMeta,
-  ledgerInvoiceStatusMeta
+  ledgerInvoiceStatusMeta,
+  invoiceStatusMeta
 } from './constants';
 import { UserForm } from '@/api/system/user/types';
 import { updateUserProfile } from '@/api/system/user';
@@ -975,7 +978,7 @@ interface CertMaterialFile {
   suffix?: string;
 }
 
-type ChainNodeKind = 'company' | 'job' | 'user' | 'apply' | 'task' | 'ledger';
+type ChainNodeKind = 'company' | 'job' | 'user' | 'apply' | 'task' | 'ledger' | 'invoice';
 
 interface CompanyChainStep {
   kind: ChainNodeKind;
@@ -1038,11 +1041,13 @@ const chainCascade = reactive<{
   users: ChainUserItem[];
   tasks: any[];
   ledgers: any[];
+  invoices: InvoiceManageVO[];
   selectedJob: any | null;
   selectedApply: any | null;
   selectedUser: ChainUserItem | null;
   selectedTask: any | null;
   selectedLedger: any | null;
+  selectedInvoice: InvoiceManageVO | null;
 }>({
   company: null,
   jobs: [],
@@ -1050,11 +1055,13 @@ const chainCascade = reactive<{
   users: [],
   tasks: [],
   ledgers: [],
+  invoices: [],
   selectedJob: null,
   selectedApply: null,
   selectedUser: null,
   selectedTask: null,
-  selectedLedger: null
+  selectedLedger: null,
+  selectedInvoice: null
 });
 
 // 投递全景详情弹窗组件引用：点击投递行 → open(applyId)
@@ -1178,7 +1185,8 @@ const companyChainSteps = computed<CompanyChainStep[]>(() => {
       code: `${chainCascade.tasks.length} 条`,
       desc: chainCascade.selectedTask?.statusName || chainCascade.selectedTask?.status
     },
-    { kind: 'ledger', label: '台账', code: `${chainCascade.ledgers.length} 条`, desc: chainCascade.selectedLedger?.orderNo }
+    { kind: 'ledger', label: '台账', code: `${chainCascade.ledgers.length} 条`, desc: chainCascade.selectedLedger?.orderNo },
+    { kind: 'invoice', label: '发票', code: `${chainCascade.invoices.length} 张`, desc: chainCascade.selectedInvoice?.invoiceNo }
   ];
 });
 
@@ -1192,11 +1200,13 @@ function resetCompanyChainCascade() {
   chainCascade.users = [];
   chainCascade.tasks = [];
   chainCascade.ledgers = [];
+  chainCascade.invoices = [];
   chainCascade.selectedJob = null;
   chainCascade.selectedApply = null;
   chainCascade.selectedUser = null;
   chainCascade.selectedTask = null;
   chainCascade.selectedLedger = null;
+  chainCascade.selectedInvoice = null;
 }
 
 function formatChainSalary(job: any) {
@@ -1243,6 +1253,10 @@ function clearChainAfter(level: ChainNodeKind) {
   if (['company', 'job', 'apply', 'user', 'task'].includes(level)) {
     chainCascade.ledgers = [];
     chainCascade.selectedLedger = null;
+  }
+  if (['company', 'job', 'apply', 'user', 'task', 'ledger'].includes(level)) {
+    chainCascade.invoices = [];
+    chainCascade.selectedInvoice = null;
   }
 }
 
@@ -1347,10 +1361,47 @@ async function loadChainLedgers(query: { companyId: number | string; jobId?: num
     const res = await listLedger({ pageNum: 1, pageSize: 100, ...query });
     chainCascade.ledgers = unwrapList(res).rows;
     chainCascade.selectedLedger = chainCascade.ledgers[0] || null;
+    if (chainCascade.selectedLedger) {
+      await loadChainInvoices(chainCascade.selectedLedger);
+    } else {
+      chainCascade.invoices = [];
+      chainCascade.selectedInvoice = null;
+    }
   } catch (error) {
     chainCascade.ledgers = [];
     chainCascade.selectedLedger = null;
+    chainCascade.invoices = [];
+    chainCascade.selectedInvoice = null;
     ElMessage.warning('台账链路加载失败，请确认台账权限');
+  }
+}
+
+async function selectChainLedger(row: any) {
+  chainCascade.selectedLedger = row;
+  await loadChainInvoices(row);
+  chainActiveNode.value = 'invoice';
+}
+
+async function loadChainInvoices(ledger: any) {
+  if (!ledger?.ledgerId && !ledger?.orderNo) {
+    chainCascade.invoices = [];
+    chainCascade.selectedInvoice = null;
+    return;
+  }
+  try {
+    const res = await listInvoiceManage({
+      pageNum: 1,
+      pageSize: 100,
+      ledgerId: ledger.ledgerId,
+      ledgerOrderNo: ledger.orderNo,
+      orderNo: ledger.orderNo
+    });
+    chainCascade.invoices = unwrapList<InvoiceManageVO>(res).rows;
+    chainCascade.selectedInvoice = chainCascade.invoices[0] || null;
+  } catch (error) {
+    chainCascade.invoices = [];
+    chainCascade.selectedInvoice = null;
+    ElMessage.warning('发票链路加载失败，请确认发票权限');
   }
 }
 

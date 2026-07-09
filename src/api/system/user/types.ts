@@ -18,9 +18,50 @@ export interface UserQuery extends PageQuery {
   nickName?: string;
   phonenumber?: string;
   status?: string;
+  userType?: string;
   deptId?: string | number;
   roleId?: string | number;
   userIds?: string | number | (string | number)[] | undefined;
+}
+
+/**
+ * B端企业用户查询对象（用户管理页专用，不复用企业管理页查询状态）
+ */
+export interface BusinessUserQuery extends PageQuery {
+  companyId?: string | number;
+  companyName?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  status?: string;
+  isSilenced?: string;
+  customerLayer?: string;
+  jobCountMin?: number | string;
+  jobCountMax?: number | string;
+  applyCountMin?: number | string;
+  applyCountMax?: number | string;
+  paidStatus?: string;
+  active7d?: string;
+  params?: Record<string, any>;
+}
+
+/**
+ * C端求职者查询对象（用户管理页专用，不复用求职者管理页查询状态）
+ */
+export interface JobSeekerUserQuery extends PageQuery {
+  userName?: string;
+  phonenumber?: string;
+  isRecruitmentSilenced?: string;
+  applyFilter?: string;
+  applyCountMin?: number | string;
+  applyCountMax?: number | string;
+  interviewCountMin?: number | string;
+  interviewCountMax?: number | string;
+  userLayer?: string;
+  activeStatus?: string;
+  resumeStatus?: string;
+  paidStatus?: string;
+  registerChannel?: string;
+  promoterKeyword?: string;
 }
 
 /**

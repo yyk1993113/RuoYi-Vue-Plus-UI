@@ -33,6 +33,9 @@
           <el-col :span="1.5">
             <el-button type="info" plain icon="Sort" @click="handleToggleExpandAll">展开/折叠</el-button>
           </el-col>
+          <el-col :span="1.5">
+            <el-button v-hasPermi="['system:dept:add']" type="success" plain icon="Connection" @click="openOrgTemplateDialog">B端组织模板</el-button>
+          </el-col>
           <right-toolbar v-model:show-search="showSearch" @query-table="getList"></right-toolbar>
         </el-row>
       </template>
@@ -138,6 +141,47 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="orgTemplateDialog.visible" title="B端企业组织架构初始化模板" append-to-body width="760px">
+      <el-alert
+        title="模板仅作为企业初始化组织架构参考；点击节点后会打开原有新增部门弹窗，仍需选择上级部门并手动确认保存。"
+        type="info"
+        :closable="false"
+        show-icon
+        class="mb-3"
+      />
+      <el-tabs v-model="activeOrgTemplateKey">
+        <el-tab-pane v-for="template in orgTemplates" :key="template.key" :label="template.name" :name="template.key">
+          <div class="org-template-layout">
+            <div class="org-template-desc">
+              <div class="org-template-title">{{ template.name }}</div>
+              <div class="org-template-text">{{ template.desc }}</div>
+            </div>
+            <el-tree
+              :data="template.nodes"
+              node-key="id"
+              default-expand-all
+              :props="{ label: 'deptName', children: 'children' }"
+              @node-click="handleOrgTemplateNodeClick"
+            >
+              <template #default="{ data }">
+                <span class="org-template-node">
+                  <span>{{ data.deptName }}</span>
+                  <el-tag size="small" effect="plain">{{ data.deptCategory }}</el-tag>
+                </span>
+              </template>
+            </el-tree>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" :disabled="!selectedOrgTemplateNode" @click="handleAddFromOrgTemplate">按选中节点新增</el-button>
+          <el-button @click="handleCustomOrgBuild">自定义搭建</el-button>
+          <el-button @click="orgTemplateDialog.visible = false">关 闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -153,6 +197,14 @@ interface DeptOptionsType {
   children: DeptOptionsType[];
 }
 
+interface OrgTemplateNode {
+  id: string;
+  deptName: string;
+  deptCategory: string;
+  orderNum: number;
+  children?: OrgTemplateNode[];
+}
+
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 const { sys_normal_disable } = toRefs<any>(proxy?.useDict('sys_normal_disable'));
 
@@ -162,11 +214,77 @@ const showSearch = ref(true);
 const deptOptions = ref<DeptOptionsType[]>([]);
 const isExpandAll = ref(true);
 const deptUserList = ref<UserVO[]>([]);
+const activeOrgTemplateKey = ref('standard');
+const selectedOrgTemplateNode = ref<OrgTemplateNode>();
 
 const dialog = reactive<DialogOption>({
   visible: false,
   title: ''
 });
+const orgTemplateDialog = reactive<DialogOption>({
+  visible: false,
+  title: ''
+});
+
+const orgTemplates: Array<{ key: string; name: string; desc: string; nodes: OrgTemplateNode[] }> = [
+  {
+    key: 'standard',
+    name: '标准企业模板',
+    desc: '适合多数中小企业：总经办、人事行政、招聘、财务、业务部门分层清晰，方便快速初始化。',
+    nodes: [
+      {
+        id: 'standard-root',
+        deptName: '企业总部',
+        deptCategory: 'company',
+        orderNum: 1,
+        children: [
+          { id: 'standard-office', deptName: '总经办', deptCategory: 'company_office', orderNum: 1 },
+          { id: 'standard-hr', deptName: '人事行政部', deptCategory: 'company_hr_admin', orderNum: 2 },
+          { id: 'standard-recruit', deptName: '招聘部', deptCategory: 'company_recruit', orderNum: 3 },
+          { id: 'standard-finance', deptName: '财务部', deptCategory: 'company_finance', orderNum: 4 },
+          { id: 'standard-business', deptName: '业务部', deptCategory: 'company_business', orderNum: 5 }
+        ]
+      }
+    ]
+  },
+  {
+    key: 'recruitment',
+    name: '招聘型企业模板',
+    desc: '适合招聘需求较重的企业：突出招聘管理、候选人运营、面试协同和用工交付。',
+    nodes: [
+      {
+        id: 'recruitment-root',
+        deptName: '招聘中心',
+        deptCategory: 'company_recruit_center',
+        orderNum: 1,
+        children: [
+          { id: 'recruitment-manager', deptName: '招聘管理组', deptCategory: 'company_recruit_manager', orderNum: 1 },
+          { id: 'recruitment-specialist', deptName: '招聘专员组', deptCategory: 'company_recruit_specialist', orderNum: 2 },
+          { id: 'recruitment-interview', deptName: '面试协同组', deptCategory: 'company_interview', orderNum: 3 },
+          { id: 'recruitment-delivery', deptName: '入职交付组', deptCategory: 'company_delivery', orderNum: 4 }
+        ]
+      }
+    ]
+  },
+  {
+    key: 'simple',
+    name: '小微企业模板',
+    desc: '适合组织较轻的小微企业：保留核心管理、招聘、人事财务三个基础单元。',
+    nodes: [
+      {
+        id: 'simple-root',
+        deptName: '企业组织',
+        deptCategory: 'company',
+        orderNum: 1,
+        children: [
+          { id: 'simple-management', deptName: '管理组', deptCategory: 'company_management', orderNum: 1 },
+          { id: 'simple-recruit', deptName: '招聘组', deptCategory: 'company_recruit', orderNum: 2 },
+          { id: 'simple-admin', deptName: '人事财务组', deptCategory: 'company_admin_finance', orderNum: 3 }
+        ]
+      }
+    ]
+  }
+];
 
 const deptTableRef = ref<ElTableInstance>();
 const queryFormRef = ref<ElFormInstance>();
@@ -257,6 +375,37 @@ const toggleExpandAll = (data: DeptVO[], status: boolean) => {
   });
 };
 
+const openOrgTemplateDialog = () => {
+  selectedOrgTemplateNode.value = undefined;
+  activeOrgTemplateKey.value = 'standard';
+  orgTemplateDialog.visible = true;
+};
+
+const handleOrgTemplateNodeClick = (data: OrgTemplateNode) => {
+  selectedOrgTemplateNode.value = data;
+};
+
+const fillTemplateDeptForm = (node: OrgTemplateNode) => {
+  form.value.deptName = node.deptName;
+  form.value.deptCategory = node.deptCategory;
+  form.value.orderNum = node.orderNum;
+  form.value.status = '0';
+};
+
+const handleAddFromOrgTemplate = async () => {
+  if (!selectedOrgTemplateNode.value) return;
+  await handleAdd();
+  fillTemplateDeptForm(selectedOrgTemplateNode.value);
+  dialog.title = '按模板添加部门';
+  orgTemplateDialog.visible = false;
+};
+
+const handleCustomOrgBuild = async () => {
+  await handleAdd();
+  dialog.title = '自定义添加部门';
+  orgTemplateDialog.visible = false;
+};
+
 /** 新增按钮操作 */
 const handleAdd = async (row?: DeptVO) => {
   reset();
@@ -318,3 +467,34 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style scoped lang="scss">
+.org-template-layout {
+  display: grid;
+  gap: 12px;
+}
+
+.org-template-desc {
+  padding: 10px 12px;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+}
+
+.org-template-title {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.org-template-text {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.org-template-node {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+</style>

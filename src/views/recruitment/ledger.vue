@@ -301,13 +301,7 @@
     </el-dialog>
 
     <!-- 意向结算：字段来自 job_settlement_intent，运营在台账维度维护临时用工服务意向和线索跟进状态。 -->
-    <el-dialog
-      v-model="settlementIntentVisible"
-      title="意向结算（临时用工服务意向）"
-      width="820px"
-      class="settlement-intent-dialog"
-      append-to-body
-    >
+    <el-dialog v-model="settlementIntentVisible" title="意向结算（临时用工服务意向）" width="820px" class="settlement-intent-dialog" append-to-body>
       <div v-loading="settlementIntentLoading" class="settlement-intent-body">
         <el-form v-if="settlementIntentJob" label-width="96px" class="settlement-intent-form">
           <el-form-item label="岗位名称">{{ settlementIntentJob.jobName || '-' }}</el-form-item>
@@ -396,6 +390,9 @@
       <template #footer>
         <el-button v-if="settlementLead?.jobId" type="primary" plain @click="openSettlementLeadJob">查看岗位</el-button>
         <el-button v-if="settlementLead?.orderNo" type="success" plain @click="openSettlementLeadLedger">查看台账</el-button>
+        <el-button v-if="settlementLead?.orderNo || settlementLead?.ledgerId" type="warning" plain @click="openSettlementLeadInvoice"
+          >查看发票</el-button
+        >
         <el-button @click="settlementLeadVisible = false">关闭</el-button>
       </template>
     </el-drawer>
@@ -416,12 +413,14 @@ import {
   getApply2Detail,
   getTask,
   updateJobSettlementIntent,
+  listInvoiceManage,
+  type InvoiceManageVO,
   type LedgerVO
 } from '@/api/recruitment';
 import { getBizNoChain, getBizNoChainByCompanyId, type BizNoChainVO } from '@/api/recruitment/serialRule';
 import { unwrapList, formatMoney } from './helpers';
 // 台账结算状态(0待结算/1已结算/2已取消) 与 发票绑定状态(0未绑定/1已绑定) → el-tag 文案/颜色，映射集中在 constants.ts
-import { ledgerStatusMeta, ledgerInvoiceStatusMeta, jobTypeMeta } from './constants';
+import { invoiceStatusMeta, ledgerStatusMeta, ledgerInvoiceStatusMeta, jobTypeMeta } from './constants';
 
 const loading = ref(false);
 const router = useRouter();
@@ -483,6 +482,7 @@ const settlementLeadLoading = ref(false);
 const settlementLead = ref<BizNoChainVO | null>(null);
 const settlementLeadContext = ref<any>(null);
 const settlementLeadActiveKey = ref('company');
+const settlementLeadInvoices = ref<InvoiceManageVO[]>([]);
 
 const settlementIntentMap: Record<string, { label: string; type: 'info' | 'primary' | 'success' | 'warning'; desc: string }> = {
   '1': {
@@ -590,6 +590,43 @@ function settlementLeadTaskSettleText(chain?: BizNoChainVO | null) {
 function settlementLeadLedgerProgressText(chain?: BizNoChainVO | null) {
   if (!chain?.orderNo && !chain?.ledgerId) return '暂无台账记录';
   return '台账已生成，进入结算/开票跟进';
+}
+
+function settlementLeadInvoiceSummary() {
+  if (!settlementLead.value?.orderNo && !settlementLead.value?.ledgerId) return '生成台账后再跟进发票';
+  if (!settlementLeadInvoices.value.length) return '暂无关联发票';
+  const totalAmount = settlementLeadInvoices.value.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  return `${settlementLeadInvoices.value.length} 张 / ¥${formatMoney(totalAmount)}`;
+}
+
+function settlementLeadInvoiceDetailText() {
+  if (!settlementLead.value?.orderNo && !settlementLead.value?.ledgerId) return '生成台账后再跟进发票';
+  if (!settlementLeadInvoices.value.length) return '暂无关联发票';
+  return settlementLeadInvoices.value
+    .map((item) => {
+      const status = invoiceStatusMeta(item.status).label;
+      const amount = item.amount != null ? `¥${formatMoney(item.amount)}` : '金额-';
+      return `${item.invoiceNo || '未编号发票'} / ${status} / ${amount}`;
+    })
+    .join('\n');
+}
+
+async function loadSettlementLeadInvoices(chain?: BizNoChainVO | null) {
+  settlementLeadInvoices.value = [];
+  if (!chain?.orderNo && !chain?.ledgerId) return;
+  try {
+    const res = await listInvoiceManage({
+      pageNum: 1,
+      pageSize: 100,
+      ledgerId: chain.ledgerId,
+      ledgerOrderNo: chain.orderNo,
+      orderNo: chain.orderNo
+    });
+    settlementLeadInvoices.value = unwrapList<InvoiceManageVO>(res).rows;
+  } catch (error) {
+    settlementLeadInvoices.value = [];
+    console.warn('线索关联发票加载失败', error);
+  }
 }
 
 function normalizeDateTimeText(value?: string | null) {
@@ -701,7 +738,21 @@ const settlementLeadSteps = computed(() => {
         { label: '求职者', value: chain.jobSeekerName },
         { label: '关联岗位', value: chain.jobName },
         { label: '关联企业', value: chain.companyName },
-        { label: '服务意向', value: settlementLabel }
+        { label: '服务意向', value: settlementLabel },
+        { label: '开票跟进', value: settlementLeadInvoiceSummary() }
+      ]
+    },
+    {
+      key: 'invoice',
+      title: '发票',
+      code: settlementLeadInvoices.value.length ? `${settlementLeadInvoices.value.length} 张` : '',
+      desc: settlementLeadInvoiceSummary(),
+      done: settlementLeadInvoices.value.length > 0,
+      emptyText: chain.orderNo || chain.ledgerId ? '暂无发票' : '待生成台账',
+      details: [
+        { label: '关联台账', value: chain.orderNo },
+        { label: '发票概览', value: settlementLeadInvoiceSummary() },
+        { label: '发票明细', value: settlementLeadInvoiceDetailText() }
       ]
     }
   ].map((step) => ({ ...step, done: step.done ?? !!step.code }));
@@ -1075,6 +1126,7 @@ async function handleSettlementLead(row: any) {
   settlementLeadVisible.value = true;
   settlementLeadLoading.value = true;
   settlementLead.value = null;
+  settlementLeadInvoices.value = [];
   settlementLeadContext.value = { ...leadRow };
   settlementLeadActiveKey.value = 'company';
   try {
@@ -1083,9 +1135,11 @@ async function handleSettlementLead(row: any) {
     }
     const res = await getBizNoChainByCompanyId(leadRow.companyId, leadRow.settlementIntentId);
     settlementLead.value = res.data || null;
-    settlementLeadActiveKey.value = settlementLeadSteps.value.find((step) => step.done)?.key || 'company';
+    await loadSettlementLeadInvoices(settlementLead.value);
+    settlementLeadActiveKey.value = [...settlementLeadSteps.value].reverse().find((step) => step.done)?.key || 'company';
   } catch {
     settlementLeadContext.value = null;
+    settlementLeadInvoices.value = [];
     ElMessage.error('线索链路加载失败');
   } finally {
     settlementLeadLoading.value = false;
@@ -1102,6 +1156,18 @@ function openSettlementLeadLedger() {
   if (!settlementLead.value?.orderNo) return;
   settlementLeadVisible.value = false;
   router.push({ name: 'RecruitmentLedger', query: { orderNo: settlementLead.value.orderNo } });
+}
+
+function openSettlementLeadInvoice() {
+  if (!settlementLead.value?.orderNo && !settlementLead.value?.ledgerId) return;
+  settlementLeadVisible.value = false;
+  router.push({
+    name: 'RecruitmentInvoice',
+    query: {
+      ...(settlementLead.value.orderNo ? { ledgerOrderNo: settlementLead.value.orderNo } : {}),
+      ...(settlementLead.value.ledgerId ? { ledgerId: String(settlementLead.value.ledgerId) } : {})
+    }
+  });
 }
 
 // 支持从任务详情「台账编号」跳转携带 ?orderNo= 预填检索条件，

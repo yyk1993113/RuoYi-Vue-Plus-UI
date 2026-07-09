@@ -239,6 +239,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormRules } from 'element-plus';
+import { listByIds } from '@/api/system/oss';
 import {
   // 轮播图
   listBanner,
@@ -759,11 +760,16 @@ async function loadData() {
       return;
     }
     const list = unwrapList(res);
-    tableData.value = list.rows.map((row) => ({
+    const rows = list.rows.map((row) => ({
       ...row,
       // 行所属 tab 用于状态切换，避免异步切换时拿错主键字段造成后端“参数错误”。
       [ROW_TAB_KEY]: cfg.key
     }));
+    const resolvedRows = await resolveTableImageUrls(rows, cfg);
+    if (activeTab.value !== cfg.key) {
+      return;
+    }
+    tableData.value = resolvedRows;
     total.value = list.total;
   } catch (e) {
     ElMessage.error('加载数据失败');
@@ -859,6 +865,57 @@ async function submitForm() {
 
 function isDirectUrlValue(value: any) {
   return typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/'));
+}
+
+function isOssIdValue(value: any) {
+  return typeof value === 'string' || typeof value === 'number' ? /^\d+$/.test(String(value).trim()) : false;
+}
+
+function imageOssIdProp(prop: string) {
+  const explicitMap: Record<string, string> = {
+    coverUrl: 'coverOssId'
+  };
+  return explicitMap[prop] || '';
+}
+
+async function resolveTableImageUrls(rows: any[], cfg: TabConfig) {
+  const imageColumns = cfg.columns.filter((col) => col.type === 'image');
+  if (!rows.length || !imageColumns.length) {
+    return rows;
+  }
+  const idSet = new Set<string>();
+  rows.forEach((row) => {
+    imageColumns.forEach((col) => {
+      const ossId = row[imageOssIdProp(col.prop)] || (isOssIdValue(row[col.prop]) ? row[col.prop] : '');
+      if (isOssIdValue(ossId)) {
+        idSet.add(String(ossId));
+      }
+    });
+  });
+  if (!idSet.size) {
+    return rows;
+  }
+  try {
+    const res = await listByIds(Array.from(idSet).join(','));
+    const urlMap: Record<string, string> = {};
+    (res.data || []).forEach((oss: any) => {
+      if (oss?.ossId && oss?.url) {
+        urlMap[String(oss.ossId)] = oss.url;
+      }
+    });
+    return rows.map((row) => {
+      const next = { ...row };
+      imageColumns.forEach((col) => {
+        const ossId = next[imageOssIdProp(col.prop)] || (isOssIdValue(next[col.prop]) ? next[col.prop] : '');
+        if (isOssIdValue(ossId) && urlMap[String(ossId)]) {
+          next[col.prop] = urlMap[String(ossId)];
+        }
+      });
+      return next;
+    });
+  } catch {
+    return rows;
+  }
 }
 
 // 历史内容可能只有 coverUrl，没有 coverOssId；编辑时用旧 URL 预览，提交时再拆回 coverUrl 兼容。

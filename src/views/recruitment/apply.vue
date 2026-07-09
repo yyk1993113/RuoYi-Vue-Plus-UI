@@ -618,6 +618,22 @@ async function applyRouteFocus() {
     queryParams.applyId = qApplyId;
     await handleDetail({ applyId: qApplyId });
   }
+  const qCompanyId = route.query.companyId;
+  if (typeof qCompanyId === 'string' && qCompanyId) {
+    queryParams.companyId = qCompanyId;
+  }
+  const qCompanyName = route.query.companyName;
+  if (typeof qCompanyName === 'string' && qCompanyName) {
+    queryParams.companyName = qCompanyName;
+  }
+  const qUserName = route.query.userName;
+  if (typeof qUserName === 'string' && qUserName) {
+    queryParams.userName = qUserName;
+  }
+  const qStatus = route.query.status;
+  if (typeof qStatus === 'string' && qStatus) {
+    queryParams.status = qStatus;
+  }
 }
 
 onMounted(() => {

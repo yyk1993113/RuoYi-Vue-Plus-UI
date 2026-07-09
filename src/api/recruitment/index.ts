@@ -310,6 +310,14 @@ export interface InvoiceStatistics {
   pendingCount: number;
   issuedCount: number;
   cancelledCount: number;
+  totalAmount?: number;
+  pendingAmount?: number;
+  issuedAmount?: number;
+  cancelledAmount?: number;
+  monthNewCount?: number;
+  monthNewAmount?: number;
+  monthDeltaCount?: number;
+  monthDeltaAmount?: number;
 }
 
 export interface InvoiceVO {
@@ -319,6 +327,9 @@ export interface InvoiceVO {
   companyId?: number | string;
   companyName?: string;
   filePath?: string;
+  ossId?: number | string;
+  fileOssId?: number | string;
+  fileId?: number | string;
   status?: string;
   statusName?: string;
   createTime?: string;
@@ -334,11 +345,16 @@ export interface InvoiceManageVO {
   ledgerOrderNo?: string;
   companyId?: number | string;
   filePath?: string;
+  ossId?: number | string;
+  fileOssId?: number | string;
+  fileId?: number | string;
   status?: string;
   amount?: number;
   createBy?: number;
   createByName?: string;
   createTime?: string;
+  updateTime?: string;
+  remark?: string;
 }
 
 // 运营台-发票上传请求体（对应后端 InvoiceUploadRequest）。
@@ -346,6 +362,9 @@ export interface InvoiceManageVO {
 export interface InvoiceUploadForm {
   invoiceNo?: string;
   filePath?: string;
+  ossId?: number | string;
+  fileOssId?: number | string;
+  fileId?: number | string;
   ledgerId?: number | string;
   companyId?: number | string;
   amount?: number;
@@ -559,8 +578,14 @@ export interface LedgerQuery {
 export interface InvoiceQuery {
   pageNum?: number;
   pageSize?: number;
-  companyId?: number;
-  ledgerId?: number;
+  companyId?: number | string;
+  ledgerId?: number | string;
+  ledgerOrderNo?: string;
+  orderNo?: string;
+  createBy?: number | string;
+  createByName?: string;
+  beginTime?: string;
+  endTime?: string;
   status?: string;
 }
 
