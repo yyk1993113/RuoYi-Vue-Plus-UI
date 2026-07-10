@@ -86,7 +86,7 @@ const childrenMenus = computed(() => {
 const activeMenu = computed(() => {
   let path = route.path;
   if (path === '/index') {
-    path = '/system/user';
+    path = '/organization/user';
   }
   let activePath = path;
   if (path !== undefined && path.lastIndexOf('/') > 0 && hideList.indexOf(path) === -1) {

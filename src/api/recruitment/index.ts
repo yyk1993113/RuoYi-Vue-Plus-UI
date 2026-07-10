@@ -1133,7 +1133,7 @@ export function getCompany(companyId: number | string) {
 
 // 企业审核历史（聚合 rec_audit_log 操作留痕 + company_cert 认证历史）。
 // 对应后端 AdminJobDetailController.getCompanyAuditHistory，供详情弹窗的「历史审核记录」展示。
-export function getCompanyAuditHistory(companyId: number) {
+export function getCompanyAuditHistory(companyId: number | string) {
   return request.get<CompanyAuditHistoryVO>(`${baseUrl}/company/${companyId}/auditHistory`);
 }
 

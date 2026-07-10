@@ -719,7 +719,7 @@
       </template>
     </el-dialog>
 
-    <!-- 人员管理弹窗：iframe 内嵌系统用户管理页(/system/user)，destroy-on-close 保证每次打开为最新状态 -->
+    <!-- 人员管理弹窗：iframe 内嵌组织架构用户管理页(/organization/user)，destroy-on-close 保证每次打开为最新状态 -->
     <el-dialog v-model="staffVisible" :title="staffTitle" width="90%" top="5vh" append-to-body destroy-on-close>
       <iframe v-if="staffUrl" :src="staffUrl" class="staff-iframe" frameborder="0"></iframe>
     </el-dialog>
@@ -1004,7 +1004,7 @@ const silenceVisible = ref(false);
 const currentCompany = ref<any>(null);
 // 表格多选：勾选行的 companyId 集合，驱动批量删除按钮的可用态与删除请求
 const selectedIds = ref<number[]>([]);
-// 人员管理弹窗：iframe 内嵌 /system/user
+// 人员管理弹窗：iframe 内嵌 /organization/user
 const staffVisible = ref(false);
 const staffUrl = ref('');
 const staffTitle = ref('人员管理');
@@ -1904,14 +1904,14 @@ async function openCompanyChain(row: any) {
   }
 }
 
-// 人员管理入口：用弹窗 + iframe 内嵌「用户管理」(/system/user)。
+// 人员管理入口：用弹窗 + iframe 内嵌「用户管理」(/organization/user)。
 // iframe 在弹窗内独立加载该路由，即使该路由 404 也只影响 iframe 内部，不会动到外层 Layout/左侧菜单。
 // 带上 companyId/deptId 作上下文透传，便于用户管理页后续按企业过滤。
 function handleStaff(row: any) {
   // deptName=企业名：企业审核通过时以企业名建的部门(deptName=companyName)，
   // 用户管理页据此默认选中对应单位并过滤用户；companyId 仅作上下文备用。
   const { href } = router.resolve({
-    path: '/system/user',
+    path: '/organization/user',
     query: { companyId: row.companyId, userId: row.userId, deptName: row.companyName }
   });
   // 兼容 history / hash 两种路由模式，统一拼成同源绝对地址供 iframe 加载

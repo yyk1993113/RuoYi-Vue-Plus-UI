@@ -109,7 +109,7 @@ const close = () => {
     params: undefined,
     query: undefined,
     redirectedFrom: undefined,
-    path: '/system/user'
+    path: '/organization/user'
   };
   proxy?.$tab.closeOpenPage(obj);
 };

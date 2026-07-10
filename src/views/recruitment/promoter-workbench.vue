@@ -4,7 +4,7 @@
     <div class="page-head">
       <div>
         <div class="title-row">
-          <h2>推广工作台</h2>
+          <h2>个人工作台</h2>
           <el-tag v-if="workbench.identityTypeName" type="success" effect="light">{{ workbench.identityTypeName }}</el-tag>
         </div>
         <p>生成专属推广链接和二维码，查看本人今日与累计推广数据</p>

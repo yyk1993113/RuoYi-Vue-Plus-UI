@@ -1411,7 +1411,7 @@ const handleStatusChange = async (row: UserVO) => {
 /** 跳转角色分配 */
 const handleAuthRole = (row: UserVO) => {
   const userId = row.userId;
-  router.push('/system/user-auth/role/' + userId);
+  router.push('/organization/user-auth/role/' + userId);
 };
 
 /** 重置密码按钮操作 */

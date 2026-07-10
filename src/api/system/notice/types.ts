@@ -99,3 +99,44 @@ export interface NoticeForm {
   reportTemplate?: string;
   autoPdf?: string;
 }
+
+export interface NoticePushHistoryVO {
+  historyId: number | string;
+  noticeId: number | string;
+  parentHistoryId?: number | string;
+  rootHistoryId?: number | string;
+  noticeTitle: string;
+  targetAudience: 'internal' | 'business' | 'jobSeeker' | 'mixed' | string;
+  periodCycle?: string;
+  triggerType: 'create' | 'manual' | 'scheduled' | 'retry' | string;
+  pushTime: string;
+  sendStatus: 'sending' | 'success' | 'partial' | 'failed' | string;
+  targetCount: number;
+  deliveredCount: number;
+  readCount: number;
+  deliveryRate: number | string;
+  readRate: number | string;
+  failureReason?: string;
+  retryCount: number;
+  maxRetryCount: number;
+  retryStatus: string;
+  nextRetryTime?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  completedTime?: string;
+}
+
+export interface NoticePushHistoryQuery extends PageQuery {
+  noticeTitle?: string;
+  sendStatus?: string;
+  failureOnly?: boolean;
+}
+
+export interface NoticePushHistoryStatistics {
+  totalCount: number;
+  successCount: number;
+  failureCount: number;
+  retryingCount: number;
+  deliveryRate: number | string;
+  readRate: number | string;
+}
