@@ -570,7 +570,7 @@
         <div class="edit-block">
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="营业执照正负本">
+              <el-form-item label="营业执照副本">
                 <imageUpload v-model="form.businessLicense" :limit="1" @update:modelValue="handleOssChange" />
               </el-form-item>
             </el-col>
@@ -1600,7 +1600,7 @@ function getSettlementIntentId(row: any): number | string | undefined {
 async function loadCompanyCertImages(company: any) {
   const isOssId = (t: string) => /^\d+$/.test(t); // 纯数字视为 OSS id，其余（含 http/相对路径）按 URL 直用
   const fields = [
-    { label: '营业执照正负本', value: company?.businessLicense, kind: 'image' as const },
+    { label: '营业执照副本', value: company?.businessLicense, kind: 'image' as const },
     { label: '法人身份证附件', value: company?.idCardPhotoIds, kind: 'image' as const },
     { label: '对公账户凭证', value: company?.bankAccountIds, kind: 'image' as const },
     { label: '办公场地实景', value: company?.companyAddressIds, kind: 'image' as const },

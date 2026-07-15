@@ -175,15 +175,20 @@ export interface ApplyStatistics {
 
 export interface ApplyVO {
   applyId?: number;
-  /** 业务编码：来自 serialRule 的 APL 编码，列表展示优先使用。 */
+  /** 对外展示的投递业务编号，由流水号规则生成。 */
   applyNo?: string;
   jobId?: number;
   jobName?: string;
   salary?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryUnit?: string;
+  companyId?: number | string;
   companyName?: string;
   userId?: number | string;
   userName?: string;
   phonenumber?: string;
+  phone?: string;
   applyTime?: string;
   status?: string;
   statusName?: string;
@@ -192,6 +197,8 @@ export interface ApplyVO {
   createTime?: string;
   avatar?: string;
   avatarUrl?: string;
+  resumeAvatarUrl?: string;
+  exchangeStatus?: string;
   exchanged?: boolean;
   contactPerson?: string;
   contactPhone?: string;
@@ -532,13 +539,17 @@ export interface JobQuery {
 export interface ApplyQuery {
   pageNum?: number;
   pageSize?: number;
-  applyId?: number;
+  applyId?: number | string;
+  /** 对外展示的投递业务编号，精确匹配 apply.apply_no。 */
+  applyNo?: string;
   jobId?: number;
   jobName?: string;
   userId?: number | string;
   userName?: string;
   status?: string;
   companyName?: string;
+  /** 对外展示的企业业务编号，精确匹配 company.company_no。 */
+  companyNo?: string;
   isRead?: string;
   beginTime?: string;
   endTime?: string;
@@ -602,6 +613,8 @@ export interface AuditLogVO {
   logId?: number;
   operId?: number;
   operName?: string;
+  /** 后端按 operId 回查的当前角色名称，仅用于审计展示，不属于 rec_audit_log 落库字段。 */
+  operRole?: string;
   operTime?: string;
   action?: string;
   targetType?: string;
