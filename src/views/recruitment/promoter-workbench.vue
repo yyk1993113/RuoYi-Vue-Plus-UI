@@ -69,9 +69,11 @@
                 <p>分享给求职者，扫码进入小程序</p>
               </div>
             </div>
-            <div class="qr-box">
+            <div v-loading="cQrLoading" class="qr-box">
               <img v-if="cQrUrl" :src="cQrUrl" alt="C端推广二维码" />
-              <el-empty v-else description="二维码待生成" :image-size="80" />
+              <el-empty v-else :description="cQrError || '二维码待生成'" :image-size="80">
+                <el-button v-if="cQrError" type="primary" link @click="loadQr('C')">重新生成</el-button>
+              </el-empty>
             </div>
             <div class="button-row">
               <el-button :icon="DocumentCopy" @click="copyText(workbench.cPromotionLink || '')">复制路径</el-button>
@@ -104,9 +106,11 @@
                 <p>用于企业手机扫码进入</p>
               </div>
             </div>
-            <div class="qr-box">
+            <div v-loading="bQrLoading" class="qr-box">
               <img v-if="bQrUrl" :src="bQrUrl" alt="B端推广二维码" />
-              <el-empty v-else description="二维码待生成" :image-size="80" />
+              <el-empty v-else :description="bQrError || '二维码待生成'" :image-size="80">
+                <el-button v-if="bQrError" type="primary" link @click="loadQr('B')">重新生成</el-button>
+              </el-empty>
             </div>
             <el-button type="primary" :icon="Download" @click="downloadQr('B')">下载二维码</el-button>
           </div>
@@ -295,6 +299,10 @@ const loading = ref(false);
 const workbench = ref<PromoterWorkbenchVO>({});
 const cQrUrl = ref('');
 const bQrUrl = ref('');
+const cQrLoading = ref(false);
+const bQrLoading = ref(false);
+const cQrError = ref('');
+const bQrError = ref('');
 
 const detailVisible = ref(false);
 const detailLoading = ref(false);
@@ -432,11 +440,8 @@ async function loadWorkbench() {
   loading.value = true;
   try {
     workbench.value = unwrapData<PromoterWorkbenchVO>(await getPromoterWorkbench());
-    const qrResults = await Promise.allSettled([loadQr('C'), loadQr('B')]);
-    const failedResult = qrResults.find((result) => result.status === 'rejected');
-    if (failedResult && failedResult.status === 'rejected') {
-      throw failedResult.reason;
-    }
+    // C/B 二维码各自维护失败态，任一端生成失败时保留另一端已成功生成的推广材料。
+    await Promise.all([loadQr('C'), loadQr('B')]);
   } catch (error: unknown) {
     ElMessage.error(formatErrorMessage(error));
     revokeUrl(cQrUrl.value);
@@ -585,43 +590,79 @@ async function loadJobList() {
 }
 
 async function loadQr(target: 'C' | 'B') {
-  const blob = unwrapData<Blob>(await getPromoterWorkbenchQrCode(target));
-  if (!blob || blob.size <= 0) {
-    throw new Error('二维码返回内容为空');
-  }
-  if (blob.type && !blob.type.startsWith('image/')) {
-    const text = await blob.text();
-    let msg = '二维码接口返回非图片内容，请稍后重试';
-    try {
-      const data = JSON.parse(text);
-      msg = data?.msg || data?.message || msg;
-    } catch {
-      if (text?.trim()) {
-        msg = text;
-      }
+  setQrLoading(target, true);
+  setQrError(target, '');
+  try {
+    // 全局响应拦截器对 responseType=blob 直接返回 res.data，此处不能再按普通 R<T> 取 .data。
+    const blob = await getPromoterWorkbenchQrCode(target);
+    if (!blob || blob.size <= 0) {
+      throw new Error('二维码返回内容为空');
     }
-    throw new Error(msg);
-  }
-  if (!blob.type && blob.size > 0) {
-    const text = (await blob.text()).trim();
-    if (text.startsWith('{') || text.startsWith('[')) {
+    if (blob.type && !blob.type.startsWith('image/')) {
+      const text = await blob.text();
       let msg = '二维码接口返回非图片内容，请稍后重试';
       try {
         const data = JSON.parse(text);
         msg = data?.msg || data?.message || msg;
       } catch {
-        msg = text || msg;
+        if (text?.trim()) {
+          msg = text;
+        }
       }
       throw new Error(msg);
     }
+    if (!blob.type && blob.size > 0) {
+      const text = (await blob.text()).trim();
+      if (text.startsWith('{') || text.startsWith('[')) {
+        let msg = '二维码接口返回非图片内容，请稍后重试';
+        try {
+          const data = JSON.parse(text);
+          msg = data?.msg || data?.message || msg;
+        } catch {
+          msg = text || msg;
+        }
+        throw new Error(msg);
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    if (target === 'C') {
+      revokeUrl(cQrUrl.value);
+      cQrUrl.value = url;
+    } else {
+      revokeUrl(bQrUrl.value);
+      bQrUrl.value = url;
+    }
+  } catch (error: unknown) {
+    clearQrUrl(target);
+    setQrError(target, formatErrorMessage(error));
+  } finally {
+    setQrLoading(target, false);
   }
-  const url = URL.createObjectURL(blob);
+}
+
+function clearQrUrl(target: 'C' | 'B') {
+  const currentUrl = target === 'C' ? cQrUrl.value : bQrUrl.value;
+  revokeUrl(currentUrl);
   if (target === 'C') {
-    revokeUrl(cQrUrl.value);
-    cQrUrl.value = url;
+    cQrUrl.value = '';
   } else {
-    revokeUrl(bQrUrl.value);
-    bQrUrl.value = url;
+    bQrUrl.value = '';
+  }
+}
+
+function setQrLoading(target: 'C' | 'B', value: boolean) {
+  if (target === 'C') {
+    cQrLoading.value = value;
+  } else {
+    bQrLoading.value = value;
+  }
+}
+
+function setQrError(target: 'C' | 'B', message: string) {
+  if (target === 'C') {
+    cQrError.value = message;
+  } else {
+    bQrError.value = message;
   }
 }
 

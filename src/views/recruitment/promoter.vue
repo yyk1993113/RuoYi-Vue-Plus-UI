@@ -1164,7 +1164,15 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="岗位/角色" prop="roleName">
-          <el-select v-model="form.roleName" placeholder="请选择岗位/角色" clearable filterable style="width: 100%">
+          <el-select
+            v-model="form.roleName"
+            placeholder="请选择岗位/角色"
+            clearable
+            filterable
+            :loading="form.identityType === '2' && partnerRoleLoading"
+            :no-data-text="form.identityType === '2' && partnerRoleLoadFailed ? '合伙人角色加载失败' : '暂无匹配角色'"
+            style="width: 100%"
+          >
             <el-option v-for="item in roleOptions" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
@@ -1594,6 +1602,8 @@ import {
   type PromoterVO
 } from '@/api/recruitment';
 import { download, globalHeaders } from '@/utils/request';
+import { listRole } from '@/api/system/role';
+import type { RoleVO } from '@/api/system/role/types';
 import { useUserStore } from '@/store/modules/user';
 import { unwrapList } from './helpers';
 import { companyStatusMeta } from './constants';
@@ -2619,12 +2629,17 @@ const adjustForm = reactive<PromotionAttributionAdjustForm & { objectName?: stri
 
 // 渠道推广人员的数量字段由运营手工维护，后端按 company_count/job_seeker_count 原样落库。
 const nonNegativeCountRule = { type: 'number', min: 0, message: '数量不能小于0', trigger: 'change' } as const;
-const roleOptionsMap: Record<string, string[]> = {
+const staticRoleOptionsMap: Record<string, string[]> = {
   // 身份类型为内部人员时，岗位角色作为二级分类使用。
   '0': ['实习生', '销售岗', '拓展岗'],
-  '1': ['外部渠道'],
-  '2': ['合伙人']
+  '1': ['外部渠道']
 };
+// 合伙人岗位直接复用角色管理数据，权限字符是跨页面稳定契约，角色名称由运营在角色管理中维护。
+const PARTNER_ROLE_KEYS = new Set(['promoter_strategic_partner', 'promoter_partnerd']);
+const partnerRoleOptions = ref<string[]>([]);
+const partnerRoleLoading = ref(false);
+const partnerRoleLoaded = ref(false);
+const partnerRoleLoadFailed = ref(false);
 
 const rules: FormRules = {
   name: [{ required: true, message: '请输入姓名/昵称', trigger: 'blur' }],
@@ -2640,7 +2655,7 @@ const rules: FormRules = {
 };
 
 const dialogTitle = computed(() => (isEdit.value ? '编辑推广人员' : '新增推广人员'));
-const roleOptions = computed(() => roleOptionsMap[form.identityType || '0'] || []);
+const roleOptions = computed(() => (form.identityType === '2' ? partnerRoleOptions.value : staticRoleOptionsMap[form.identityType || '0'] || []));
 // 卡片同比/环比涨跌：current 为本期「新增(B+C)合计」，base 为后端按「同期至今」口径返回的对比基数。
 // base<=0 视为无可比基数（如去年同期尚无数据/从 0 起步），统一显示「—」，避免出现 +∞%。
 // trend: up 增长(绿) / down 下降(红) / flat 持平(灰) / new 从0新增(蓝，无可比基数但本期有量)
@@ -3552,21 +3567,47 @@ function resetFormData() {
   form.remark = '';
 }
 
-function handleIdentityTypeChange(value: string | number | boolean | undefined) {
-  const type = String(value ?? '0');
-  const options = roleOptionsMap[type] || [];
-  form.roleName = options.length === 1 ? options[0] : '';
+async function loadPartnerRoleOptions() {
+  if (partnerRoleLoaded.value || partnerRoleLoading.value) return;
+  partnerRoleLoading.value = true;
+  partnerRoleLoadFailed.value = false;
+  try {
+    const responses = await Promise.all(
+      [...PARTNER_ROLE_KEYS].map((roleKey) =>
+        listRole({
+          pageNum: 1,
+          pageSize: 100,
+          roleName: '',
+          roleKey,
+          status: ''
+        })
+      )
+    );
+    const matchedRoles = responses
+      .flatMap((response) => unwrapList<RoleVO>(response).rows)
+      // 角色列表接口按权限字符模糊查询，这里再次精确过滤，避免相似角色混入合伙人选项。
+      .filter((role) => PARTNER_ROLE_KEYS.has(String(role.roleKey || '').trim()))
+      .sort((a, b) => Number(a.roleSort || 0) - Number(b.roleSort || 0));
+    partnerRoleOptions.value = [...new Set(matchedRoles.map((role) => String(role.roleName || '').trim()).filter(Boolean))];
+    partnerRoleLoaded.value = true;
+  } catch {
+    partnerRoleLoadFailed.value = true;
+    ElMessage.error('合伙人角色加载失败，请稍后重试');
+  } finally {
+    partnerRoleLoading.value = false;
+  }
 }
 
-watch(
-  () => form.identityType,
-  (value) => {
-    const options = roleOptionsMap[value || '0'] || [];
-    if (form.roleName && !options.includes(form.roleName)) {
-      form.roleName = options.length === 1 ? options[0] : '';
-    }
+async function handleIdentityTypeChange(value: string | number | boolean | undefined) {
+  const type = String(value ?? '0');
+  form.roleName = '';
+  if (type === '2') {
+    await loadPartnerRoleOptions();
+    if (form.identityType !== '2') return;
   }
-);
+  const options = type === '2' ? partnerRoleOptions.value : staticRoleOptionsMap[type] || [];
+  form.roleName = options.length === 1 ? options[0] : '';
+}
 
 watch(statisticsSide, () => {
   scheduleActiveTabCharts();
@@ -4300,6 +4341,13 @@ async function handleEdit(row: PromoterVO) {
     Object.assign(form, res?.data || row);
   } catch {
     Object.assign(form, row);
+  }
+  if (form.identityType === '2') {
+    await loadPartnerRoleOptions();
+    // 旧数据若仍是写死的“合伙人”，不再作为有效选项，要求运营重新选择角色管理中的匹配角色。
+    if (partnerRoleLoaded.value && !partnerRoleOptions.value.includes(form.roleName || '')) {
+      form.roleName = '';
+    }
   }
   dialogVisible.value = true;
 }

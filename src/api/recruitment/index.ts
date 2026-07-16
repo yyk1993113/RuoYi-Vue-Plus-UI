@@ -1048,7 +1048,8 @@ export function getPromoterWorkbench() {
 }
 
 export function getPromoterWorkbenchQrCode(target: 'C' | 'B') {
-  return request.get<Blob>(`${baseUrl}/promoter/workbench/qrcode`, {
+  // 二进制响应会在全局响应拦截器中直接解包为 Blob，第二个泛型同步声明真实返回类型。
+  return request.get<Blob, Blob>(`${baseUrl}/promoter/workbench/qrcode`, {
     params: { target },
     responseType: 'blob'
   });
