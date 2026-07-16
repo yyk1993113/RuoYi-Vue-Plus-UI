@@ -2,7 +2,7 @@
   <!--
     运营台·配置项页
     职责：维护站点级单例 / KV 配置（C/B 底部导航名称、新人弹窗、消息提醒前/中/后文案、
-          兼职三选一文案、招聘授权书模板文件），并只读查看复用 sys_dict 的字典
+          兼职三选一文案、按三级职位配置的岗位描述模板、招聘授权书模板文件），并只读查看复用 sys_dict 的字典
           （行业 / 职位类目 / 福利标签）。
     数据来源：后端 AdminConfigController（/admin/config，@SaCheckRole("admin")）。
       - GET  /admin/config/get?key=xxx           单 key 读取（R<RecConfig>）
@@ -111,7 +111,57 @@
           </el-form>
         </el-card>
 
-        <!-- 5) 招聘授权书模板文件 -->
+        <!-- 5) 按「一级类目 / 二级类目 / 具体职位」配置岗位描述模板 -->
+        <el-card v-loading="jobTemplateLoading" shadow="hover" class="mb-4 cfg-card">
+          <template #header>
+            <div class="cfg-card-header">
+              <span class="cfg-title">具体职位岗位描述模板</span>
+              <el-button
+                type="primary"
+                :loading="jobTemplateSaving"
+                :disabled="!selectedJobPositionKey"
+                @click="saveJobDescriptionTemplate"
+              >
+                保存模板
+              </el-button>
+            </div>
+          </template>
+          <el-alert
+            class="mb-3"
+            type="info"
+            :closable="false"
+            description="配置路径与岗位类别管理保持一致：一级类目 → 二级类目 → 具体职位。企业选择具体职位后展示对应模板；未配置时继续使用企业端默认模板。"
+          />
+          <el-form label-width="100px" label-position="right">
+            <el-form-item label="具体职位">
+              <el-tree-select
+                v-model="selectedJobPositionKey"
+                :data="jobTemplateTree"
+                :props="{ label: 'label', children: 'children', value: 'value', disabled: 'disabled' }"
+                node-key="value"
+                value-key="value"
+                check-strictly
+                filterable
+                clearable
+                placeholder="请选择一级类目 / 二级类目 / 具体职位"
+                style="width: 100%"
+                @change="handleJobTemplatePositionChange"
+              />
+            </el-form-item>
+            <el-form-item label="岗位描述">
+              <el-input
+                v-model="jobDescriptionTemplate"
+                type="textarea"
+                :rows="10"
+                maxlength="2000"
+                show-word-limit
+                placeholder="请输入该具体职位对应的岗位描述模板；清空后保存可恢复企业端默认模板"
+              />
+            </el-form-item>
+          </el-form>
+        </el-card>
+
+        <!-- 6) 招聘授权书模板文件 -->
         <el-card v-loading="loading" shadow="hover" class="mb-4 cfg-card">
           <template #header>
             <div class="cfg-card-header">
@@ -211,6 +261,7 @@ import {
   type RecConfigVO,
   type ConfigDictDataVO
 } from '@/api/recruitment';
+import { getJobPositionTree, updateJobPosition, type JobPositionVO } from '@/api/recruitment/jobCategory';
 
 // ---------- KV 配置字段定义 ----------
 // 每个字段对应一个 configKey；configGroup 用于后端归类，valueType 仅作渲染提示。
@@ -271,6 +322,84 @@ const saving = reactive<Record<string, boolean>>({
   message: false,
   parttime: false
 });
+
+interface JobTemplateTreeNode {
+  value: string;
+  label: string;
+  disabled?: boolean;
+  children?: JobTemplateTreeNode[];
+}
+
+// 模板随第三级 job_position 维护；前两级节点只负责分组，不能直接保存模板。
+const jobTemplateLoading = ref(false);
+const jobTemplateSaving = ref(false);
+const jobTemplateTree = ref<JobTemplateTreeNode[]>([]);
+const jobTemplatePositions = ref<Record<string, JobPositionVO>>({});
+const selectedJobPositionKey = ref<string>('');
+const jobDescriptionTemplate = ref('');
+
+function buildJobTemplateNode(node: any, positionMap: Record<string, JobPositionVO>): JobTemplateTreeNode {
+  const categoryChildren = (node.children || []).map((child: any) => buildJobTemplateNode(child, positionMap));
+  const positionChildren = (node.positions || []).map((position: JobPositionVO) => {
+    const key = `position:${String(position.id)}`;
+    positionMap[key] = position;
+    return { value: key, label: position.name || '未命名职位' };
+  });
+  return {
+    value: `category:${String(node.id)}`,
+    label: String(node.name || '未命名类目'),
+    disabled: true,
+    children: [...categoryChildren, ...positionChildren]
+  };
+}
+
+function handleJobTemplatePositionChange(positionKey?: string) {
+  const selected = jobTemplatePositions.value[String(positionKey || '')];
+  jobDescriptionTemplate.value = selected?.descriptionTemplate || '';
+}
+
+async function loadJobTemplateTree() {
+  jobTemplateLoading.value = true;
+  try {
+    const res = await getJobPositionTree();
+    const positionMap: Record<string, JobPositionVO> = {};
+    jobTemplateTree.value = ((res as any)?.data || []).map((node: any) => buildJobTemplateNode(node, positionMap));
+    jobTemplatePositions.value = positionMap;
+    const firstPositionKey = Object.keys(positionMap)[0] || '';
+    if (!jobTemplatePositions.value[selectedJobPositionKey.value]) {
+      selectedJobPositionKey.value = firstPositionKey;
+    }
+    handleJobTemplatePositionChange(selectedJobPositionKey.value);
+  } catch (error) {
+    jobTemplateTree.value = [];
+    jobTemplatePositions.value = {};
+    ElMessage.error('加载三级职位目录失败');
+  } finally {
+    jobTemplateLoading.value = false;
+  }
+}
+
+async function saveJobDescriptionTemplate() {
+  const selected = jobTemplatePositions.value[selectedJobPositionKey.value];
+  if (!selected?.id) {
+    ElMessage.warning('请先选择第三级具体职位');
+    return;
+  }
+  jobTemplateSaving.value = true;
+  try {
+    await updateJobPosition({
+      id: selected.id,
+      descriptionTemplate: jobDescriptionTemplate.value
+    });
+    selected.descriptionTemplate = jobDescriptionTemplate.value;
+    ElMessage.success('岗位描述模板保存成功');
+  } catch (error) {
+    ElMessage.error('岗位描述模板保存失败，请重试');
+  } finally {
+    jobTemplateSaving.value = false;
+  }
+}
+
 type AuthLetterTemplateType = keyof AuthLetterTemplateSet;
 type AuthLetterTemplateOption = {
   type: AuthLetterTemplateType;
@@ -464,6 +593,7 @@ function loadAllDicts() {
 
 onMounted(() => {
   loadAllConfigs();
+  loadJobTemplateTree();
   loadAuthLetterTemplate();
   loadAllDicts();
 });
