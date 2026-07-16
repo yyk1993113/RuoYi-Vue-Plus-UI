@@ -1169,8 +1169,8 @@
             placeholder="请选择岗位/角色"
             clearable
             filterable
-            :loading="form.identityType === '2' && partnerRoleLoading"
-            :no-data-text="form.identityType === '2' && partnerRoleLoadFailed ? '合伙人角色加载失败' : '暂无匹配角色'"
+            :loading="managedRoleIdentityTypes.has(form.identityType || '') && managedRoleLoading"
+            :no-data-text="managedRoleIdentityTypes.has(form.identityType || '') && managedRoleLoadFailed ? '角色列表加载失败' : '暂无匹配角色'"
             style="width: 100%"
           >
             <el-option v-for="item in roleOptions" :key="item" :label="item" :value="item" />
@@ -1602,6 +1602,7 @@ import {
   type PromoterVO
 } from '@/api/recruitment';
 import { download, globalHeaders } from '@/utils/request';
+import { hasOperationsManagerRole } from '@/utils/role';
 import { listRole } from '@/api/system/role';
 import type { RoleVO } from '@/api/system/role/types';
 import { useUserStore } from '@/store/modules/user';
@@ -1705,7 +1706,10 @@ const queryFormRef = ref();
 const formRef = ref();
 const uploadRef = ref<UploadInstance>();
 const userStore = useUserStore();
-const isAdminUser = computed(() => userStore.roles.includes('superadmin'));
+// 推广管理的全量统计与客户管理由超管、运营主管共享；普通运营仍按后端菜单权限访问基础列表。
+const isAdminUser = computed(
+  () => userStore.roles.some((role) => ['superadmin', 'admin'].includes(role)) || hasOperationsManagerRole(userStore.roles)
+);
 const activeTab = ref<ActiveTab>(isAdminUser.value ? 'overview' : 'list');
 
 const statisticsLoading = ref(false);
@@ -2631,15 +2635,14 @@ const adjustForm = reactive<PromotionAttributionAdjustForm & { objectName?: stri
 const nonNegativeCountRule = { type: 'number', min: 0, message: '数量不能小于0', trigger: 'change' } as const;
 const staticRoleOptionsMap: Record<string, string[]> = {
   // 身份类型为内部人员时，岗位角色作为二级分类使用。
-  '0': ['实习生', '销售岗', '拓展岗'],
-  '1': ['外部渠道']
+  '0': ['实习生', '销售岗', '拓展岗']
 };
-// 合伙人岗位直接复用角色管理数据，权限字符是跨页面稳定契约，角色名称由运营在角色管理中维护。
-const PARTNER_ROLE_KEYS = new Set(['promoter_strategic_partner', 'promoter_partnerd']);
-const partnerRoleOptions = ref<string[]>([]);
-const partnerRoleLoading = ref(false);
-const partnerRoleLoaded = ref(false);
-const partnerRoleLoadFailed = ref(false);
+// 外部渠道与合伙人的岗位统一复用角色管理全量数据，避免前端写死角色或遗漏后续新增角色。
+const managedRoleIdentityTypes = new Set(['1', '2']);
+const managedRoleOptions = ref<string[]>([]);
+const managedRoleLoading = ref(false);
+const managedRoleLoaded = ref(false);
+const managedRoleLoadFailed = ref(false);
 
 const rules: FormRules = {
   name: [{ required: true, message: '请输入姓名/昵称', trigger: 'blur' }],
@@ -2655,7 +2658,9 @@ const rules: FormRules = {
 };
 
 const dialogTitle = computed(() => (isEdit.value ? '编辑推广人员' : '新增推广人员'));
-const roleOptions = computed(() => (form.identityType === '2' ? partnerRoleOptions.value : staticRoleOptionsMap[form.identityType || '0'] || []));
+const roleOptions = computed(() =>
+  managedRoleIdentityTypes.has(form.identityType || '') ? managedRoleOptions.value : staticRoleOptionsMap[form.identityType || '0'] || []
+);
 // 卡片同比/环比涨跌：current 为本期「新增(B+C)合计」，base 为后端按「同期至今」口径返回的对比基数。
 // base<=0 视为无可比基数（如去年同期尚无数据/从 0 起步），统一显示「—」，避免出现 +∞%。
 // trend: up 增长(绿) / down 下降(红) / flat 持平(灰) / new 从0新增(蓝，无可比基数但本期有量)
@@ -3567,45 +3572,37 @@ function resetFormData() {
   form.remark = '';
 }
 
-async function loadPartnerRoleOptions() {
-  if (partnerRoleLoaded.value || partnerRoleLoading.value) return;
-  partnerRoleLoading.value = true;
-  partnerRoleLoadFailed.value = false;
+async function loadManagedRoleOptions() {
+  if (managedRoleLoaded.value || managedRoleLoading.value) return;
+  managedRoleLoading.value = true;
+  managedRoleLoadFailed.value = false;
   try {
-    const responses = await Promise.all(
-      [...PARTNER_ROLE_KEYS].map((roleKey) =>
-        listRole({
-          pageNum: 1,
-          pageSize: 100,
-          roleName: '',
-          roleKey,
-          status: ''
-        })
-      )
-    );
-    const matchedRoles = responses
-      .flatMap((response) => unwrapList<RoleVO>(response).rows)
-      // 角色列表接口按权限字符模糊查询，这里再次精确过滤，避免相似角色混入合伙人选项。
-      .filter((role) => PARTNER_ROLE_KEYS.has(String(role.roleKey || '').trim()))
-      .sort((a, b) => Number(a.roleSort || 0) - Number(b.roleSort || 0));
-    partnerRoleOptions.value = [...new Set(matchedRoles.map((role) => String(role.roleName || '').trim()).filter(Boolean))];
-    partnerRoleLoaded.value = true;
+    const response = await listRole({
+      pageNum: 1,
+      pageSize: 10000,
+      roleName: '',
+      roleKey: '',
+      status: ''
+    });
+    const matchedRoles = unwrapList<RoleVO>(response).rows.sort((a, b) => Number(a.roleSort || 0) - Number(b.roleSort || 0));
+    managedRoleOptions.value = [...new Set(matchedRoles.map((role) => String(role.roleName || '').trim()).filter(Boolean))];
+    managedRoleLoaded.value = true;
   } catch {
-    partnerRoleLoadFailed.value = true;
-    ElMessage.error('合伙人角色加载失败，请稍后重试');
+    managedRoleLoadFailed.value = true;
+    ElMessage.error('角色列表加载失败，请稍后重试');
   } finally {
-    partnerRoleLoading.value = false;
+    managedRoleLoading.value = false;
   }
 }
 
 async function handleIdentityTypeChange(value: string | number | boolean | undefined) {
   const type = String(value ?? '0');
   form.roleName = '';
-  if (type === '2') {
-    await loadPartnerRoleOptions();
-    if (form.identityType !== '2') return;
+  if (managedRoleIdentityTypes.has(type)) {
+    await loadManagedRoleOptions();
+    if (form.identityType !== type) return;
   }
-  const options = type === '2' ? partnerRoleOptions.value : staticRoleOptionsMap[type] || [];
+  const options = managedRoleIdentityTypes.has(type) ? managedRoleOptions.value : staticRoleOptionsMap[type] || [];
   form.roleName = options.length === 1 ? options[0] : '';
 }
 
@@ -4342,10 +4339,10 @@ async function handleEdit(row: PromoterVO) {
   } catch {
     Object.assign(form, row);
   }
-  if (form.identityType === '2') {
-    await loadPartnerRoleOptions();
-    // 旧数据若仍是写死的“合伙人”，不再作为有效选项，要求运营重新选择角色管理中的匹配角色。
-    if (partnerRoleLoaded.value && !partnerRoleOptions.value.includes(form.roleName || '')) {
+  if (managedRoleIdentityTypes.has(form.identityType || '')) {
+    await loadManagedRoleOptions();
+    // 外部渠道与合伙人仅保留角色管理中仍存在的角色名称，避免继续提交已删除的历史角色。
+    if (managedRoleLoaded.value && !managedRoleOptions.value.includes(form.roleName || '')) {
       form.roleName = '';
     }
   }

@@ -294,7 +294,7 @@ const activeRoleSegmentMeta = computed(() => roleSegments.find((item) => item.va
 const roleSegmentTemplates: Record<RoleSegment, Array<{ roleName: string; roleKey: string; roleSort: number; roleDesc: string; matchKeys: string[] }>> = {
   admin: [
     { roleName: '超级管理员', roleKey: 'superadmin', roleSort: 1, roleDesc: '平台最高权限，负责系统配置、角色授权和全局数据管理。', matchKeys: ['superadmin', 'admin'] },
-    { roleName: '运营主管', roleKey: 'operation_manager', roleSort: 2, roleDesc: '管理运营团队和关键业务数据，负责跨模块运营决策。', matchKeys: ['operation_manager', 'operator_manager'] },
+    { roleName: '运营主管', roleKey: 'operations_manager', roleSort: 2, roleDesc: '管理运营团队和关键业务数据，负责跨模块运营决策。', matchKeys: ['operations_manager', 'operation_manager', 'operator_manager'] },
     { roleName: '普通运营', roleKey: 'operator', roleSort: 3, roleDesc: '处理日常企业、岗位、投递、求职者运营工作。', matchKeys: ['operator'] },
     { roleName: '客服', roleKey: 'customer_service', roleSort: 4, roleDesc: '负责企业和求职者咨询、投诉和售后处理。', matchKeys: ['customer_service', 'service'] },
     { roleName: '审核员', roleKey: 'auditor', roleSort: 5, roleDesc: '负责企业资质、岗位内容、风险内容审核。', matchKeys: ['auditor', 'audit'] },
