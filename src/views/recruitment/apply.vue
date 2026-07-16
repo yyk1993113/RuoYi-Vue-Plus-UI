@@ -269,7 +269,7 @@
                   </div>
                   <div class="grid-item">
                     <span class="label">性别 / 年龄</span>
-                    <span class="value">{{ seeker.sex || '-' }} / {{ seeker.age != null ? seeker.age : '-' }}</span>
+                    <span class="value">{{ formatSex(seeker.sex) }} / {{ seeker.age != null ? seeker.age : '-' }}</span>
                   </div>
                 </div>
 
@@ -307,7 +307,6 @@
                   >
                     <div class="flow-title">{{ item.title }}</div>
                     <div v-if="item.content" class="flow-content">{{ item.content }}</div>
-                    <el-tag size="small" effect="plain" class="flow-source">{{ item.source === 'apply' ? '系统' : '通知' }}</el-tag>
                   </el-timeline-item>
                 </el-timeline>
                 <el-empty v-else description="暂无状态流水" :image-size="60" />
@@ -466,7 +465,7 @@ import {
 import { listApply, getApplyStatistics, getApply2Detail } from '@/api/recruitment';
 import type { ApplyDetailVO, ApplyQuery, ApplyVO } from '@/api/recruitment';
 import { download } from '@/utils/request';
-import { unwrapList, splitToArray, formatSalary } from './helpers';
+import { unwrapList, splitToArray, formatSalary, formatSex } from './helpers';
 import { applyStatusMeta } from './constants';
 
 const route = useRoute();
@@ -1065,10 +1064,6 @@ function handlePrint() {
   color: #606266;
   margin-top: 2px;
 }
-.flow-source {
-  margin-top: 4px;
-}
-
 /* 面试记录 / 通用记录列表 */
 .record-list {
   display: flex;

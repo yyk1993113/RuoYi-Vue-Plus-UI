@@ -1119,7 +1119,7 @@ async function submitApprove() {
   const result = await runBatch(auditTargets.value, (row) => approveSettlementSubAccount(row.applicationId, opinion));
   auditSubmitting.value = false;
   auditVisible.value = false;
-  showBatchResult('审核通过', result);
+  showBatchResult('审核通过', result, true);
   await refreshAll();
 }
 
@@ -1177,22 +1177,47 @@ async function submitBlacklist() {
 
 async function runBatch(targets: SettlementSubAccountVO[], action: (row: SettlementSubAccountVO) => Promise<any>) {
   let success = 0;
+  const successMessages: string[] = [];
+  const failureMessages: string[] = [];
   const failed: string[] = [];
   submittingIds.value = targets.map((row) => String(row.applicationId));
   for (const row of targets) {
     try {
-      await action(row);
+      const response = await action(row);
       success += 1;
-    } catch {
+      // 审核响应携带银行开户首个结果，页面必须采用后端文案，不能统一误报“审核成功”。
+      if (response?.msg) successMessages.push(response.msg);
+    } catch (error: any) {
       failed.push(row.companyName || String(row.applicationId));
+      if (error?.message) failureMessages.push(error.message);
     }
   }
   submittingIds.value = [];
-  return { success, failed };
+  return { success, failed, successMessages, failureMessages };
 }
 
-function showBatchResult(action: string, result: { success: number; failed: string[] }) {
-  if (!result.failed.length) return ElMessage.success(`${action}成功，共 ${result.success} 条`);
+function showBatchResult(
+  action: string,
+  result: { success: number; failed: string[]; successMessages: string[]; failureMessages: string[] },
+  useResponseMessage = false
+) {
+  if (!result.failed.length) {
+    const messages = Array.from(new Set(result.successMessages));
+    const processingMessages = messages.filter((message) => message.includes('处理中'));
+    if (useResponseMessage && processingMessages.length) {
+      const message = result.success === 1 ? processingMessages[0] : `${action}已提交，其中 ${processingMessages.length} 条银行开户仍在处理中`;
+      return ElMessage.warning(message);
+    }
+    const message = useResponseMessage && messages.length === 1 ? messages[0] : `${action}成功，共 ${result.success} 条`;
+    return ElMessage.success(message);
+  }
+  const failureMessages = Array.from(new Set(result.failureMessages));
+  if (useResponseMessage && result.success === 0 && failureMessages.length === 1) {
+    return ElMessage.error(failureMessages[0]);
+  }
+  if (useResponseMessage && failureMessages.length) {
+    return ElMessage.warning(`${action}完成：成功 ${result.success} 条，失败 ${result.failed.length} 条；${failureMessages.join('；')}`);
+  }
   ElMessage.warning(`${action}完成：成功 ${result.success} 条，失败 ${result.failed.length} 条（${result.failed.join('、')}）`);
 }
 

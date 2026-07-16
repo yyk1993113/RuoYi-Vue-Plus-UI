@@ -103,7 +103,8 @@ export function updateSettlementCmbConfig(data: SettlementCmbConfigRequest) {
 }
 
 export function approveSettlementSubAccount(applicationId: string | number, opinion: string) {
-  return request.post(`${baseUrl}/${applicationId}/approve`, { opinion });
+  // 审核页统一汇总银行开户结果，关闭全局错误弹窗以避免同一失败重复提示。
+  return request.post(`${baseUrl}/${applicationId}/approve`, { opinion }, { silent: true } as any);
 }
 
 export function rejectSettlementSubAccount(applicationId: string | number, reason: string) {
