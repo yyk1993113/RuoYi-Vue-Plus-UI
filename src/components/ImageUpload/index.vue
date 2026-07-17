@@ -69,6 +69,13 @@ const props = defineProps({
     default: 'ossId',
     validator: (value: string) => ['ossId', 'url'].includes(value)
   },
+  // 业务页面可注入受领域权限保护的 OSS 回显方法；默认仍使用系统 OSS 查询接口。
+  resolveFiles: {
+    type: Function,
+    default: undefined
+  },
+  // 业务表单只解除材料关联时可关闭远端物理删除，避免要求系统文件删除权限。
+  deleteRemote: propTypes.bool.def(true),
   // 是否支持压缩，默认否
   compressSupport: {
     type: Boolean,
@@ -112,7 +119,7 @@ watch(
           .map((item) => item.trim())
           .filter(Boolean);
       } else {
-        const res = await listByIds(val);
+        const res = props.resolveFiles ? await props.resolveFiles(val) : await listByIds(val);
 
         list = res.data;
       }
@@ -204,7 +211,7 @@ const handleDelete = (file: UploadFile): boolean => {
   const findex = fileList.value.map((f) => f.name).indexOf(file.name);
   if (findex > -1 && uploadList.value.length === number.value) {
     const ossId = fileList.value[findex].ossId;
-    if (ossId) delOss(ossId);
+    if (ossId && props.deleteRemote) delOss(ossId);
     fileList.value.splice(findex, 1);
     emit('update:modelValue', listToString(fileList.value));
     return false;

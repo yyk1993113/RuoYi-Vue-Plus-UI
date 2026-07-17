@@ -1145,6 +1145,11 @@ export function getCompany(companyId: number | string) {
   return request.get<any>(`${baseUrl}/company/${companyId}`);
 }
 
+// 企业详情/编辑按企业范围解析资质 OSS id，避免依赖系统文件管理权限。
+export function listCompanyMaterials(companyId: number | string, ossIds: string) {
+  return request.get<any>(`${baseUrl}/company/${companyId}/materials/${ossIds}`);
+}
+
 // 企业审核历史（聚合 rec_audit_log 操作留痕 + company_cert 认证历史）。
 // 对应后端 AdminJobDetailController.getCompanyAuditHistory，供详情弹窗的「历史审核记录」展示。
 export function getCompanyAuditHistory(companyId: number | string) {

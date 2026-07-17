@@ -2601,17 +2601,21 @@ const queryParams = reactive<PromoterQuery>({
   status: ''
 });
 
-const form = reactive<PromoterForm>({
-  promoterId: undefined,
-  name: '',
-  phonenumber: '',
-  identityType: '0',
-  roleName: '',
-  companyCount: 0,
-  jobSeekerCount: 0,
-  status: '1',
-  remark: ''
-});
+function createDefaultPromoterForm(): PromoterForm {
+  return {
+    promoterId: undefined,
+    name: '',
+    phonenumber: '',
+    identityType: '0',
+    roleName: '',
+    companyCount: 0,
+    jobSeekerCount: 0,
+    status: '1',
+    remark: ''
+  };
+}
+
+const form = reactive<PromoterForm>(createDefaultPromoterForm());
 
 const upload = reactive<ImportOption>({
   open: false,
@@ -3561,15 +3565,9 @@ function openIdentityPeriodChartDrilldown(row: PromoterIdentityPeriod, identityT
 }
 
 function resetFormData() {
-  form.promoterId = undefined;
-  form.name = '';
-  form.phonenumber = '';
-  form.identityType = '0';
-  form.roleName = '';
-  form.companyCount = 0;
-  form.jobSeekerCount = 0;
-  form.status = '1';
-  form.remark = '';
+  // 编辑详情会动态带入推广码、租户等服务端字段；新增前必须删除，不能只重置可见项。
+  Object.keys(form).forEach((key) => Reflect.deleteProperty(form, key));
+  Object.assign(form, createDefaultPromoterForm());
 }
 
 async function loadManagedRoleOptions() {
@@ -4402,16 +4400,26 @@ async function submitForm() {
   await formRef.value?.validate();
   submitting.value = true;
   try {
-    const payload = {
-      ...form,
-      companyCount: form.companyCount ?? 0,
-      jobSeekerCount: form.jobSeekerCount ?? 0
-    };
     if (isEdit.value) {
+      const payload = {
+        ...form,
+        companyCount: form.companyCount ?? 0,
+        jobSeekerCount: form.jobSeekerCount ?? 0
+      };
       await updatePromoter(payload);
       ElMessage.success('修改成功');
     } else {
-      await addPromoter(payload);
+      // 新增仅发送可录入字段，推广码、租户和审计信息统一由后端生成。
+      await addPromoter({
+        name: form.name,
+        phonenumber: form.phonenumber,
+        identityType: form.identityType,
+        roleName: form.roleName,
+        companyCount: form.companyCount ?? 0,
+        jobSeekerCount: form.jobSeekerCount ?? 0,
+        status: form.status,
+        remark: form.remark
+      });
       ElMessage.success('新增成功，已生成专属推广链接');
     }
     dialogVisible.value = false;

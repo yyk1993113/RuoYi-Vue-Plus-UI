@@ -189,7 +189,7 @@
       <template #header>
         <el-row :gutter="10">
           <el-col :span="1.5">
-            <el-button type="primary" plain icon="Plus" @click="add">新增</el-button>
+            <el-button v-if="canCompanyAudit" type="primary" plain icon="Plus" @click="add">新增</el-button>
           </el-col>
           <el-col :span="1.5">
             <el-button type="primary" plain icon="Refresh" @click="loadData">刷新</el-button>
@@ -279,12 +279,12 @@
           <template #default="{ row }">
             <div style="display: flex; align-items: center; justify-content: center; gap: 8px">
               <template v-if="row.deleted === '1'">
-                <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
+                <el-button v-if="canCompanyQuery" link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
                 <el-button link type="success" icon="RefreshLeft" @click="handleRestore(row)">恢复</el-button>
               </template>
               <template v-else>
-                <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
-                <el-button link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
+                <el-button v-if="canCompanyQuery" link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
+                <el-button v-if="canCompanyAudit" link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
                 <el-dropdown trigger="click">
                   <span class="el-dropdown-link">
                     <el-button link type="primary"
@@ -295,13 +295,21 @@
                     <el-dropdown-menu>
                       <!-- 人员：已认证企业的人员管理入口，置于菜单最上方（行为待接，后端接口待补） -->
                       <el-dropdown-item v-if="row.status === '1'" icon="User" @click="handleStaff(row)">人员</el-dropdown-item>
-                      <el-dropdown-item v-if="row.status === '0'" icon="CircleCheck" @click="handleAudit(row, '1')">审核通过</el-dropdown-item>
-                      <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '2')">审核拒绝</el-dropdown-item>
+                      <el-dropdown-item v-if="row.status === '0' && canCompanyAudit" icon="CircleCheck" @click="handleAudit(row, '1')">
+                        审核通过
+                      </el-dropdown-item>
+                      <el-dropdown-item v-if="row.status === '0' && canCompanyAudit" icon="Close" @click="handleAudit(row, '2')">
+                        审核拒绝
+                      </el-dropdown-item>
                       <el-dropdown-item v-if="hasPendingSettlementIntent(row)" icon="Phone" @click="handleSettlementContacted(row)">
                         标记已联系
                       </el-dropdown-item>
-                      <el-dropdown-item v-if="row.status === '1'" icon="Lock" @click="handleStatusChange(row, '2')">禁用企业</el-dropdown-item>
-                      <el-dropdown-item v-if="row.status === '2'" icon="Unlock" @click="handleStatusChange(row, '1')">启用企业</el-dropdown-item>
+                      <el-dropdown-item v-if="row.status === '1' && canCompanyChangeStatus" icon="Lock" @click="handleStatusChange(row, '2')">
+                        禁用企业
+                      </el-dropdown-item>
+                      <el-dropdown-item v-if="row.status === '2' && canCompanyChangeStatus" icon="Unlock" @click="handleStatusChange(row, '1')">
+                        启用企业
+                      </el-dropdown-item>
                       <el-dropdown-item divided icon="MuteNotification" @click="handleSilence(row)" v-if="row.isSilenced !== '1'">
                         禁言企业
                       </el-dropdown-item>
@@ -571,31 +579,60 @@
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="营业执照副本">
-                <imageUpload v-model="form.businessLicense" :limit="1" @update:modelValue="handleOssChange" />
+                <imageUpload
+                  v-model="form.businessLicense"
+                  :limit="1"
+                  :resolve-files="resolveCompanyMaterialFiles"
+                  :delete-remote="false"
+                  @update:modelValue="handleOssChange"
+                />
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="法人身份证附件">
-                <imageUpload v-model="form.idCardPhotoIds" :limit="2" @update:modelValue="handleOssIdCarPhotoChange" />
+                <imageUpload
+                  v-model="form.idCardPhotoIds"
+                  :limit="2"
+                  :resolve-files="resolveCompanyMaterialFiles"
+                  :delete-remote="false"
+                  @update:modelValue="handleOssIdCarPhotoChange"
+                />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="对公账户凭证">
-                <imageUpload v-model="form.bankAccountIds" :limit="1" @update:modelValue="handleOssBankAccountIdsChange" />
+                <imageUpload
+                  v-model="form.bankAccountIds"
+                  :limit="1"
+                  :resolve-files="resolveCompanyMaterialFiles"
+                  :delete-remote="false"
+                  @update:modelValue="handleOssBankAccountIdsChange"
+                />
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="办公场地实景">
-                <imageUpload v-model="form.companyAddressIds" @update:modelValue="handleOssCompanyAddressIdsChange" />
+                <imageUpload
+                  v-model="form.companyAddressIds"
+                  :resolve-files="resolveCompanyMaterialFiles"
+                  :delete-remote="false"
+                  @update:modelValue="handleOssCompanyAddressIdsChange"
+                />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="企业logo">
-                <imageUpload v-model="form.logoUrl" :limit="1" @update:modelValue="handleOsslogoUrlChange" />
+                <imageUpload
+                  v-model="form.logoUrl"
+                  :limit="1"
+                  :resolve-files="resolveCompanyMaterialFiles"
+                  :delete-remote="false"
+                  @update:modelValue="handleOsslogoUrlChange"
+                />
               </el-form-item>
             </el-col>
             <el-col :span="12">
@@ -606,6 +643,8 @@
                   :file-size="10"
                   :file-type="['pdf', 'jpg', 'jpeg', 'png', 'bmp', 'webp', 'gif']"
                   upload-url="/api/company/upload"
+                  :resolve-files="resolveCompanyMaterialFiles"
+                  :delete-remote="false"
                   @update:modelValue="handleOssRecruitmentAuthorizationIdsChange"
                 />
               </el-form-item>
@@ -616,7 +655,7 @@
       <template #footer>
         <!-- 提交中：当前操作按钮转圈，其余按钮禁用，防止重复/交叉提交 -->
         <el-button
-          v-if="form.status && form.status !== '4'"
+          v-if="canCompanyAudit && form.status && form.status !== '4'"
           type="primary"
           :loading="editSubmitting === 'save'"
           :disabled="!!editSubmitting && editSubmitting !== 'save'"
@@ -625,7 +664,7 @@
         >
         <!-- 存草稿仅限"新增（尚无状态）/ 草稿(4)"：已进入审核流（待审核/已认证/驳回）的企业不允许再回退为草稿 -->
         <el-button
-          v-if="!form.status || form.status === '4'"
+          v-if="canCompanyAudit && (!form.status || form.status === '4')"
           type="primary"
           :loading="editSubmitting === 'draft'"
           :disabled="!!editSubmitting && editSubmitting !== 'draft'"
@@ -633,7 +672,7 @@
           >存草稿</el-button
         >
         <el-button
-          v-if="form.status !== '1'"
+          v-if="canCompanyAudit && form.status !== '1'"
           type="primary"
           :loading="editSubmitting === 'submit'"
           :disabled="!!editSubmitting && editSubmitting !== 'submit'"
@@ -641,8 +680,12 @@
           >提交</el-button
         >
         <!-- 待审核(0)：运营可在编辑弹窗内直接发起审核，复用「企业审核」对话框（通过/驳回），不改保存/提交逻辑 -->
-        <el-button v-if="form.status === '0'" type="success" :disabled="!!editSubmitting" @click="handleAuditFromEdit('1')">审核通过</el-button>
-        <el-button v-if="form.status === '0'" type="danger" :disabled="!!editSubmitting" @click="handleAuditFromEdit('2')">审核拒绝</el-button>
+        <el-button v-if="canCompanyAudit && form.status === '0'" type="success" :disabled="!!editSubmitting" @click="handleAuditFromEdit('1')">
+          审核通过
+        </el-button>
+        <el-button v-if="canCompanyAudit && form.status === '0'" type="danger" :disabled="!!editSubmitting" @click="handleAuditFromEdit('2')">
+          审核拒绝
+        </el-button>
         <el-button :disabled="!!editSubmitting" @click="editVisible = false">取消</el-button>
       </template>
     </el-dialog>
@@ -687,7 +730,7 @@
       </el-form>
       <template #footer>
         <el-button @click="auditVisible = false">取消</el-button>
-        <el-button :type="auditForm.status === '2' ? 'danger' : 'primary'" :loading="auditSubmitting" @click="submitAudit">
+        <el-button v-if="canCompanyAudit" :type="auditForm.status === '2' ? 'danger' : 'primary'" :loading="auditSubmitting" @click="submitAudit">
           {{ auditForm.status === '2' ? '确认驳回' : '确认通过' }}
         </el-button>
       </template>
@@ -929,6 +972,7 @@ import {
   listCompany,
   getCompanyStatistics,
   getCompany,
+  listCompanyMaterials,
   getCompanyAuditHistory,
   auditCompany,
   changeCompanyStatus,
@@ -951,7 +995,6 @@ import {
 } from '@/api/recruitment';
 import ApplyDetailDialog from './components/ApplyDetailDialog.vue';
 import { download } from '@/utils/request';
-import { listByIds } from '@/api/system/oss';
 import { unwrapList, splitToArray, formatSalary, formatMoney } from './helpers';
 import {
   companyStatusMeta,
@@ -966,9 +1009,37 @@ import {
 import { UserForm } from '@/api/system/user/types';
 import { updateUserProfile } from '@/api/system/user';
 import { RoleVO } from '@/api/system/role/types';
+import { useUserStore } from '@/store/modules/user';
 
 const router = useRouter();
 const route = useRoute();
+const userStore = useUserStore();
+
+// 企业按钮优先跟随后台菜单权限；保留原角色矩阵作为兼容兜底，避免已在岗账号因本次对齐突然失去操作入口。
+const hasPermissionOrLegacyRole = (permission: string, legacyRoles: string[]): boolean => {
+  return (
+    userStore.permissions.includes('*:*:*') ||
+    userStore.permissions.includes(permission) ||
+    legacyRoles.some((role) => userStore.roles.includes(role))
+  );
+};
+const canCompanyQuery = computed(() =>
+  hasPermissionOrLegacyRole('recruitment:company:query', [
+    'superadmin',
+    'operations_manager',
+    'auditor',
+    'finance',
+    'operator',
+    'customer_service',
+    'developer'
+  ])
+);
+const canCompanyAudit = computed(() =>
+  hasPermissionOrLegacyRole('recruitment:company:audit', ['superadmin', 'operations_manager', 'operator', 'auditor'])
+);
+const canCompanyChangeStatus = computed(() =>
+  hasPermissionOrLegacyRole('recruitment:company:changeStatus', ['superadmin', 'operations_manager', 'operator'])
+);
 
 interface CertMaterialFile {
   kind: 'image' | 'doc';
@@ -1074,6 +1145,12 @@ const dateRange = ref<[string, string] | []>([]);
 const showMoreQuery = ref(false);
 
 const form = ref<Partial<UserForm>>({});
+
+// 编辑组件只解析当前企业实际关联的材料，避免借用系统文件管理权限。
+const resolveCompanyMaterialFiles = (ossIds: string) => {
+  const companyId = (form.value as any).companyId;
+  return companyId ? listCompanyMaterials(companyId, ossIds) : Promise.resolve({ data: [] });
+};
 
 const rules = reactive({
   companyName: [{ required: true, message: '请输入公司全称', trigger: 'blur' }],
@@ -1619,7 +1696,7 @@ async function loadCompanyCertImages(company: any) {
     );
     const fileMap: Record<string, any> = {};
     if (idSet.size > 0) {
-      const res = await listByIds(Array.from(idSet).join(','));
+      const res = await listCompanyMaterials(company.companyId, Array.from(idSet).join(','));
       (res.data || []).forEach((o: any) => {
         fileMap[String(o.ossId)] = o;
       });
@@ -1688,7 +1765,7 @@ async function loadAuditHistory(companyId: number) {
   try {
     const res = await getCompanyAuditHistory(companyId);
     auditHistory.value = res.data || { auditLogs: [], certHistory: [] };
-    await hydrateCertHistoryFiles();
+    await hydrateCertHistoryFiles(companyId);
   } catch (error) {
     console.error('审核历史加载失败:', error);
   } finally {
@@ -1697,7 +1774,7 @@ async function loadAuditHistory(companyId: number) {
 }
 
 // 认证历史从后端取到的材料字段可能仍是 OSS id；这里统一解析，避免文档/图片展示拿到不可访问的裸 id。
-async function hydrateCertHistoryFiles() {
+async function hydrateCertHistoryFiles(companyId: number) {
   const certs = auditHistory.value.certHistory || [];
   const isOssId = (t: string) => /^\d+$/.test(t);
   const materialFields = ['businessLicense', 'legalPersonIdFront', 'legalPersonIdBack', 'bankAccountProof', 'authLetter', 'officePhotos'];
@@ -1710,7 +1787,7 @@ async function hydrateCertHistoryFiles() {
     );
   });
   if (idSet.size === 0) return;
-  const res = await listByIds(Array.from(idSet).join(','));
+  const res = await listCompanyMaterials(companyId, Array.from(idSet).join(','));
   const fileMap: Record<string, any> = {};
   (res.data || []).forEach((file: any) => {
     fileMap[String(file.ossId)] = file;
