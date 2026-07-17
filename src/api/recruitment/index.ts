@@ -721,6 +721,14 @@ export interface PromoterQuery {
 }
 
 export type PromoterForm = PromoterVO;
+
+export interface PromoterPostOption {
+  optionType: 'post' | 'role';
+  optionId: string | number;
+  optionName: string;
+  categoryCode: string;
+}
+
 export type PromoterStatisticsTimeUnit = 'day' | 'month' | 'quarter' | 'halfYear' | 'year';
 
 export interface PromoterStatisticsRow extends PromoterVO {
@@ -861,6 +869,7 @@ export interface PromotionAttributionQuery {
   promoterKeyword?: string;
   identityType?: string;
   status?: string;
+  resumeCompletenessRange?: '' | 'high' | 'mid' | 'low';
   keyword?: string;
   beginTime?: string;
   endTime?: string;
@@ -879,6 +888,8 @@ export interface PromotionAttributionDetailVO {
   identityType?: string;
   identityTypeName?: string;
   roleName?: string;
+  /** 后端按与小程序一致的规则计算，取求职者简历中的最高完成度（0-100）。 */
+  resumeCompleteness?: number | null;
   status?: string;
   statusName?: string;
   completed?: string;
@@ -933,6 +944,11 @@ export interface PromotionHandoverVO {
 
 export function listPromoter(query: PromoterQuery) {
   return request.get<any>(`${baseUrl}/promoter/list`, { params: query });
+}
+
+// 推广人员岗位/角色只读取与所选身份类别编码一致、且已启用的数据。
+export function listPromoterPostOptions(identityType: string) {
+  return request.get<PromoterPostOption[]>(`${baseUrl}/promoter/post-options`, { params: { identityType } });
 }
 
 export function getPromoterStatistics(query: PromoterQuery) {

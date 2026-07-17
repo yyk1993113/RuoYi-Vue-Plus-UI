@@ -593,6 +593,11 @@
                   <el-option label="合伙人" value="2" />
                 </el-select>
               </el-form-item>
+              <el-form-item v-if="detailObjectType === 'user'" label="完成度">
+                <el-select v-model="detailQuery.resumeCompletenessRange" placeholder="全部" clearable style="width: 150px">
+                  <el-option v-for="item in resumeCompletenessRangeOptions" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+              </el-form-item>
               <el-form-item label="状态">
                 <el-select v-model="detailQuery.status" placeholder="全部" clearable style="width: 150px">
                   <el-option v-for="item in detailStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
@@ -650,6 +655,14 @@
                   <template #default="{ row }">
                     <el-tag :type="identityTypeTag(row.identityType)" size="small">{{
                       row.identityTypeName || identityTypeText(row.identityType)
+                    }}</el-tag>
+                  </template>
+                </el-table-column>
+                <!-- 百分比由后端按小程序同源规则计算，运营台只负责格式化展示。 -->
+                <el-table-column v-if="detailObjectType === 'user'" label="简历完成度" prop="resumeCompleteness" width="120" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="resumeCompletenessTag(row.resumeCompleteness)" size="small">{{
+                      formatResumeCompleteness(row.resumeCompleteness)
                     }}</el-tag>
                   </template>
                 </el-table-column>
@@ -1169,11 +1182,16 @@
             placeholder="请选择岗位/角色"
             clearable
             filterable
-            :loading="managedRoleIdentityTypes.has(form.identityType || '') && managedRoleLoading"
-            :no-data-text="managedRoleIdentityTypes.has(form.identityType || '') && managedRoleLoadFailed ? '角色列表加载失败' : '暂无匹配角色'"
+            :loading="roleOptionLoading"
+            :no-data-text="roleOptionLoadFailed ? '岗位/角色列表加载失败' : '暂无匹配岗位/角色'"
             style="width: 100%"
           >
-            <el-option v-for="item in roleOptions" :key="item" :label="item" :value="item" />
+            <el-option
+              v-for="item in roleOptions"
+              :key="`${item.optionType}-${item.optionId}`"
+              :label="`${item.optionType === 'post' ? '岗位' : '角色'} · ${item.optionName}`"
+              :value="item.optionName"
+            />
           </el-select>
         </el-form-item>
         <el-row v-if="isEdit" :gutter="12">
@@ -1583,6 +1601,7 @@ import {
   listSeaCustomerCompany,
   listSeaCustomerUser,
   listPromoter,
+  listPromoterPostOptions,
   listExportTemplates,
   saveExportTemplate,
   delExportTemplate,
@@ -1592,6 +1611,7 @@ import {
   type PromotionHandoverVO,
   type PromotionAttributionQuery,
   type PromoterForm,
+  type PromoterPostOption,
   type PromoterIdentityPeriod,
   type PromoterQuery,
   type PromoterStatisticsGroup,
@@ -1603,8 +1623,6 @@ import {
 } from '@/api/recruitment';
 import { download, globalHeaders } from '@/utils/request';
 import { hasOperationsManagerRole } from '@/utils/role';
-import { listRole } from '@/api/system/role';
-import type { RoleVO } from '@/api/system/role/types';
 import { useUserStore } from '@/store/modules/user';
 import { unwrapList } from './helpers';
 import { companyStatusMeta } from './constants';
@@ -2147,6 +2165,7 @@ const PROMOTER_METRIC_HINTS: Record<string, string> = {
   completed: '企业资料是否完整',
   jobCount: '企业名下岗位数量',
   authorized: '求职者是否已授权手机号',
+  resumeCompleteness: '求职者多份简历中的最高完成度百分比',
   resumeCompleted: '求职者是否已完成简历',
   applied: '求职者是否已产生投递',
   promotedAt: '首次通过推广进入的时间',
@@ -2300,6 +2319,7 @@ function flattenAttributionRows(rows: PromotionAttributionDetailVO[], objectType
     promoterName: r.promoterName || '-',
     promoterPhone: r.promoterPhone || '-',
     identityTypeName: r.identityTypeName || identityTypeText(r.identityType),
+    resumeCompleteness: formatResumeCompleteness(r.resumeCompleteness),
     statusName: detailStatusText(r, objectType),
     completed: r.completed || '-',
     jobCount: toCount(r.jobCount),
@@ -2328,6 +2348,7 @@ function buildAttributionExportColumns(objectType: DetailObjectType, includeProm
       { key: 'identityTypeName', label: '推广人身份' }
     );
   }
+  if (objectType === 'user' && includePromoter) cols.push({ key: 'resumeCompleteness', label: '简历完成度' });
   cols.push({ key: 'statusName', label: '状态' });
   if (objectType === 'company') {
     cols.push({ key: 'completed', label: '资料完整' }, { key: 'jobCount', label: '岗位数', numeric: true });
@@ -2368,7 +2389,10 @@ function buildAttributionExportGroups(objectType: DetailObjectType, includePromo
   const base = ['objectName', 'phone'];
   if (objectType === 'company') base.push('contactPerson');
   const source = includePromoter ? ['promoterName', 'promoterPhone', 'identityTypeName'] : [];
-  const stage = objectType === 'company' ? ['statusName', 'completed', 'jobCount'] : ['statusName', 'authorized', 'resumeCompleted', 'applied'];
+  const stage =
+    objectType === 'company'
+      ? ['statusName', 'completed', 'jobCount']
+      : [...(includePromoter ? ['resumeCompleteness'] : []), 'statusName', 'authorized', 'resumeCompleted', 'applied'];
   const time =
     objectType === 'company' ? ['promotedAt', 'createTime'] : ['promotedAt', 'authorizedTime', 'resumeCompletedTime', 'firstApplyTime', 'createTime'];
   const groups = [
@@ -2543,6 +2567,7 @@ const detailQuery = reactive<PromotionAttributionQuery>({
   promoterKeyword: '',
   identityType: '',
   status: '',
+  resumeCompletenessRange: '',
   keyword: ''
 });
 
@@ -2637,16 +2662,11 @@ const adjustForm = reactive<PromotionAttributionAdjustForm & { objectName?: stri
 
 // 渠道推广人员的数量字段由运营手工维护，后端按 company_count/job_seeker_count 原样落库。
 const nonNegativeCountRule = { type: 'number', min: 0, message: '数量不能小于0', trigger: 'change' } as const;
-const staticRoleOptionsMap: Record<string, string[]> = {
-  // 身份类型为内部人员时，岗位角色作为二级分类使用。
-  '0': ['实习生', '销售岗', '拓展岗']
-};
-// 外部渠道与合伙人的岗位统一复用角色管理全量数据，避免前端写死角色或遗漏后续新增角色。
-const managedRoleIdentityTypes = new Set(['1', '2']);
-const managedRoleOptions = ref<string[]>([]);
-const managedRoleLoading = ref(false);
-const managedRoleLoaded = ref(false);
-const managedRoleLoadFailed = ref(false);
+// 三类推广身份分别缓存同类别编码下的启用岗位和角色。
+const promoterPostOptions = reactive<Record<string, PromoterPostOption[]>>({ '0': [], '1': [], '2': [] });
+const promoterPostOptionsLoaded = reactive<Record<string, boolean>>({ '0': false, '1': false, '2': false });
+const promoterPostOptionsFailed = reactive<Record<string, boolean>>({ '0': false, '1': false, '2': false });
+const promoterPostOptionsLoading = reactive(new Set<string>());
 
 const rules: FormRules = {
   name: [{ required: true, message: '请输入姓名/昵称', trigger: 'blur' }],
@@ -2662,9 +2682,9 @@ const rules: FormRules = {
 };
 
 const dialogTitle = computed(() => (isEdit.value ? '编辑推广人员' : '新增推广人员'));
-const roleOptions = computed(() =>
-  managedRoleIdentityTypes.has(form.identityType || '') ? managedRoleOptions.value : staticRoleOptionsMap[form.identityType || '0'] || []
-);
+const roleOptions = computed(() => promoterPostOptions[form.identityType || '0'] || []);
+const roleOptionLoading = computed(() => promoterPostOptionsLoading.has(form.identityType || ''));
+const roleOptionLoadFailed = computed(() => promoterPostOptionsFailed[form.identityType || ''] || false);
 // 卡片同比/环比涨跌：current 为本期「新增(B+C)合计」，base 为后端按「同期至今」口径返回的对比基数。
 // base<=0 视为无可比基数（如去年同期尚无数据/从 0 起步），统一显示「—」，避免出现 +∞%。
 // trend: up 增长(绿) / down 下降(红) / flat 持平(灰) / new 从0新增(蓝，无可比基数但本期有量)
@@ -2772,6 +2792,13 @@ const detailStatusOptions = computed(() =>
       ]
 );
 
+// 与企业人才库沿用同一套完成度分档，统计明细由服务端筛选全量数据而非只过滤当前页。
+const resumeCompletenessRangeOptions = [
+  { label: '80%及以上', value: 'high' },
+  { label: '60%-79%', value: 'mid' },
+  { label: '60%以下', value: 'low' }
+] as const;
+
 const metricCards = computed(() => [
   { key: 'promoter', label: '推广人', value: statisticsData.totalPromoterCount || 0, sub: '当前筛选结果', tone: 'primary' },
   { key: 'company', label: 'B端企业', value: statisticsData.totalCompanyCount || 0, sub: '企业注册/线索量', tone: 'success' },
@@ -2863,6 +2890,21 @@ function detailStatusText(row: PromotionAttributionDetailVO, objectType: DetailO
 
 function yesNoTag(value?: string): TagType {
   return value === '是' ? 'success' : 'info';
+}
+
+function formatResumeCompleteness(value?: number | null): string {
+  if (value === null || value === undefined) return '-';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '-';
+  return `${Math.min(100, Math.max(0, Math.round(numeric)))}%`;
+}
+
+function resumeCompletenessTag(value?: number | null): TagType {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 'info';
+  if (numeric >= 80) return 'success';
+  if (numeric >= 60) return 'warning';
+  return 'info';
 }
 
 function toCount(value?: number) {
@@ -3570,38 +3612,30 @@ function resetFormData() {
   Object.assign(form, createDefaultPromoterForm());
 }
 
-async function loadManagedRoleOptions() {
-  if (managedRoleLoaded.value || managedRoleLoading.value) return;
-  managedRoleLoading.value = true;
-  managedRoleLoadFailed.value = false;
+async function loadPromoterPostOptions(identityType: string) {
+  if (promoterPostOptionsLoaded[identityType] || promoterPostOptionsLoading.has(identityType)) return;
+  promoterPostOptionsLoading.add(identityType);
+  promoterPostOptionsFailed[identityType] = false;
   try {
-    const response = await listRole({
-      pageNum: 1,
-      pageSize: 10000,
-      roleName: '',
-      roleKey: '',
-      status: ''
-    });
-    const matchedRoles = unwrapList<RoleVO>(response).rows.sort((a, b) => Number(a.roleSort || 0) - Number(b.roleSort || 0));
-    managedRoleOptions.value = [...new Set(matchedRoles.map((role) => String(role.roleName || '').trim()).filter(Boolean))];
-    managedRoleLoaded.value = true;
+    const response = await listPromoterPostOptions(identityType);
+    const rows = ((response as any)?.data || []) as PromoterPostOption[];
+    promoterPostOptions[identityType] = rows.filter((item) => String(item.optionName || '').trim());
+    promoterPostOptionsLoaded[identityType] = true;
   } catch {
-    managedRoleLoadFailed.value = true;
-    ElMessage.error('角色列表加载失败，请稍后重试');
+    promoterPostOptionsFailed[identityType] = true;
+    ElMessage.error('岗位/角色列表加载失败，请稍后重试');
   } finally {
-    managedRoleLoading.value = false;
+    promoterPostOptionsLoading.delete(identityType);
   }
 }
 
 async function handleIdentityTypeChange(value: string | number | boolean | undefined) {
   const type = String(value ?? '0');
   form.roleName = '';
-  if (managedRoleIdentityTypes.has(type)) {
-    await loadManagedRoleOptions();
-    if (form.identityType !== type) return;
-  }
-  const options = managedRoleIdentityTypes.has(type) ? managedRoleOptions.value : staticRoleOptionsMap[type] || [];
-  form.roleName = options.length === 1 ? options[0] : '';
+  await loadPromoterPostOptions(type);
+  if (form.identityType !== type) return;
+  const options = promoterPostOptions[type] || [];
+  form.roleName = options.length === 1 ? options[0].optionName : '';
 }
 
 watch(statisticsSide, () => {
@@ -3610,6 +3644,8 @@ watch(statisticsSide, () => {
 
 watch(detailObjectType, () => {
   detailQuery.status = '';
+  // 完成度仅属于 C 端求职者，切换到 B 端时清空，避免隐藏筛选继续影响后续查询。
+  detailQuery.resumeCompletenessRange = '';
   detailQuery.pageNum = 1;
 });
 
@@ -3986,6 +4022,7 @@ function buildAttributionDetailQuery(): PromotionAttributionQuery {
     promoterKeyword: detailQuery.promoterKeyword || undefined,
     identityType: detailQuery.identityType || undefined,
     status: detailQuery.status || undefined,
+    resumeCompletenessRange: detailObjectType.value === 'user' ? detailQuery.resumeCompletenessRange || undefined : undefined,
     keyword: detailQuery.keyword || undefined,
     beginTime: beginDate ? `${beginDate} 00:00:00` : undefined,
     endTime: endDate ? `${endDate} 23:59:59` : undefined
@@ -4018,6 +4055,7 @@ function resetAttributionQuery() {
   detailQuery.promoterKeyword = '';
   detailQuery.identityType = '';
   detailQuery.status = '';
+  detailQuery.resumeCompletenessRange = '';
   detailQuery.keyword = '';
   detailDateRange.value = [];
   loadAttributionDetails();
@@ -4326,6 +4364,7 @@ function handleAdd() {
   isEdit.value = false;
   resetFormData();
   dialogVisible.value = true;
+  void loadPromoterPostOptions(form.identityType || '0');
 }
 
 async function handleEdit(row: PromoterVO) {
@@ -4337,12 +4376,11 @@ async function handleEdit(row: PromoterVO) {
   } catch {
     Object.assign(form, row);
   }
-  if (managedRoleIdentityTypes.has(form.identityType || '')) {
-    await loadManagedRoleOptions();
-    // 外部渠道与合伙人仅保留角色管理中仍存在的角色名称，避免继续提交已删除的历史角色。
-    if (managedRoleLoaded.value && !managedRoleOptions.value.includes(form.roleName || '')) {
-      form.roleName = '';
-    }
+  const identityType = form.identityType || '0';
+  await loadPromoterPostOptions(identityType);
+  // 编辑时只保留当前身份类别中仍存在的启用岗位，防止提交已停用或已改类的历史岗位。
+  if (promoterPostOptionsLoaded[identityType] && !promoterPostOptions[identityType].some((item) => item.optionName === (form.roleName || ''))) {
+    form.roleName = '';
   }
   dialogVisible.value = true;
 }

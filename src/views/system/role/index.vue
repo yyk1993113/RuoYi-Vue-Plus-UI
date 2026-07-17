@@ -54,6 +54,11 @@
             <el-button v-hasPermi="['system:role:remove']" type="danger" plain :disabled="ids.length === 0" @click="handleDelete()">删除</el-button>
           </el-col>
           <el-col :span="1.5">
+            <el-button v-hasPermi="['system:role:edit']" type="primary" plain :disabled="multiple" @click="handleBatchCategoryCode">
+              批量设置类别编码
+            </el-button>
+          </el-col>
+          <el-col :span="1.5">
             <el-button v-hasPermi="['system:role:export']" type="warning" plain icon="Download" @click="handleExport">导出</el-button>
           </el-col>
           <right-toolbar v-model:show-search="showSearch" @query-table="getList"></right-toolbar>
@@ -74,6 +79,14 @@
           </template>
         </el-table-column>
         <el-table-column label="权限字符" prop="roleKey" :show-overflow-tooltip="true" width="200" />
+        <el-table-column label="类别编码" prop="categoryCode" align="center" width="120">
+          <template #default="scope">
+            <el-tag v-if="scope.row.categoryCode" type="primary" size="small">
+              {{ promoterPostCategoryLabel(scope.row.categoryCode) }}
+            </el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="角色定位" prop="roleDesc" :show-overflow-tooltip="true" min-width="220" />
         <el-table-column label="显示顺序" prop="roleSort" width="100" />
         <el-table-column label="状态" align="center" width="100">
@@ -141,6 +154,25 @@
         @pagination="getList"
       />
     </el-card>
+
+    <el-dialog v-model="batchCategoryCodeDialog.visible" title="批量设置类别编码" width="420px" append-to-body>
+      <el-form label-width="90px">
+        <el-form-item label="已选角色">
+          <span>{{ ids.length }} 个</span>
+        </el-form-item>
+        <el-form-item label="类别编码" required>
+          <el-select v-model="batchCategoryCodeForm.categoryCode" placeholder="请选择类别编码" class="w-full">
+            <el-option v-for="item in promoterPostCategoryOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="batchCategoryCodeDialog.visible = false">取 消</el-button>
+          <el-button type="primary" :loading="batchCategoryCodeSubmitting" @click="submitBatchCategoryCode">确 定</el-button>
+        </div>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="dialog.visible" :title="dialog.title" width="500px" append-to-body>
       <el-form ref="roleFormRef" :model="form" :rules="rules" label-width="100px">
@@ -235,10 +267,11 @@
 </template>
 
 <script setup name="Role" lang="ts">
-import { addRole, changeRoleStatus, dataScope, delRole, getRole, listRole, updateRole, deptTreeSelect } from '@/api/system/role';
+import { addRole, batchUpdateRoleCategoryCode, changeRoleStatus, dataScope, delRole, getRole, listRole, updateRole, deptTreeSelect } from '@/api/system/role';
 import { roleMenuTreeselect, treeselect as menuTreeselect } from '@/api/system/menu/index';
 import { RoleVO, RoleForm, RoleQuery, DeptTreeOption } from '@/api/system/role/types';
 import { MenuTreeOption, RoleMenuTree } from '@/api/system/menu/types';
+import { promoterPostCategoryLabel, promoterPostCategoryOptions, type PromoterPostCategoryCode } from '@/constants/promoterPostCategory';
 
 const router = useRouter();
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
@@ -267,6 +300,9 @@ const deptExpand = ref(true);
 const deptNodeAll = ref(false);
 const deptOptions = ref<DeptTreeOption[]>([]);
 const openDataScope = ref(false);
+const batchCategoryCodeSubmitting = ref(false);
+const batchCategoryCodeDialog = reactive({ visible: false });
+const batchCategoryCodeForm = reactive<{ categoryCode: PromoterPostCategoryCode | '' }>({ categoryCode: '' });
 const COMPANY_RECRUITER_ROLE_KEY = 'B';
 const GENERAL_MANAGER_ROLE_NAME = '总经理';
 const GENERAL_MANAGER_ROLE_KEY = 'general_manager';
@@ -462,7 +498,7 @@ const handleRoleSegmentChange = (value: string | number) => {
   getList();
 };
 
-const isSelectableRole = (row: RoleDisplayRow) => !row.templateMissing;
+const isSelectableRole = (row: RoleDisplayRow) => !row.templateMissing && Number(row.roleId) !== 1;
 
 /**
  * 搜索按钮操作
@@ -502,6 +538,33 @@ const handleSelectionChange = (selection: RoleDisplayRow[]) => {
   ids.value = selection.map((item: RoleVO) => item.roleId);
   single.value = selection.length != 1;
   multiple.value = !selection.length;
+};
+
+/** 打开批量类别编码弹窗，复用岗位类别编码选项。 */
+const handleBatchCategoryCode = () => {
+  if (!ids.value.length) return;
+  batchCategoryCodeForm.categoryCode = '';
+  batchCategoryCodeDialog.visible = true;
+};
+
+/** 提交批量类别编码，成功后刷新当前角色分组列表。 */
+const submitBatchCategoryCode = async () => {
+  if (!batchCategoryCodeForm.categoryCode) {
+    proxy?.$modal.msgWarning('请选择类别编码');
+    return;
+  }
+  batchCategoryCodeSubmitting.value = true;
+  try {
+    await batchUpdateRoleCategoryCode(ids.value, batchCategoryCodeForm.categoryCode);
+    proxy?.$modal.msgSuccess('批量设置类别编码成功');
+    batchCategoryCodeDialog.visible = false;
+    ids.value = [];
+    single.value = true;
+    multiple.value = true;
+    getList();
+  } finally {
+    batchCategoryCodeSubmitting.value = false;
+  }
 };
 
 /** 角色状态修改 */

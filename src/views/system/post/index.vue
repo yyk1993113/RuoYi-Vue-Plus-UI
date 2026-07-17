@@ -28,13 +28,9 @@
                   <el-input v-model="queryParams.postCode" placeholder="请输入岗位编码" clearable @keyup.enter="handleQuery" />
                 </el-form-item>
                 <el-form-item label="类别编码" prop="postCategory">
-                  <el-input
-                    v-model="queryParams.postCategory"
-                    placeholder="请输入类别编码"
-                    clearable
-                    style="width: 200px"
-                    @keyup.enter="handleQuery"
-                  />
+                  <el-select v-model="queryParams.postCategory" placeholder="请选择类别编码" clearable style="width: 200px">
+                    <el-option v-for="item in promoterPostCategoryOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
                 </el-form-item>
                 <el-form-item label="岗位名称" prop="postName">
                   <el-input v-model="queryParams.postName" placeholder="请输入岗位名称" clearable @keyup.enter="handleQuery" />
@@ -88,7 +84,12 @@
             <el-table-column type="selection" width="55" align="center" />
             <el-table-column v-if="false" label="岗位编号" align="center" prop="postId" />
             <el-table-column label="岗位编码" align="center" prop="postCode" />
-            <el-table-column label="类别编码" align="center" prop="postCategory" />
+            <el-table-column label="类别编码" align="center" prop="postCategory">
+              <template #default="scope">
+                <el-tag v-if="scope.row.postCategory" type="info">{{ promoterPostCategoryLabel(scope.row.postCategory) }}</el-tag>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
             <el-table-column label="岗位名称" align="center" prop="postName" />
             <el-table-column label="部门" align="center" prop="deptName" />
             <el-table-column label="排序" align="center" prop="postSort" />
@@ -143,7 +144,9 @@
               <el-input v-model="form.postCode" placeholder="请输入编码名称" />
             </el-form-item>
             <el-form-item label="类别编码" prop="postCategory">
-              <el-input v-model="form.postCategory" placeholder="请输入类别编码" />
+              <el-select v-model="form.postCategory" placeholder="请选择类别编码" style="width: 100%">
+                <el-option v-for="item in promoterPostCategoryOptions" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
             </el-form-item>
             <el-form-item label="岗位顺序" prop="postSort">
               <el-input-number v-model="form.postSort" controls-position="right" :min="0" />
@@ -173,6 +176,7 @@
 import { listPost, addPost, delPost, getPost, updatePost, deptTreeSelect } from '@/api/system/post';
 import { PostForm, PostQuery, PostVO } from '@/api/system/post/types';
 import { DeptTreeVO, DeptVO } from '@/api/system/dept/types';
+import { promoterPostCategoryLabel, promoterPostCategoryOptions } from '@/constants/promoterPostCategory';
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 const { sys_normal_disable } = toRefs<any>(proxy?.useDict('sys_normal_disable'));
@@ -221,6 +225,7 @@ const data = reactive<PageData<PostForm, PostQuery>>({
   rules: {
     postName: [{ required: true, message: '岗位名称不能为空', trigger: 'blur' }],
     postCode: [{ required: true, message: '岗位编码不能为空', trigger: 'blur' }],
+    postCategory: [{ required: true, message: '请选择类别编码', trigger: 'change' }],
     deptId: [{ required: true, message: '部门不能为空', trigger: 'blur' }],
     postSort: [{ required: true, message: '岗位顺序不能为空', trigger: 'blur' }]
   }
