@@ -869,7 +869,7 @@ export interface PromotionAttributionQuery {
   promoterKeyword?: string;
   identityType?: string;
   status?: string;
-  resumeCompletenessRange?: '' | 'high' | 'mid' | 'low';
+  resumeCompletenessRange?: '' | 'completed' | 'progress' | 'blank';
   keyword?: string;
   beginTime?: string;
   endTime?: string;

@@ -658,12 +658,16 @@
                     }}</el-tag>
                   </template>
                 </el-table-column>
-                <!-- 百分比由后端按小程序同源规则计算，运营台只负责格式化展示。 -->
-                <el-table-column v-if="detailObjectType === 'user'" label="简历完成度" prop="resumeCompleteness" width="120" align="center">
+                <!-- 百分比由后端按小程序同源规则计算；空值表示后端尚未升级，0% 表示求职者未填写简历。 -->
+                <el-table-column v-if="detailObjectType === 'user'" label="简历完成度" prop="resumeCompleteness" width="160" align="center">
                   <template #default="{ row }">
-                    <el-tag :type="resumeCompletenessTag(row.resumeCompleteness)" size="small">{{
-                      formatResumeCompleteness(row.resumeCompleteness)
-                    }}</el-tag>
+                    <el-progress
+                      v-if="row.resumeCompleteness !== null && row.resumeCompleteness !== undefined"
+                      :percentage="normalizeResumeCompleteness(row.resumeCompleteness)"
+                      :stroke-width="8"
+                      :color="resumeCompletenessColor(row.resumeCompleteness)"
+                    />
+                    <span v-else class="text-gray-400">暂无数据</span>
                   </template>
                 </el-table-column>
                 <el-table-column label="状态" prop="statusName" width="120" align="center">
@@ -2792,11 +2796,11 @@ const detailStatusOptions = computed(() =>
       ]
 );
 
-// 与企业人才库沿用同一套完成度分档，统计明细由服务端筛选全量数据而非只过滤当前页。
+// 推广管理以 70% 为“已完善”阈值，筛选由服务端作用于全量数据而非当前页。
 const resumeCompletenessRangeOptions = [
-  { label: '80%及以上', value: 'high' },
-  { label: '60%-79%', value: 'mid' },
-  { label: '60%以下', value: 'low' }
+  { label: '已完善（≥70%）', value: 'completed' },
+  { label: '完善中（1%-69%）', value: 'progress' },
+  { label: '未填写（0%）', value: 'blank' }
 ] as const;
 
 const metricCards = computed(() => [
@@ -2894,17 +2898,20 @@ function yesNoTag(value?: string): TagType {
 
 function formatResumeCompleteness(value?: number | null): string {
   if (value === null || value === undefined) return '-';
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return '-';
-  return `${Math.min(100, Math.max(0, Math.round(numeric)))}%`;
+  return `${normalizeResumeCompleteness(value)}%`;
 }
 
-function resumeCompletenessTag(value?: number | null): TagType {
+function normalizeResumeCompleteness(value?: number | null): number {
   const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return 'info';
-  if (numeric >= 80) return 'success';
-  if (numeric >= 60) return 'warning';
-  return 'info';
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.min(100, Math.max(0, Math.round(numeric)));
+}
+
+function resumeCompletenessColor(value?: number | null): string {
+  const numeric = normalizeResumeCompleteness(value);
+  if (numeric >= 70) return '#67c23a';
+  if (numeric > 0) return '#e6a23c';
+  return '#909399';
 }
 
 function toCount(value?: number) {
