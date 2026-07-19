@@ -494,7 +494,8 @@ function resetDetailQuery() {
 async function loadDetail() {
   detailLoading.value = true;
   try {
-    const res = unwrapData<any>(await listPromoterWorkbenchDetail(buildDetailParams()));
+    // 分页接口返回 TableDataInfo，rows/total 在根节点；不能按普通 R<T> 再拆 data。
+    const res = await listPromoterWorkbenchDetail(buildDetailParams());
     detailRows.value = res?.rows || [];
     detailTotal.value = Number(res?.total || 0);
   } catch (error: unknown) {

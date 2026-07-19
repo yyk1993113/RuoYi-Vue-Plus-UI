@@ -86,8 +86,8 @@ const { t } = useI18n();
 // 登录页只负责采集认证表单；租户列表、验证码和登录结果都来自后端认证接口。
 const loginForm = ref<LoginData>({
   tenantId: '000000',
-  username: 'admin',
-  password: 'admin123',
+  username: '',
+  password: '',
   rememberMe: false,
   code: '',
   uuid: ''

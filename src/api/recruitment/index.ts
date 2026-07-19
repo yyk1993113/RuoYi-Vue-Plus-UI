@@ -1072,7 +1072,10 @@ export function getPromoterWorkbenchQrCode(target: 'C' | 'B') {
 }
 
 export function listPromoterWorkbenchDetail(query: PromotionAttributionQuery & { metric: string; period: 'today' | 'total' }) {
-  return request.get<any>(`${baseUrl}/promoter/workbench/detail/list`, { params: query });
+  // TableDataInfo 的 rows/total 位于响应根节点；第二泛型声明拦截器解包后的真实结构，避免页面再误取 data。
+  return request.get<any, { rows: PromotionAttributionDetailVO[]; total: number }>(`${baseUrl}/promoter/workbench/detail/list`, {
+    params: query
+  });
 }
 
 // ---------- 推广奖励 ----------
