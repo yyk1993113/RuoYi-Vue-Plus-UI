@@ -124,6 +124,16 @@
           </div>
           <div class="toolbar-right">
             <el-button
+              v-hasPermi="['settlement:subAccount:commissionRate', 'settlement:subAccount:interestRate', 'settlement:subAccount:config']"
+              type="primary"
+              plain
+              icon="Setting"
+              @click="openGlobalSettings"
+            >
+              全局设置
+            </el-button>
+            <el-button
+              v-if="showCmbConfigEntry"
               v-hasPermi="['settlement:subAccount:config']"
               type="warning"
               plain
@@ -185,12 +195,62 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column v-if="isColumnVisible('subAccount')" label="记账子单元" min-width="180">
+        <el-table-column v-if="isColumnVisible('subAccount')" label="子单元账户" min-width="180">
           <template #default="{ row }">
             <div class="two-line-cell">
               <span>{{ row.subAccountName || '-' }}</span>
+              <div class="sensitive-value-row masked-account secondary-text">
+                <span>{{ subAccountNoText(row) }}</span>
+                <el-tooltip v-if="row.subAccountNoMasked" :content="isSubAccountNoRevealed(row) ? '隐藏完整子单元账户' : '查看完整子单元账户'" placement="top">
+                  <el-button
+                    v-hasPermi="['settlement:subAccount:decrypt']"
+                    class="sensitive-eye-button"
+                    link
+                    type="primary"
+                    :icon="isSubAccountNoRevealed(row) ? 'Hide' : 'View'"
+                    :loading="isSensitiveLoading(row, 'subAccount')"
+                    :aria-label="isSubAccountNoRevealed(row) ? '隐藏完整招商子单元账户' : '查看完整招商子单元账户'"
+                    @click.stop="toggleSubAccountNo(row)"
+                  />
+                </el-tooltip>
+              </div>
               <span class="secondary-text">{{ accountTypeText(row.accountType) }}</span>
             </div>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="isColumnVisible('commissionRate')" label="抽佣比例" width="130" align="center">
+          <template #default="{ row }">
+            <div class="two-line-cell align-center">
+              <el-tooltip :disabled="row.status !== 'APPROVED' || !canManageCommissionRate" content="点击修改该企业抽佣比例" placement="top">
+                <el-button
+                  class="commission-rate-value"
+                  link
+                  type="primary"
+                  :disabled="row.status !== 'APPROVED' || !canManageCommissionRate"
+                  @click="openCommissionRateEditor(row)"
+                >
+                  {{ commissionRateText(row.effectiveCommissionRate) }}
+                </el-button>
+              </el-tooltip>
+              <el-tag :type="row.commissionRateSource === 'INDIVIDUAL' ? 'warning' : 'info'" size="small" effect="plain">
+                {{ row.commissionRateSource === 'INDIVIDUAL' ? '企业单独' : '继承全局' }}
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="主账号设置" width="125" align="center">
+          <template #default="{ row }">
+            <el-button
+              v-if="row.status === 'APPROVED' && row.openingStatus === 'SUCCESS'"
+              v-hasPermi="['settlement:subAccount:config']"
+              link
+              type="primary"
+              icon="CreditCard"
+              @click="openPaymentAccounts(row)"
+            >
+              设置
+            </el-button>
+            <span v-else class="secondary-text">-</span>
           </template>
         </el-table-column>
         <el-table-column v-if="isColumnVisible('bankAccount')" label="开户行 / 账号" min-width="230">
@@ -275,7 +335,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="230" fixed="right" align="center">
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
             <div class="row-actions">
               <el-button link type="primary" icon="View" @click="openDetail(row)">详情</el-button>
@@ -301,24 +361,36 @@
               >
                 驳回
               </el-button>
-              <el-button
-                v-if="row.status === 'APPROVED'"
-                v-hasPermi="['settlement:subAccount:blacklist']"
-                link
-                type="danger"
-                icon="Lock"
-                :disabled="isSubmitting(row)"
-                @click="openBlacklist(row)"
-              >
-                拉黑
-              </el-button>
               <el-dropdown trigger="click" @command="(command) => handleRowCommand(command, row)">
                 <el-button link type="primary">更多<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
+                    <el-dropdown-item
+                      v-if="row.status !== 'BLACKLISTED'"
+                      v-hasPermi="['settlement:subAccount:edit']"
+                      command="editRecord"
+                      icon="Edit"
+                    >
+                      编辑
+                    </el-dropdown-item>
                     <el-dropdown-item command="materials" icon="FolderOpened">查看材料</el-dropdown-item>
                     <el-dropdown-item command="logs" icon="Document">审计日志</el-dropdown-item>
+                    <el-dropdown-item
+                      v-if="row.status === 'APPROVED' && row.openingStatus === 'SUCCESS'"
+                      v-hasPermi="['settlement:subAccount:config']"
+                      command="paymentAccounts"
+                      icon="CreditCard"
+                    >主账号设置</el-dropdown-item>
                     <el-dropdown-item v-hasPermi="['settlement:subAccount:decrypt']" command="account" icon="View">查看完整账号</el-dropdown-item>
+                    <el-dropdown-item
+                      v-if="row.status === 'APPROVED'"
+                      v-hasPermi="['settlement:subAccount:blacklist']"
+                      command="blacklist"
+                      icon="Lock"
+                      divided
+                    >
+                      拉黑并关闭子单元
+                    </el-dropdown-item>
                     <el-dropdown-item command="freeze" icon="Warning" disabled divided>临时冻结（待接入）</el-dropdown-item>
                     <el-dropdown-item command="export" icon="Download" disabled>导出凭证（待接入）</el-dropdown-item>
                   </el-dropdown-menu>
@@ -354,6 +426,21 @@
               </el-descriptions-item>
               <el-descriptions-item label="记账子单元">{{ detailTarget?.subAccountName || '-' }}</el-descriptions-item>
               <el-descriptions-item label="账户类型">{{ accountTypeText(detailTarget?.accountType) }}</el-descriptions-item>
+              <el-descriptions-item label="子单元账户" :span="2">
+                <div v-if="detailTarget" class="sensitive-value-row masked-account">
+                  <span>{{ subAccountNoText(detailTarget) }}</span>
+                  <el-button
+                    v-if="detailTarget.subAccountNoMasked"
+                    v-hasPermi="['settlement:subAccount:decrypt']"
+                    class="sensitive-eye-button"
+                    link
+                    type="primary"
+                    :icon="isSubAccountNoRevealed(detailTarget) ? 'Hide' : 'View'"
+                    :loading="isSensitiveLoading(detailTarget, 'subAccount')"
+                    @click="toggleSubAccountNo(detailTarget)"
+                  />
+                </div>
+              </el-descriptions-item>
               <el-descriptions-item label="开户行" :span="2">{{ detailTarget?.bankBranch || '-' }}</el-descriptions-item>
               <el-descriptions-item label="银行账号">
                 <div v-if="detailTarget" class="sensitive-value-row masked-account">
@@ -511,8 +598,76 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="editVisible"
+      title="编辑白名单数据"
+      width="680px"
+      append-to-body
+      destroy-on-close
+      @closed="clearEditSensitiveFields"
+    >
+      <el-alert
+        v-if="editTarget?.status === 'APPROVED'"
+        title="修改已开户数据的子单元名称后，系统会同步提交招行 NTDMAMNT 修改任务。"
+        type="warning"
+        :closable="false"
+        show-icon
+      />
+      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="118px" class="dialog-form">
+        <el-form-item label="企业名称">{{ editTarget?.companyName || '-' }}</el-form-item>
+        <el-form-item label="子单元名称" prop="subAccountName">
+          <el-input v-model="editForm.subAccountName" maxlength="100" show-word-limit />
+        </el-form-item>
+        <el-form-item label="账户类型" prop="accountType">
+          <el-radio-group v-model="editForm.accountType">
+            <el-radio value="CORPORATE">对公账户</el-radio>
+            <el-radio value="INDIVIDUAL">个人账户</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="开户行 / 支行" prop="bankBranch">
+          <el-input v-model="editForm.bankBranch" maxlength="120" show-word-limit />
+        </el-form-item>
+        <el-form-item label="当前银行账号">
+          <el-input :model-value="editTarget?.bankAccountMasked || '-'" disabled />
+        </el-form-item>
+        <el-form-item label="新银行账号" prop="bankAccount">
+          <el-input v-model="editForm.bankAccount" type="password" show-password clearable maxlength="32" autocomplete="new-password" placeholder="不填写则保留当前账号" />
+        </el-form-item>
+        <el-form-item label="联系人" prop="contactName">
+          <el-input v-model="editForm.contactName" maxlength="50" show-word-limit />
+        </el-form-item>
+        <el-form-item label="当前联系电话">
+          <el-input :model-value="editTarget?.contactPhoneMasked || '-'" disabled />
+        </el-form-item>
+        <el-form-item label="新联系电话" prop="contactPhone">
+          <el-input v-model="editForm.contactPhone" type="password" show-password clearable maxlength="11" autocomplete="new-password" placeholder="不填写则保留当前电话" />
+        </el-form-item>
+        <template v-if="editTarget?.status === 'APPROVED' && canManageCommissionRate">
+          <el-divider content-position="left">抽佣比例</el-divider>
+          <el-form-item label="全局抽佣比例">{{ commissionRateText(globalCommissionRate) }}</el-form-item>
+          <el-form-item label="抽佣方式" prop="commissionRateMode">
+            <el-radio-group v-model="editForm.commissionRateMode">
+              <el-radio value="GLOBAL">继承全局</el-radio>
+              <el-radio value="INDIVIDUAL">单独设置</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item v-if="editForm.commissionRateMode === 'INDIVIDUAL'" label="企业抽佣比例" prop="commissionRate">
+            <el-input-number v-model="editForm.commissionRate" :min="3" :max="100" :precision="1" :step="0.1" controls-position="right" />
+            <span class="rate-unit">%</span>
+          </el-form-item>
+        </template>
+        <el-form-item label="修改原因" prop="reason">
+          <el-input v-model="editForm.reason" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="请说明本次修改原因" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button :disabled="editSubmitting" @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="editSubmitting" @click="submitEditRecord">保存修改</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="blacklistVisible" title="企业移出结算白名单" width="620px" append-to-body>
-      <el-alert title="拉黑后该企业立即失去子单元白名单资格，并无法重新提交申请。该操作会写入不可删除的审计日志。" type="error" :closable="false" show-icon />
+      <el-alert title="拉黑后企业立即失去白名单资格，系统同时提交子单元关户任务；余额未清零或存在未完成支付时会等待，满足条件后关闭。" type="error" :closable="false" show-icon />
       <el-form ref="blacklistFormRef" :model="blacklistForm" :rules="blacklistRules" label-width="112px" class="dialog-form">
         <el-form-item label="企业名称">{{ blacklistTarget?.companyName || '-' }}</el-form-item>
         <el-form-item label="风险原因" prop="reasonCode">
@@ -533,7 +688,67 @@
       </el-form>
       <template #footer>
         <el-button :disabled="blacklistSubmitting" @click="blacklistVisible = false">取消</el-button>
-        <el-button type="danger" :loading="blacklistSubmitting" @click="submitBlacklist">确认拉黑</el-button>
+        <el-button type="danger" :loading="blacklistSubmitting" @click="submitBlacklist">确认拉黑并关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="globalSettingsVisible" title="全局设置" width="600px" append-to-body @closed="globalSettingsForm.mainAccountNo = ''">
+      <el-alert
+        title="抽佣比例和多主账号开关作为企业默认值；修改全局主账号不会批量替换企业已有的银行关联。"
+        type="info"
+        :closable="false"
+        show-icon
+      />
+      <el-form
+        v-loading="globalSettingsLoading"
+        ref="globalSettingsFormRef"
+        :model="globalSettingsForm"
+        :rules="commissionRateRules"
+        label-width="150px"
+        class="dialog-form"
+      >
+        <el-form-item label="全局抽佣比例" prop="commissionRate">
+          <el-input-number v-model="globalSettingsForm.commissionRate" :min="3" :max="100" :precision="1" :step="0.1" controls-position="right" />
+          <span class="rate-unit">%</span>
+        </el-form-item>
+        <el-form-item label="全局配置主账号" prop="mainAccountNo">
+          <el-input
+            v-model="globalSettingsForm.mainAccountNo"
+            maxlength="35"
+            clearable
+            :placeholder="globalMainAccountConfigured ? `已配置 ${globalMainAccountNoMasked}，留空不修改` : '请输入6至35位主账号'"
+          />
+        </el-form-item>
+        <el-form-item label="允许多个主账号">
+          <el-switch
+            v-model="globalSettingsForm.allowMultipleMainAccounts"
+            active-text="允许"
+            inactive-text="仅单个"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button :disabled="globalSettingsSubmitting" @click="globalSettingsVisible = false">取消</el-button>
+        <el-button type="primary" :loading="globalSettingsSubmitting" @click="submitGlobalSettings">保存并生效</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="commissionRateEditorVisible" :title="`${commissionRateEditorTarget?.companyName || ''} · 抽佣比例`" width="500px" append-to-body>
+      <el-form ref="commissionRateEditorFormRef" :model="commissionRateEditorForm" :rules="commissionRateRules" label-width="110px">
+        <el-form-item label="设置方式">
+          <el-radio-group v-model="commissionRateEditorForm.mode">
+            <el-radio value="GLOBAL">继承全局（{{ commissionRateText(globalCommissionRate) }}）</el-radio>
+            <el-radio value="INDIVIDUAL">企业单独设置</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="commissionRateEditorForm.mode === 'INDIVIDUAL'" label="抽佣比例" prop="commissionRate">
+          <el-input-number v-model="commissionRateEditorForm.commissionRate" :min="3" :max="100" :precision="1" :step="0.1" controls-position="right" />
+          <span class="rate-unit">%</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button :disabled="commissionRateEditorSubmitting" @click="commissionRateEditorVisible = false">取消</el-button>
+        <el-button type="primary" :loading="commissionRateEditorSubmitting" @click="submitCommissionRateEditor">保存</el-button>
       </template>
     </el-dialog>
 
@@ -671,6 +886,116 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="paymentAccountVisible"
+      :title="`${paymentAccountTarget?.companyName || ''} · 主账号设置`"
+      width="800px"
+      append-to-body
+      destroy-on-close
+      @closed="clearPaymentAccountSensitiveValues"
+    >
+      <div v-loading="paymentAccountLoading" class="payment-account-dialog">
+        <el-alert
+          title="企业端仅能选择银行已确认关联成功的账户；新增或调整后通常需要短暂等待银行查询确认。"
+          type="info"
+          :closable="false"
+          show-icon
+        />
+        <div class="main-account-policy">
+          <div>
+            <span class="policy-label">允许多个主账号</span>
+            <el-tag v-if="paymentAccountSettingSource === 'GLOBAL'" type="info" size="small" effect="plain">当前继承全局</el-tag>
+          </div>
+          <el-switch
+            v-model="paymentAccountAllowMultiple"
+            active-text="开启"
+            inactive-text="关闭"
+            @change="handleMultipleMainAccountChange"
+          />
+        </div>
+        <el-table :data="paymentAccountRows" row-key="accountId" class="payment-account-table">
+          <el-table-column label="选择" width="72" align="center">
+            <template #default="{ row }">
+              <el-checkbox
+                :model-value="paymentAccountSelectedIds.includes(String(row.accountId))"
+                @change="(checked) => togglePaymentAccount(row.accountId, Boolean(checked))"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="主账号名称" min-width="180">
+            <template #default="{ row }">
+              <div class="payment-account-name-cell">
+                <span
+                  :class="['payment-bank-logo', `is-${paymentAccountBankBrand(row.accountName).key}`]"
+                  role="img"
+                  :aria-label="`${paymentAccountBankBrand(row.accountName).name} Logo`"
+                  :title="paymentAccountBankBrand(row.accountName).name"
+                >
+                  <img
+                    v-if="paymentAccountBankBrand(row.accountName).logo"
+                    class="payment-bank-logo-image"
+                    :src="paymentAccountBankBrand(row.accountName).logo"
+                    alt=""
+                  />
+                  <template v-else>{{ paymentAccountBankBrand(row.accountName).glyph }}</template>
+                </span>
+                <span class="payment-account-name">{{ row.accountName || '-' }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="银行卡号" min-width="190">
+            <template #default="{ row }">
+              <div class="sensitive-value-row masked-account">
+                <span>{{ paymentAccountNoText(row) }}</span>
+                <el-tooltip :content="isPaymentAccountNoRevealed(row) ? '隐藏完整银行卡号' : '查看完整银行卡号'" placement="top">
+                  <el-button
+                    v-hasPermi="['settlement:subAccount:decrypt']"
+                    class="sensitive-eye-button"
+                    link
+                    type="primary"
+                    :icon="isPaymentAccountNoRevealed(row) ? 'Hide' : 'View'"
+                    :loading="isPaymentAccountNoLoading(row)"
+                    :aria-label="isPaymentAccountNoRevealed(row) ? '隐藏完整主账号银行卡号' : '查看完整主账号银行卡号'"
+                    @click.stop="togglePaymentAccountNo(row)"
+                  />
+                </el-tooltip>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="默认" width="72" align="center">
+            <template #default="{ row }">
+              <el-radio
+                v-model="paymentAccountDefaultId"
+                :label="String(row.accountId)"
+                :disabled="!paymentAccountSelectedIds.includes(String(row.accountId))"
+              ><span /></el-radio>
+            </template>
+          </el-table-column>
+          <el-table-column label="银行状态" width="120">
+            <template #default="{ row }">
+              <el-tag :type="paymentAccountStatusType(row.syncStatus)" size="small">
+                {{ paymentAccountStatusText(row.syncStatus) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-divider content-position="left">新增主账号</el-divider>
+        <el-form :inline="true" class="payment-account-add-form" @submit.prevent>
+          <el-form-item label="名称">
+            <el-input v-model="paymentAccountCreate.accountName" maxlength="64" placeholder="如：工资主账号" />
+          </el-form-item>
+          <el-form-item label="银行卡号">
+            <el-input v-model="paymentAccountCreate.accountNo" maxlength="35" placeholder="请输入完整银行卡号" />
+          </el-form-item>
+          <el-button :loading="paymentAccountAdding" @click="addPaymentAccount">添加</el-button>
+        </el-form>
+      </div>
+      <template #footer>
+        <el-button :disabled="paymentAccountSubmitting" @click="paymentAccountVisible = false">取消</el-button>
+        <el-button type="primary" :loading="paymentAccountSubmitting" @click="submitPaymentAccounts">保存配置</el-button>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -681,27 +1006,44 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import { getAuditHistory, getCompany, getCompanyAuditHistory, type AuditLogVO } from '@/api/recruitment';
 import { listByIds } from '@/api/system/oss';
 import { useUserStore } from '@/store/modules/user';
+import { encrypt } from '@/utils/jsencrypt';
+import hengfengBankLogo from '@/assets/bank-logos/hfb.png';
+import jiangsuBankLogo from '@/assets/bank-logos/jsbc.svg';
 import {
   approveSettlementSubAccount,
+  addSettlementPaymentAccount,
+  assignSettlementPaymentAccounts,
   blacklistSettlementSubAccount,
+  getSettlementGlobalSettings,
+  getSettlementMainAccountSettings,
+  getSettlementPaymentAccountNo,
   getSettlementSubAccountBankAccount,
+  getSettlementSubAccountNo,
   getSettlementSubAccountContactPhone,
   getSettlementSubAccountAuthorizationLetter,
+  getSettlementPaymentAccounts,
   getSettlementSubAccountStatistics,
   getSettlementCmbConfig,
   listSettlementSubAccount,
   rejectSettlementSubAccount,
+  resetCompanySettlementCommissionRate,
+  updateCompanySettlementCommissionRate,
+  updateSettlementGlobalSettings,
+  updateSettlementSubAccount,
   updateSettlementCmbConfig,
   type SettlementCmbConfig,
   type SettlementCmbConfigRequest,
   type SettlementSubAccountQuery,
   type SettlementSubAccountStatistics,
+  type SettlementSubAccountUpdateRequest,
   type SettlementSubAccountVO,
+  type SettlementPaymentAccount,
   type SubAccountAuditStatus
 } from '@/api/recruitment/settlementSubAccount';
 
 type QuickRange = '' | 'today' | '7d' | '30d';
 type DetailTab = 'application' | 'materials' | 'logs';
+type CommissionRateMode = 'GLOBAL' | 'INDIVIDUAL';
 
 interface MaterialFile {
   label: string;
@@ -711,9 +1053,17 @@ interface MaterialFile {
 }
 
 const FILTER_STORAGE_KEY = 'admin:sub-account:filters:v2';
-const COLUMN_STORAGE_KEY = 'admin:sub-account:columns:v1';
+const COLUMN_STORAGE_KEY = 'admin:sub-account:columns:v2';
 const router = useRouter();
 const userStore = useUserStore();
+// 编辑权限与抽佣权限分开判断，只有具备抽佣权限时才在编辑弹窗展示比例设置。
+const canManageCommissionRate = computed(() =>
+  userStore.permissions.includes('*:*:*')
+  || userStore.permissions.includes('settlement:subAccount:commissionRate')
+  || userStore.permissions.includes('settlement:subAccount:interestRate')
+);
+// 生产参数仍由后端保留，本页面按运营要求隐藏配置入口，后续可通过开关恢复。
+const showCmbConfigEntry = false;
 const loading = ref(false);
 const rows = ref<SettlementSubAccountVO[]>([]);
 const selectedRows = ref<SettlementSubAccountVO[]>([]);
@@ -741,7 +1091,8 @@ const query = reactive<SettlementSubAccountQuery>({
 
 const columnOptions = [
   { key: 'company', label: '企业名称', required: true },
-  { key: 'subAccount', label: '记账子单元' },
+  { key: 'subAccount', label: '子单元账户', required: true },
+  { key: 'commissionRate', label: '抽佣比例', required: true },
   { key: 'bankAccount', label: '开户行 / 账号' },
   { key: 'contact', label: '联系人' },
   { key: 'createTime', label: '申请提交时间' },
@@ -812,6 +1163,75 @@ const rejectTemplates = [
   '受益所有人材料不全，需补充持股 25% 以上人员身份证及股权结构图'
 ];
 
+interface SettlementSubAccountEditForm {
+  subAccountName: string;
+  accountType: 'CORPORATE' | 'INDIVIDUAL';
+  bankBranch: string;
+  bankAccount: string;
+  contactName: string;
+  contactPhone: string;
+  commissionRateMode: CommissionRateMode;
+  commissionRate: number;
+  reason: string;
+}
+
+const editVisible = ref(false);
+const editSubmitting = ref(false);
+const editTarget = ref<SettlementSubAccountVO>();
+const editFormRef = ref<FormInstance>();
+const editForm = reactive<SettlementSubAccountEditForm>({
+  subAccountName: '',
+  accountType: 'CORPORATE',
+  bankBranch: '',
+  bankAccount: '',
+  contactName: '',
+  contactPhone: '',
+  commissionRateMode: 'GLOBAL',
+  commissionRate: 5,
+  reason: ''
+});
+const editRules: FormRules = {
+  subAccountName: [
+    { required: true, message: '请输入子单元名称', trigger: 'blur' },
+    { max: 100, message: '子单元名称不能超过100个字符', trigger: 'blur' },
+    { pattern: /^[\p{L}\p{N}\s（）()·&._-]+$/u, message: '子单元名称包含不允许的特殊符号', trigger: 'blur' }
+  ],
+  accountType: [{ required: true, message: '请选择账户类型', trigger: 'change' }],
+  bankBranch: [
+    { required: true, message: '请输入开户行或支行', trigger: 'blur' },
+    { max: 120, message: '开户支行不能超过120个字符', trigger: 'blur' },
+    { pattern: /^[\p{L}\p{N}\s（）()·&._-]+$/u, message: '开户支行包含不允许的特殊符号', trigger: 'blur' }
+  ],
+  bankAccount: [
+    { pattern: /^$|^\d{8,32}$/, message: '新银行账号应为8到32位数字', trigger: 'blur' }
+  ],
+  contactName: [
+    { required: true, message: '请输入联系人', trigger: 'blur' },
+    { max: 50, message: '联系人不能超过50个字符', trigger: 'blur' },
+    { pattern: /^[\p{L}\p{N}\s·._-]+$/u, message: '联系人包含不允许的特殊符号', trigger: 'blur' }
+  ],
+  contactPhone: [
+    { pattern: /^$|^1[3-9]\d{9}$/, message: '新联系电话格式不正确', trigger: 'blur' }
+  ],
+  commissionRateMode: [{ required: true, message: '请选择抽佣方式', trigger: 'change' }],
+  commissionRate: [
+    { required: true, message: '请输入抽佣比例', trigger: 'change' },
+    {
+      validator: (_rule, value, callback) => {
+        const rate = Number(value);
+        if (!Number.isFinite(rate) || rate < 3 || rate > 100) return callback(new Error('抽佣比例需在3.0%到100.0%之间'));
+        if (!/^\d{1,3}(\.\d)?$/.test(String(value))) return callback(new Error('抽佣比例只能保留1位小数'));
+        callback();
+      },
+      trigger: 'change'
+    }
+  ],
+  reason: [
+    { required: true, message: '请输入修改原因', trigger: 'blur' },
+    { max: 500, message: '修改原因不能超过500个字符', trigger: 'blur' }
+  ]
+};
+
 const blacklistVisible = ref(false);
 const blacklistSubmitting = ref(false);
 const blacklistTarget = ref<SettlementSubAccountVO>();
@@ -825,6 +1245,58 @@ const blacklistRules: FormRules = {
     { validator: (_rule, value, callback) => (value === blacklistTarget.value?.companyName ? callback() : callback(new Error('企业名称不一致'))), trigger: 'blur' }
   ]
 };
+
+// 付款账户配置按当前申请加载；完整卡号只在管理员主动点击后留存在当前弹窗内，关闭即清除。
+const paymentAccountVisible = ref(false);
+const paymentAccountLoading = ref(false);
+const paymentAccountSubmitting = ref(false);
+const paymentAccountAdding = ref(false);
+const paymentAccountTarget = ref<SettlementSubAccountVO>();
+const paymentAccountRows = ref<SettlementPaymentAccount[]>([]);
+const revealedPaymentAccountNos = reactive<Record<string, string>>({});
+const paymentAccountNoLoadingIds = ref<string[]>([]);
+const paymentAccountRevealVersion = ref(0);
+const paymentAccountSelectedIds = ref<string[]>([]);
+const paymentAccountDefaultId = ref('');
+const paymentAccountAllowMultiple = ref(false);
+const paymentAccountSettingSource = ref<'GLOBAL' | 'INDIVIDUAL'>('GLOBAL');
+const paymentAccountCreate = reactive({ accountName: '', accountNo: '' });
+
+const globalCommissionRate = ref(5);
+const globalSettingsVisible = ref(false);
+const globalSettingsLoading = ref(false);
+const globalSettingsSubmitting = ref(false);
+const globalSettingsFormRef = ref<FormInstance>();
+const globalMainAccountNoMasked = ref('');
+const globalMainAccountConfigured = ref(false);
+const globalSettingsForm = reactive({ commissionRate: 5, mainAccountNo: '', allowMultipleMainAccounts: false });
+const commissionRateRules: FormRules = {
+  commissionRate: [
+    { required: true, message: '请输入抽佣比例', trigger: 'change' },
+    {
+      validator: (_rule, value, callback) => {
+        const rate = Number(value);
+        if (!Number.isFinite(rate) || rate < 3 || rate > 100) return callback(new Error('抽佣比例需在3.0%到100.0%之间'));
+        if (!/^\d{1,3}(\.\d)?$/.test(String(value))) return callback(new Error('抽佣比例只能保留1位小数'));
+        callback();
+      },
+      trigger: 'change'
+    }
+  ],
+  mainAccountNo: [
+    { pattern: /^$|^\d{6,35}$/, message: '全局主账号必须为6至35位数字', trigger: 'blur' }
+  ]
+};
+
+// 列表比例采用独立轻量弹窗，避免为只改抽佣比例打开完整企业编辑表单。
+const commissionRateEditorVisible = ref(false);
+const commissionRateEditorSubmitting = ref(false);
+const commissionRateEditorTarget = ref<SettlementSubAccountVO>();
+const commissionRateEditorFormRef = ref<FormInstance>();
+const commissionRateEditorForm = reactive<{ mode: CommissionRateMode; commissionRate: number }>({
+  mode: 'GLOBAL',
+  commissionRate: 5
+});
 
 // 招行密钥只存在于当前编辑表单，加载接口永不回填明文；空值由后端解释为保留既有密钥。
 const cmbConfigVisible = ref(false);
@@ -840,7 +1312,7 @@ const cmbConfigStatus = reactive<SettlementCmbConfig>({
   approvalRequired: true,
   overdraftControl: 'Y',
   refundType: 'N',
-  closeType: 'Y',
+  closeType: 'N',
   connectTimeoutSeconds: 3,
   readTimeoutSeconds: 15,
   maxResponseBytes: 2097152,
@@ -864,7 +1336,7 @@ const cmbConfigForm = reactive<SettlementCmbConfigRequest>({
   approvalRequired: true,
   overdraftControl: 'Y',
   refundType: 'N',
-  closeType: 'Y',
+  closeType: 'N',
   connectTimeoutSeconds: 3,
   readTimeoutSeconds: 15,
   maxResponseBytes: 2097152
@@ -899,6 +1371,7 @@ const cmbConfigRules: FormRules = {
 
 // 完整敏感值仅保存在当前页面内存，翻页/刷新即清空；每次首次查看都由后端记录审计。
 const revealedBankAccounts = reactive<Record<string, string>>({});
+const revealedSubAccountNumbers = reactive<Record<string, string>>({});
 const revealedContactPhones = reactive<Record<string, string>>({});
 const sensitiveLoadingKeys = ref<string[]>([]);
 
@@ -953,6 +1426,84 @@ async function refreshAll() {
   await Promise.all([loadData(), loadStatistics()]);
 }
 
+async function loadGlobalCommissionRate() {
+  const res: any = await getSettlementGlobalSettings();
+  globalCommissionRate.value = Number(res.data?.globalCommissionRate ?? 5);
+  return globalCommissionRate.value;
+}
+
+async function openGlobalSettings() {
+  globalSettingsVisible.value = true;
+  globalSettingsLoading.value = true;
+  try {
+    const res: any = await getSettlementGlobalSettings();
+    const data = res.data || {};
+    globalCommissionRate.value = Number(data.globalCommissionRate ?? 5);
+    globalMainAccountNoMasked.value = data.globalMainAccountNoMasked || '';
+    globalMainAccountConfigured.value = data.globalMainAccountConfigured === true;
+    Object.assign(globalSettingsForm, {
+      commissionRate: globalCommissionRate.value,
+      mainAccountNo: '',
+      allowMultipleMainAccounts: data.allowMultipleMainAccounts === true
+    });
+    globalSettingsFormRef.value?.clearValidate();
+  } finally {
+    globalSettingsLoading.value = false;
+  }
+}
+
+async function submitGlobalSettings() {
+  if (!globalSettingsFormRef.value) return;
+  const valid = await globalSettingsFormRef.value.validate().catch(() => false);
+  if (!valid) return;
+  globalSettingsSubmitting.value = true;
+  try {
+    await updateSettlementGlobalSettings({
+      commissionRate: globalSettingsForm.commissionRate,
+      mainAccountNo: globalSettingsForm.mainAccountNo.trim() || undefined,
+      allowMultipleMainAccounts: globalSettingsForm.allowMultipleMainAccounts
+    });
+    globalCommissionRate.value = globalSettingsForm.commissionRate;
+    globalSettingsVisible.value = false;
+    ElMessage.success('全局设置已更新');
+    await loadData();
+  } finally {
+    globalSettingsSubmitting.value = false;
+  }
+}
+
+async function openCommissionRateEditor(row: SettlementSubAccountVO) {
+  if (row.status !== 'APPROVED' || !canManageCommissionRate.value) return;
+  commissionRateEditorTarget.value = row;
+  commissionRateEditorForm.mode = row.commissionRateSource === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'GLOBAL';
+  commissionRateEditorForm.commissionRate = Number(row.individualCommissionRate ?? row.effectiveCommissionRate ?? 5);
+  commissionRateEditorVisible.value = true;
+  await loadGlobalCommissionRate();
+  commissionRateEditorFormRef.value?.clearValidate();
+}
+
+async function submitCommissionRateEditor() {
+  const target = commissionRateEditorTarget.value;
+  if (!target || !commissionRateEditorFormRef.value) return;
+  if (commissionRateEditorForm.mode === 'INDIVIDUAL') {
+    const valid = await commissionRateEditorFormRef.value.validate().catch(() => false);
+    if (!valid) return;
+  }
+  commissionRateEditorSubmitting.value = true;
+  try {
+    if (commissionRateEditorForm.mode === 'INDIVIDUAL') {
+      await updateCompanySettlementCommissionRate(target.applicationId, commissionRateEditorForm.commissionRate);
+    } else {
+      await resetCompanySettlementCommissionRate(target.applicationId);
+    }
+    ElMessage.success('企业抽佣比例已更新');
+    commissionRateEditorVisible.value = false;
+    await loadData();
+  } finally {
+    commissionRateEditorSubmitting.value = false;
+  }
+}
+
 async function openCmbConfig() {
   cmbConfigVisible.value = true;
   cmbConfigLoading.value = true;
@@ -972,7 +1523,7 @@ async function openCmbConfig() {
       approvalRequired: data.approvalRequired !== false,
       overdraftControl: data.overdraftControl || 'Y',
       refundType: data.refundType || 'N',
-      closeType: data.closeType || 'Y',
+      closeType: data.closeType || 'N',
       connectTimeoutSeconds: Number(data.connectTimeoutSeconds || 3),
       readTimeoutSeconds: Number(data.readTimeoutSeconds || 15),
       maxResponseBytes: Number(data.maxResponseBytes || 2097152)
@@ -1071,7 +1622,9 @@ function restorePreferences() {
     });
     timeRange.value = Array.isArray(saved.timeRange) && saved.timeRange.length === 2 ? saved.timeRange : [];
     const columns = JSON.parse(localStorage.getItem(COLUMN_STORAGE_KEY) || '[]');
-    if (Array.isArray(columns) && columns.length) visibleColumns.value = Array.from(new Set(['company', ...columns]));
+    if (Array.isArray(columns) && columns.length) {
+      visibleColumns.value = Array.from(new Set(['company', 'subAccount', 'commissionRate', ...columns]));
+    }
   } catch {
     localStorage.removeItem(FILTER_STORAGE_KEY);
     localStorage.removeItem(COLUMN_STORAGE_KEY);
@@ -1079,7 +1632,9 @@ function restorePreferences() {
 }
 
 function saveColumnSettings() {
-  if (!visibleColumns.value.includes('company')) visibleColumns.value.unshift('company');
+  ['commissionRate', 'subAccount', 'company'].forEach((key) => {
+    if (!visibleColumns.value.includes(key)) visibleColumns.value.unshift(key);
+  });
   localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(visibleColumns.value));
 }
 
@@ -1150,6 +1705,74 @@ async function submitReject() {
   await refreshAll();
 }
 
+async function openEditRecord(row: SettlementSubAccountVO) {
+  editTarget.value = row;
+  Object.assign(editForm, {
+    subAccountName: row.subAccountName || '',
+    accountType: row.accountType === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'CORPORATE',
+    bankBranch: row.bankBranch || '',
+    bankAccount: '',
+    contactName: row.contactName || '',
+    contactPhone: '',
+    commissionRateMode: row.commissionRateSource === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'GLOBAL',
+    commissionRate: Number(row.individualCommissionRate ?? row.effectiveCommissionRate ?? 5),
+    reason: ''
+  });
+  editVisible.value = true;
+  if (row.status === 'APPROVED' && canManageCommissionRate.value) {
+    await loadGlobalCommissionRate();
+  }
+  editFormRef.value?.clearValidate();
+}
+
+function clearEditSensitiveFields() {
+  editForm.bankAccount = '';
+  editForm.contactPhone = '';
+  editTarget.value = undefined;
+}
+
+async function submitEditRecord() {
+  const target = editTarget.value;
+  if (!editFormRef.value || !target) return;
+  const valid = await editFormRef.value.validate().catch(() => false);
+  if (!valid) return;
+
+  const bankAccount = editForm.bankAccount.trim();
+  const contactPhone = editForm.contactPhone.trim();
+  const encryptedBankAccount = bankAccount ? encrypt(bankAccount) : undefined;
+  const encryptedContactPhone = contactPhone ? encrypt(contactPhone) : undefined;
+  if ((bankAccount && !encryptedBankAccount) || (contactPhone && !encryptedContactPhone)) {
+    return ElMessage.error('敏感信息加密失败，请刷新页面后重试');
+  }
+
+  const payload: SettlementSubAccountUpdateRequest = {
+    subAccountName: editForm.subAccountName.trim(),
+    accountType: editForm.accountType,
+    bankBranch: editForm.bankBranch.trim(),
+    contactName: editForm.contactName.trim(),
+    reason: editForm.reason.trim(),
+    version: Number(target.version ?? 0)
+  };
+  if (encryptedBankAccount) payload.encryptedBankAccount = encryptedBankAccount;
+  if (encryptedContactPhone) payload.encryptedContactPhone = encryptedContactPhone;
+  if (target.status === 'APPROVED' && canManageCommissionRate.value) {
+    payload.commissionRateMode = editForm.commissionRateMode;
+    if (editForm.commissionRateMode === 'INDIVIDUAL') {
+      payload.commissionRate = editForm.commissionRate;
+    }
+  }
+
+  editSubmitting.value = true;
+  try {
+    await updateSettlementSubAccount(target.applicationId, payload);
+    ElMessage.success('这条白名单数据已更新');
+    editVisible.value = false;
+    await loadData();
+  } finally {
+    editSubmitting.value = false;
+  }
+}
+
 function openBlacklist(row: SettlementSubAccountVO) {
   blacklistTarget.value = row;
   Object.assign(blacklistForm, { reasonCode: '', reason: '', confirmation: '' });
@@ -1166,7 +1789,7 @@ async function submitBlacklist() {
   submittingIds.value = [...submittingIds.value, id];
   try {
     await blacklistSettlementSubAccount(blacklistTarget.value.applicationId, `【${blacklistForm.reasonCode}】${blacklistForm.reason.trim()}`);
-    ElMessage.success('企业已移出结算白名单');
+    ElMessage.success('企业已拉黑，子单元关户任务已提交');
     blacklistVisible.value = false;
     await refreshAll();
   } finally {
@@ -1324,6 +1947,18 @@ function bankAccountText(row: SettlementSubAccountVO) {
   return revealedBankAccounts[sensitiveRowKey(row)] || row.bankAccountMasked || '-';
 }
 
+function subAccountNoText(row: SettlementSubAccountVO) {
+  return revealedSubAccountNumbers[sensitiveRowKey(row)]
+    || row.subAccountNoMasked
+    || (row.openingStatus === 'SUCCESS' ? '编号暂不可用' : '开户成功后显示');
+}
+
+function commissionRateText(value?: number | null) {
+  const rate = Number(value);
+  if (!Number.isFinite(rate)) return '-';
+  return `${rate.toFixed(1)}%`;
+}
+
 function contactPhoneText(row: SettlementSubAccountVO) {
   return revealedContactPhones[sensitiveRowKey(row)] || row.contactPhoneMasked || '号码未返回';
 }
@@ -1332,11 +1967,15 @@ function isBankAccountRevealed(row: SettlementSubAccountVO) {
   return Boolean(revealedBankAccounts[sensitiveRowKey(row)]);
 }
 
+function isSubAccountNoRevealed(row: SettlementSubAccountVO) {
+  return Boolean(revealedSubAccountNumbers[sensitiveRowKey(row)]);
+}
+
 function isContactPhoneRevealed(row: SettlementSubAccountVO) {
   return Boolean(revealedContactPhones[sensitiveRowKey(row)]);
 }
 
-function isSensitiveLoading(row: SettlementSubAccountVO, kind: 'bank' | 'phone') {
+function isSensitiveLoading(row: SettlementSubAccountVO, kind: 'bank' | 'subAccount' | 'phone') {
   return sensitiveLoadingKeys.value.includes(`${kind}:${sensitiveRowKey(row)}`);
 }
 
@@ -1353,6 +1992,24 @@ async function toggleBankAccount(row: SettlementSubAccountVO) {
     const value = res.data?.bankAccount;
     if (!value) return ElMessage.warning('未获取到完整银行卡号');
     revealedBankAccounts[rowKey] = value;
+  } finally {
+    sensitiveLoadingKeys.value = sensitiveLoadingKeys.value.filter((item) => item !== loadingKey);
+  }
+}
+
+async function toggleSubAccountNo(row: SettlementSubAccountVO) {
+  const rowKey = sensitiveRowKey(row);
+  if (revealedSubAccountNumbers[rowKey]) {
+    delete revealedSubAccountNumbers[rowKey];
+    return;
+  }
+  const loadingKey = `subAccount:${rowKey}`;
+  sensitiveLoadingKeys.value.push(loadingKey);
+  try {
+    const res: any = await getSettlementSubAccountNo(row.applicationId);
+    const value = res.data?.subAccountNo;
+    if (!value) return ElMessage.warning('未获取到完整招商子单元账户');
+    revealedSubAccountNumbers[rowKey] = value;
   } finally {
     sensitiveLoadingKeys.value = sensitiveLoadingKeys.value.filter((item) => item !== loadingKey);
   }
@@ -1378,13 +2035,252 @@ async function toggleContactPhone(row: SettlementSubAccountVO) {
 
 function clearRevealedValues() {
   Object.keys(revealedBankAccounts).forEach((key) => delete revealedBankAccounts[key]);
+  Object.keys(revealedSubAccountNumbers).forEach((key) => delete revealedSubAccountNumbers[key]);
   Object.keys(revealedContactPhones).forEach((key) => delete revealedContactPhones[key]);
 }
 
 function handleRowCommand(command: string, row: SettlementSubAccountVO) {
+  if (command === 'editRecord') openEditRecord(row);
   if (command === 'materials') openDetail(row, 'materials');
   if (command === 'logs') openDetail(row, 'logs');
+  if (command === 'paymentAccounts') openPaymentAccounts(row);
   if (command === 'account') toggleBankAccount(row);
+  if (command === 'blacklist') openBlacklist(row);
+}
+
+interface PaymentBankBrand {
+  terms: readonly string[];
+  key: string;
+  glyph: string;
+  name: string;
+  logo?: string;
+}
+
+// 银行名称来自账户名称字段；全国性商业银行使用本地品牌图标字库，江苏银行使用本地 SVG，未知银行才显示通用标识。
+const paymentBankBrands: readonly PaymentBankBrand[] = [
+  { terms: ['招商银行', 'CMB'], key: 'cmb', glyph: '\ue512', name: '招商银行' },
+  { terms: ['工商银行', 'ICBC'], key: 'icbc', glyph: '\ue516', name: '中国工商银行' },
+  { terms: ['农业银行', 'ABC'], key: 'abc', glyph: '\ue502', name: '中国农业银行' },
+  { terms: ['中国银行', 'BOC'], key: 'boc', glyph: '\ue501', name: '中国银行' },
+  { terms: ['建设银行', 'CCB'], key: 'ccb', glyph: '\ue507', name: '中国建设银行' },
+  { terms: ['交通银行', 'BOCOM', 'BOCO'], key: 'bocom', glyph: '\ue504', name: '交通银行' },
+  { terms: ['邮储银行', '邮政储蓄', 'PSBC'], key: 'psbc', glyph: '\ue520', name: '中国邮政储蓄银行' },
+  { terms: ['浦发银行', 'SPDB'], key: 'spdb', glyph: '\ue521', name: '浦发银行' },
+  { terms: ['中信银行', 'CITIC'], key: 'citic', glyph: '\ue510', name: '中信银行' },
+  { terms: ['光大银行', 'CEB'], key: 'ceb', glyph: '\ue508', name: '中国光大银行' },
+  { terms: ['民生银行', 'CMBC'], key: 'cmbc', glyph: '\ue511', name: '中国民生银行' },
+  { terms: ['兴业银行', 'CIB'], key: 'cib', glyph: '\ue509', name: '兴业银行' },
+  { terms: ['平安银行', 'PAB'], key: 'pingan', glyph: '\ue519', name: '平安银行' },
+  { terms: ['广发银行', 'CGB', 'GDB'], key: 'cgb', glyph: '\ue514', name: '广发银行' },
+  { terms: ['华夏银行', 'HXB'], key: 'hxb', glyph: '\ue515', name: '华夏银行' },
+  { terms: ['浙商银行', 'CZB'], key: 'czb', glyph: '\ue513', name: '浙商银行' },
+  { terms: ['渤海银行', 'CBHB'], key: 'cbhb', glyph: '\ue506', name: '渤海银行' },
+  { terms: ['恒丰银行', 'HFB', 'EGB'], key: 'hfb', glyph: '', name: '恒丰银行', logo: hengfengBankLogo },
+  { terms: ['北京银行', 'BCCB', 'BOB'], key: 'bccb', glyph: '\ue503', name: '北京银行' },
+  { terms: ['北京农商银行', '北京农村商业银行', 'BRCB'], key: 'brcb', glyph: '\ue505', name: '北京农商银行' },
+  { terms: ['南京银行', 'NJCB'], key: 'njcb', glyph: '\ue518', name: '南京银行' },
+  { terms: ['江苏银行', 'JSBC'], key: 'jsbc', glyph: '', name: '江苏银行', logo: jiangsuBankLogo }
+];
+
+function paymentAccountBankBrand(accountName?: string): PaymentBankBrand {
+  const normalizedName = String(accountName || '').toUpperCase();
+  const words = normalizedName.split(/[^A-Z0-9]+/).filter(Boolean);
+  return paymentBankBrands.find((brand) => brand.terms.some((term) => {
+    const normalizedTerm = term.toUpperCase();
+    return /^[A-Z]+$/.test(normalizedTerm)
+      ? words.includes(normalizedTerm)
+      : normalizedName.includes(normalizedTerm);
+  }))
+    || { terms: [], key: 'generic', glyph: '银', name: '银行账户' };
+}
+
+function paymentAccountNoText(row: SettlementPaymentAccount) {
+  return revealedPaymentAccountNos[String(row.accountId)] || row.accountNoMasked || '-';
+}
+
+function isPaymentAccountNoRevealed(row: SettlementPaymentAccount) {
+  return Boolean(revealedPaymentAccountNos[String(row.accountId)]);
+}
+
+function isPaymentAccountNoLoading(row: SettlementPaymentAccount) {
+  return paymentAccountNoLoadingIds.value.includes(String(row.accountId));
+}
+
+async function togglePaymentAccountNo(row: SettlementPaymentAccount) {
+  const accountId = String(row.accountId);
+  if (revealedPaymentAccountNos[accountId]) {
+    delete revealedPaymentAccountNos[accountId];
+    return;
+  }
+  if (!paymentAccountTarget.value || paymentAccountNoLoadingIds.value.includes(accountId)) return;
+  const revealVersion = paymentAccountRevealVersion.value;
+  paymentAccountNoLoadingIds.value.push(accountId);
+  try {
+    const response: any = await getSettlementPaymentAccountNo(
+      paymentAccountTarget.value.applicationId,
+      row.accountId
+    );
+    const accountNo = response?.data?.accountNo;
+    if (!accountNo) return ElMessage.warning('未获取到完整银行卡号');
+    if (!paymentAccountVisible.value || revealVersion !== paymentAccountRevealVersion.value) return;
+    revealedPaymentAccountNos[accountId] = accountNo;
+  } finally {
+    paymentAccountNoLoadingIds.value = paymentAccountNoLoadingIds.value.filter((item) => item !== accountId);
+  }
+}
+
+function clearPaymentAccountSensitiveValues() {
+  paymentAccountRevealVersion.value += 1;
+  Object.keys(revealedPaymentAccountNos).forEach((key) => delete revealedPaymentAccountNos[key]);
+  paymentAccountNoLoadingIds.value = [];
+  paymentAccountTarget.value = undefined;
+  Object.assign(paymentAccountCreate, { accountName: '', accountNo: '' });
+}
+
+async function loadPaymentAccounts() {
+  if (!paymentAccountTarget.value) return;
+  paymentAccountRevealVersion.value += 1;
+  Object.keys(revealedPaymentAccountNos).forEach((key) => delete revealedPaymentAccountNos[key]);
+  paymentAccountLoading.value = true;
+  try {
+    const [response, settingsResponse]: any[] = await Promise.all([
+      getSettlementPaymentAccounts(paymentAccountTarget.value.applicationId),
+      getSettlementMainAccountSettings(paymentAccountTarget.value.applicationId)
+    ]);
+    paymentAccountRows.value = Array.isArray(response?.data) ? response.data : [];
+    paymentAccountAllowMultiple.value = settingsResponse?.data?.allowMultipleMainAccounts === true;
+    paymentAccountSettingSource.value = settingsResponse?.data?.settingSource === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'GLOBAL';
+    paymentAccountSelectedIds.value = paymentAccountRows.value
+      .filter((item) => item.assigned)
+      .map((item) => String(item.accountId));
+    paymentAccountDefaultId.value = String(
+      paymentAccountRows.value.find((item) => item.assigned && item.defaultAccount)?.accountId
+        ?? paymentAccountRows.value.find((item) => item.assigned)?.accountId
+        ?? ''
+    );
+    if (!paymentAccountAllowMultiple.value && paymentAccountSelectedIds.value.length > 1) {
+      const retainedId = paymentAccountDefaultId.value || paymentAccountSelectedIds.value[0];
+      paymentAccountSelectedIds.value = retainedId ? [retainedId] : [];
+      paymentAccountDefaultId.value = retainedId || '';
+    }
+  } finally {
+    paymentAccountLoading.value = false;
+  }
+}
+
+async function openPaymentAccounts(row: SettlementSubAccountVO) {
+  clearPaymentAccountSensitiveValues();
+  paymentAccountTarget.value = row;
+  paymentAccountVisible.value = true;
+  await loadPaymentAccounts();
+}
+
+function togglePaymentAccount(accountId: string | number, checked: boolean) {
+  const id = String(accountId);
+  if (checked && !paymentAccountAllowMultiple.value) {
+    paymentAccountSelectedIds.value = [id];
+    paymentAccountDefaultId.value = id;
+    return;
+  }
+  const selected = new Set(paymentAccountSelectedIds.value);
+  if (checked) selected.add(id);
+  else selected.delete(id);
+  paymentAccountSelectedIds.value = [...selected];
+  if (!selected.has(paymentAccountDefaultId.value)) {
+    paymentAccountDefaultId.value = paymentAccountSelectedIds.value[0] || '';
+  }
+}
+
+function handleMultipleMainAccountChange(enabled: boolean | string | number) {
+  paymentAccountSettingSource.value = 'INDIVIDUAL';
+  if (Boolean(enabled) || paymentAccountSelectedIds.value.length <= 1) return;
+  const retainedId = paymentAccountDefaultId.value || paymentAccountSelectedIds.value[0] || '';
+  paymentAccountSelectedIds.value = retainedId ? [retainedId] : [];
+  paymentAccountDefaultId.value = retainedId;
+  ElMessage.info('已保留当前默认主账号，其余账号将在保存后解除分配');
+}
+
+function selectPaymentAccountForSave(accountId: string | number) {
+  const id = String(accountId);
+  if (!paymentAccountAllowMultiple.value) {
+    paymentAccountSelectedIds.value = [id];
+    paymentAccountDefaultId.value = id;
+    return;
+  }
+  if (!paymentAccountSelectedIds.value.includes(id)) paymentAccountSelectedIds.value.push(id);
+  if (!paymentAccountDefaultId.value) paymentAccountDefaultId.value = id;
+}
+
+async function persistPaymentAccount(accountName: string, accountNo: string) {
+  const response = await addSettlementPaymentAccount(paymentAccountTarget.value!.applicationId, { accountName, accountNo });
+  const savedAccount = response?.data;
+  if (!savedAccount?.accountId) throw new Error('新增主账号后未返回账户信息，请刷新后重试');
+  const existingIndex = paymentAccountRows.value.findIndex((item) => String(item.accountId) === String(savedAccount.accountId));
+  // 新增接口按银行卡号幂等返回实际记录，弹窗始终以服务端账户 ID 作为后续分配依据。
+  if (existingIndex >= 0) paymentAccountRows.value.splice(existingIndex, 1, savedAccount);
+  else paymentAccountRows.value.push(savedAccount);
+  Object.assign(paymentAccountCreate, { accountName: '', accountNo: '' });
+  return { savedAccount, existing: existingIndex >= 0 };
+}
+
+async function addPaymentAccount() {
+  if (!paymentAccountTarget.value) return;
+  const accountName = paymentAccountCreate.accountName.trim();
+  const accountNo = paymentAccountCreate.accountNo.replace(/\s/g, '');
+  if (!accountName) return ElMessage.warning('请输入账户名称');
+  if (!/^\d{6,35}$/.test(accountNo)) return ElMessage.warning('请输入6至35位银行卡号');
+  paymentAccountAdding.value = true;
+  try {
+    const { savedAccount, existing } = await persistPaymentAccount(accountName, accountNo);
+    await loadPaymentAccounts();
+    selectPaymentAccountForSave(savedAccount.accountId);
+    ElMessage.success(existing ? '该银行卡号已存在，已自动选中' : '主账号已添加并选中，请保存配置');
+  } finally {
+    paymentAccountAdding.value = false;
+  }
+}
+
+async function submitPaymentAccounts() {
+  if (!paymentAccountTarget.value) return;
+  paymentAccountSubmitting.value = true;
+  try {
+    const pendingName = paymentAccountCreate.accountName.trim();
+    const pendingNo = paymentAccountCreate.accountNo.replace(/\s/g, '');
+    // 用户直接点击“保存配置”时，先把尚未点击“添加”的输入内容落库并自动加入本次分配。
+    if (pendingName || pendingNo) {
+      if (!pendingName) return ElMessage.warning('请输入账户名称');
+      if (!/^\d{6,35}$/.test(pendingNo)) return ElMessage.warning('请输入6至35位银行卡号');
+      const { savedAccount } = await persistPaymentAccount(pendingName, pendingNo);
+      await loadPaymentAccounts();
+      selectPaymentAccountForSave(savedAccount.accountId);
+    }
+    if (!paymentAccountSelectedIds.value.length || !paymentAccountDefaultId.value) {
+      return ElMessage.warning('请至少选择一个主账号并指定默认账号');
+    }
+    await assignSettlementPaymentAccounts(paymentAccountTarget.value.applicationId, {
+      accountIds: paymentAccountSelectedIds.value,
+      defaultAccountId: paymentAccountDefaultId.value,
+      allowMultipleMainAccounts: paymentAccountAllowMultiple.value
+    });
+    ElMessage.success('主账号设置已提交，银行确认后企业端即可选择');
+    paymentAccountVisible.value = false;
+  } finally {
+    paymentAccountSubmitting.value = false;
+  }
+}
+
+function paymentAccountStatusText(status?: string) {
+  const texts: Record<string, string> = {
+    UNASSIGNED: '未分配', PENDING: '待提交', ACCEPTED: '银行确认中', UNKNOWN: '查询中', SUCCESS: '已生效', FAILED: '失败'
+  };
+  return texts[String(status || '')] || '未知';
+}
+
+function paymentAccountStatusType(status?: string): 'success' | 'warning' | 'danger' | 'info' {
+  if (status === 'SUCCESS') return 'success';
+  if (status === 'FAILED') return 'danger';
+  if (status === 'ACCEPTED' || status === 'UNKNOWN' || status === 'PENDING') return 'warning';
+  return 'info';
 }
 
 function goCompanyManagement() {
@@ -1703,6 +2599,37 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
   letter-spacing: 0.4px;
 }
 
+.commission-rate-value {
+  font-weight: 600;
+}
+
+.commission-rate-value.is-disabled {
+  color: var(--el-color-primary);
+  opacity: 1;
+}
+
+.rate-unit {
+  margin-left: 8px;
+  color: var(--el-text-color-secondary);
+}
+
+.main-account-policy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 14px 0 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: var(--el-fill-color-light);
+}
+
+.policy-label {
+  margin-right: 8px;
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+}
+
 .sensitive-value-row {
   display: inline-flex;
   align-items: center;
@@ -1862,6 +2789,110 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
 .audit-checklist {
   display: grid;
   grid-template-columns: 1fr;
+}
+
+.payment-account-dialog {
+  min-height: 240px;
+}
+
+.payment-account-table {
+  margin-top: 16px;
+}
+
+.payment-account-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.payment-account-name {
+  overflow: hidden;
+  color: var(--el-text-color-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@font-face {
+  font-family: 'China Bank Logos';
+  src: url('../../../assets/bank-logos/china-bank-logos.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+/* 银行品牌资源全部随前端发布，未知银行才使用统一“银”标识兜底。 */
+.payment-bank-logo {
+  display: inline-flex;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--el-border-color-lighter);
+  background: #fff;
+  color: #5b6472;
+  font-family: 'China Bank Logos', sans-serif;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 8%);
+}
+
+.payment-bank-logo.is-cmb,
+.payment-bank-logo.is-njcb,
+.payment-bank-logo.is-bccb,
+.payment-bank-logo.is-icbc,
+.payment-bank-logo.is-boc,
+.payment-bank-logo.is-citic,
+.payment-bank-logo.is-cgb,
+.payment-bank-logo.is-hxb,
+.payment-bank-logo.is-czb {
+  color: #c9152c;
+}
+
+.payment-bank-logo.is-abc,
+.payment-bank-logo.is-psbc,
+.payment-bank-logo.is-cmbc,
+.payment-bank-logo.is-brcb {
+  color: #008b72;
+}
+
+.payment-bank-logo.is-ccb,
+.payment-bank-logo.is-bocom,
+.payment-bank-logo.is-spdb,
+.payment-bank-logo.is-cib,
+.payment-bank-logo.is-cbhb {
+  color: #075aa5;
+}
+
+.payment-bank-logo.is-ceb {
+  color: #69419b;
+}
+
+.payment-bank-logo.is-pingan {
+  color: #ef6c00;
+}
+
+.payment-bank-logo.is-generic {
+  border-color: transparent;
+  background: #409eff;
+  color: #fff;
+  font-family: var(--el-font-family);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.payment-bank-logo-image {
+  display: block;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.payment-account-add-form :deep(.el-form-item) {
+  margin-right: 12px;
 }
 
 @media (max-width: 1200px) {

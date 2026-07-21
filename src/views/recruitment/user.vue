@@ -889,7 +889,12 @@ function parseResumeList(value: unknown): ResumeJsonRecord[] {
 }
 
 function displayStoredValue(value: unknown): string {
-  return displayText(parseJsonValue(value));
+  const parsed = parseJsonValue(value);
+  // C 端部分补充字段（如荣誉）以 { text: "..." } 保存，运营端应展示内容而不是原始 JSON。
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'text' in parsed) {
+    return displayText((parsed as ResumeJsonRecord).text);
+  }
+  return displayText(parsed);
 }
 
 function pickText(source: ResumeJsonRecord, keys: string[]) {
