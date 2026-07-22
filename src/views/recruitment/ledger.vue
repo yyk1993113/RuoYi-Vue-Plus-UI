@@ -178,6 +178,15 @@
       <template #header>
         <div class="card-header">
           <el-button type="primary" plain icon="Refresh" @click="loadData">刷新</el-button>
+          <el-button
+            v-hasPermi="['recruitment:ledger:taxCategory']"
+            type="primary"
+            plain
+            icon="Tickets"
+            @click="openTaxCategoryManage"
+          >
+            税务业务分类
+          </el-button>
           <!-- 批量结算：仅当勾选了「待结算」台账时可用 -->
           <el-button type="success" icon="Money" :disabled="!settleableSelection.length" @click="openSettle(settleableSelection)">
             批量标记已结算{{ settleableSelection.length ? `(${settleableSelection.length})` : '' }}
@@ -365,7 +374,6 @@
               >
                 保存岗位配置
               </el-button>
-              <el-button v-hasPermi="['recruitment:ledger:taxCategory']" link type="primary" @click="openTaxCategoryCreate"> 新增分类 </el-button>
               <span class="tax-category-hint">所得类型固定为劳务报酬所得</span>
             </div>
           </div>
@@ -416,6 +424,64 @@
         <el-button type="primary" :disabled="!payoutPreview?.canConfirm" :loading="payoutSubmitting" @click="preparePayoutConfirm">
           确认发放
         </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 税务业务分类是台账发放专用主数据，独立于岗位分类和系统字典，在台账页单独查询与新增。 -->
+    <el-dialog v-model="taxCategoryManageVisible" title="税务业务分类" width="820px" append-to-body destroy-on-close>
+      <el-alert
+        class="mb-3"
+        title="这里维护台账发放专用的税务业务分类，不会写入岗位分类或系统字典。所得类型统一为劳务报酬所得。"
+        type="info"
+        :closable="false"
+        show-icon
+      />
+      <el-form :model="taxCategoryQuery" inline>
+        <el-form-item label="分类查询">
+          <el-input
+            v-model="taxCategoryQuery.keyword"
+            clearable
+            placeholder="分类名称 / 分类编码"
+            style="width: 260px"
+            @keyup.enter="handleTaxCategoryQuery"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" icon="Search" @click="handleTaxCategoryQuery">查询</el-button>
+          <el-button icon="Refresh" @click="resetTaxCategoryQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
+      <div class="tax-category-manage-toolbar">
+        <span class="tax-category-count">共 {{ filteredTaxCategories.length }} 个分类</span>
+        <el-button v-hasPermi="['recruitment:ledger:taxCategory']" type="primary" icon="Plus" @click="openTaxCategoryCreate">
+          新增税务业务分类
+        </el-button>
+      </div>
+      <el-table
+        v-loading="taxCategoryManageLoading"
+        :data="filteredTaxCategories"
+        border
+        stripe
+        max-height="420"
+        empty-text="暂无符合条件的税务业务分类"
+      >
+        <el-table-column type="index" label="序号" width="70" align="center" />
+        <el-table-column prop="categoryCode" label="分类编码" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="categoryName" label="分类名称" min-width="160" show-overflow-tooltip />
+        <el-table-column label="所得类型" width="140" align="center">
+          <template #default>劳务报酬所得</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.status === '1' ? 'info' : 'success'">{{ row.status === '1' ? '停用' : '正常' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.remark || '-' }}</template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="taxCategoryManageVisible = false">关闭</el-button>
       </template>
     </el-dialog>
 
@@ -658,9 +724,20 @@ const payoutPreview = ref<AdminLedgerPayoutPreview | null>(null);
 const taxCategories = ref<TaxBusinessCategory[]>([]);
 const selectedTaxCategoryId = ref<string | number>();
 const taxCategoryBinding = ref(false);
+const taxCategoryManageVisible = ref(false);
+const taxCategoryManageLoading = ref(false);
+const taxCategoryQuery = reactive({ keyword: '' });
+const appliedTaxCategoryKeyword = ref('');
 const taxCategoryCreateVisible = ref(false);
 const taxCategoryCreating = ref(false);
 const taxCategoryCreateForm = reactive({ categoryCode: '', categoryName: '', remark: '' });
+const filteredTaxCategories = computed(() => {
+  const keyword = appliedTaxCategoryKeyword.value.toLowerCase();
+  if (!keyword) return taxCategories.value;
+  return taxCategories.value.filter((item) =>
+    [item.categoryCode, item.categoryName].some((value) => String(value || '').toLowerCase().includes(keyword))
+  );
+});
 const payoutPasswordSetupVisible = ref(false);
 const payoutPasswordVerifyVisible = ref(false);
 const payoutPasswordSubmitting = ref(false);
@@ -1284,13 +1361,35 @@ function formatRate(value?: number | null) {
   return value == null ? '-' : `${Number(value).toFixed(2)}%`;
 }
 
-async function loadTaxBusinessCategories() {
+async function loadTaxBusinessCategories(showError = false) {
   try {
     const res = await listTaxBusinessCategories();
     taxCategories.value = Array.isArray(res.data) ? res.data : [];
   } catch {
     taxCategories.value = [];
+    if (showError) ElMessage.error('获取税务业务分类失败');
   }
+}
+
+async function openTaxCategoryManage() {
+  taxCategoryManageVisible.value = true;
+  taxCategoryQuery.keyword = '';
+  appliedTaxCategoryKeyword.value = '';
+  taxCategoryManageLoading.value = true;
+  try {
+    await loadTaxBusinessCategories(true);
+  } finally {
+    taxCategoryManageLoading.value = false;
+  }
+}
+
+function handleTaxCategoryQuery() {
+  appliedTaxCategoryKeyword.value = taxCategoryQuery.keyword.trim();
+}
+
+function resetTaxCategoryQuery() {
+  taxCategoryQuery.keyword = '';
+  appliedTaxCategoryKeyword.value = '';
 }
 
 async function loadPayoutPreview() {
@@ -1363,15 +1462,14 @@ async function submitTaxCategoryCreate() {
   }
   taxCategoryCreating.value = true;
   try {
-    const res = await createTaxBusinessCategory({
+    await createTaxBusinessCategory({
       categoryCode,
       categoryName,
       remark: taxCategoryCreateForm.remark.trim() || undefined
     });
-    await loadTaxBusinessCategories();
-    selectedTaxCategoryId.value = res.data;
+    await loadTaxBusinessCategories(true);
     taxCategoryCreateVisible.value = false;
-    ElMessage.success('税务业务分类已新增，请保存岗位配置');
+    ElMessage.success('税务业务分类已新增');
   } catch {
     ElMessage.error('新增税务业务分类失败');
   } finally {
@@ -1939,6 +2037,18 @@ onMounted(() => {
 .tax-category-hint {
   color: #909399;
   font-size: 12px;
+}
+
+.tax-category-manage-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.tax-category-count {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 
 .payout-captcha-row {
