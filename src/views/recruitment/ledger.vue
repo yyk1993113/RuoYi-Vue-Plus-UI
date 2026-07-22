@@ -345,7 +345,10 @@
           <el-descriptions title="台账与人员" :column="3" border>
             <el-descriptions-item label="台账编号" :span="2">{{ payoutPreview.orderNo || '-' }}</el-descriptions-item>
             <el-descriptions-item label="预览有效期">{{ payoutPreview.expiresAt || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="岗位编码">{{ payoutPreview.jobNo || '-' }}</el-descriptions-item>
+            <!-- 历史岗位可能已被删除且未留业务号；此时展示真实岗位 ID，避免用猜造编号掩盖数据缺口。 -->
+            <el-descriptions-item label="岗位编码">
+              {{ payoutPreview.jobNo || (payoutPreview.jobId ? `岗位ID ${payoutPreview.jobId}` : '-') }}
+            </el-descriptions-item>
             <el-descriptions-item label="岗位名称">{{ payoutPreview.jobName || '-' }}</el-descriptions-item>
             <el-descriptions-item label="用工类型">{{ payoutPreview.jobTypeName || '-' }}</el-descriptions-item>
             <el-descriptions-item label="人员编码">{{ payoutPreview.jobSeekerNo || payoutPreview.userId || '-' }}</el-descriptions-item>
@@ -356,7 +359,14 @@
           <div class="payout-section">
             <div class="payout-section-title">税务业务分类</div>
             <div class="tax-category-row">
-              <el-select v-model="selectedTaxCategoryId" placeholder="请选择岗位税务业务分类" filterable style="width: 320px">
+              <el-select
+                v-model="selectedTaxCategoryId"
+                placeholder="请选择本次发放的税务业务分类"
+                filterable
+                style="width: 320px"
+                :disabled="payoutLoading || payoutSubmitting"
+                @change="handleTaxCategoryChange"
+              >
                 <el-option
                   v-for="item in taxCategories"
                   :key="item.categoryId"
@@ -364,19 +374,30 @@
                   :value="item.categoryId"
                 />
               </el-select>
-              <el-button
-                v-hasPermi="['recruitment:ledger:taxCategory']"
-                type="primary"
-                plain
-                :disabled="!selectedTaxCategoryId || !payoutPreview.jobId"
-                :loading="taxCategoryBinding"
-                @click="bindCurrentJobTaxCategory"
-              >
-                保存岗位配置
-              </el-button>
-              <span class="tax-category-hint">所得类型固定为劳务报酬所得</span>
+            </div>
+            <div class="tax-policy-stack">
+              <el-alert type="info" :closable="false" show-icon :title="taxPolicySummary" />
+              <el-alert
+                type="warning"
+                :closable="false"
+                show-icon
+                title="销售货物、提供运输服务取得的所得属于经营所得，不适用本页劳务报酬发放。"
+              />
             </div>
           </div>
+
+          <el-descriptions class="payout-section payout-tax-detail" title="本次完整计税明细" :column="2" border>
+            <el-descriptions-item label="所得类型">{{ payoutPreview.incomeTypeName || '劳务报酬所得' }}</el-descriptions-item>
+            <el-descriptions-item label="计税规则版本">{{ payoutPreview.taxRuleVersion || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="本次前累计收入">¥{{ formatMoney(payoutPreview.cumulativeGrossBefore) }}</el-descriptions-item>
+            <el-descriptions-item label="本次前累计已扣税">¥{{ formatMoney(payoutPreview.cumulativeTaxBefore) }}</el-descriptions-item>
+            <el-descriptions-item label="连续计税月数">{{ payoutPreview.continuousMonths || 0 }} 个月</el-descriptions-item>
+            <el-descriptions-item label="累计费用扣除">¥{{ formatMoney(payoutPreview.deductionAmount) }}</el-descriptions-item>
+            <el-descriptions-item label="累计应纳税所得额">¥{{ formatMoney(payoutPreview.cumulativeTaxableIncome) }}</el-descriptions-item>
+            <el-descriptions-item label="适用税率">{{ formatRate(payoutPreview.taxRate) }}</el-descriptions-item>
+            <el-descriptions-item label="速算扣除数">¥{{ formatMoney(payoutPreview.quickDeduction) }}</el-descriptions-item>
+            <el-descriptions-item label="计算公式" :span="2">{{ payoutPreview.taxFormula || '-' }}</el-descriptions-item>
+          </el-descriptions>
 
           <el-descriptions class="payout-section" title="资金明细" :column="3" border>
             <el-descriptions-item label="人员税前劳务报酬">¥{{ formatMoney(payoutPreview.grossAmount) }}</el-descriptions-item>
@@ -400,38 +421,27 @@
             </el-descriptions-item>
           </el-descriptions>
 
-          <el-collapse class="payout-section">
-            <el-collapse-item title="查看完整计税明细" name="tax-detail">
-              <el-descriptions :column="2" border>
-                <el-descriptions-item label="所得类型">{{ payoutPreview.incomeTypeName || '劳务报酬所得' }}</el-descriptions-item>
-                <el-descriptions-item label="计税规则版本">{{ payoutPreview.taxRuleVersion || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="本次前累计收入">¥{{ formatMoney(payoutPreview.cumulativeGrossBefore) }}</el-descriptions-item>
-                <el-descriptions-item label="本次前累计已扣税">¥{{ formatMoney(payoutPreview.cumulativeTaxBefore) }}</el-descriptions-item>
-                <el-descriptions-item label="连续计税月数">{{ payoutPreview.continuousMonths || 0 }} 个月</el-descriptions-item>
-                <el-descriptions-item label="累计费用扣除">¥{{ formatMoney(payoutPreview.deductionAmount) }}</el-descriptions-item>
-                <el-descriptions-item label="累计应纳税所得额">¥{{ formatMoney(payoutPreview.cumulativeTaxableIncome) }}</el-descriptions-item>
-                <el-descriptions-item label="适用税率">{{ formatRate(payoutPreview.taxRate) }}</el-descriptions-item>
-                <el-descriptions-item label="速算扣除数">¥{{ formatMoney(payoutPreview.quickDeduction) }}</el-descriptions-item>
-                <el-descriptions-item label="计算公式" :span="2">{{ payoutPreview.taxFormula || '-' }}</el-descriptions-item>
-              </el-descriptions>
-            </el-collapse-item>
-          </el-collapse>
         </template>
         <el-empty v-else-if="!payoutLoading" description="未获取到发放计税预览" />
       </div>
       <template #footer>
         <el-button :disabled="payoutSubmitting" @click="payoutVisible = false">关闭</el-button>
-        <el-button type="primary" :disabled="!payoutPreview?.canConfirm" :loading="payoutSubmitting" @click="preparePayoutConfirm">
+        <el-button
+          type="primary"
+          :disabled="!selectedTaxCategoryId || !payoutPreview?.canConfirm || payoutLoading"
+          :loading="payoutSubmitting"
+          @click="preparePayoutConfirm"
+        >
           确认发放
         </el-button>
       </template>
     </el-dialog>
 
-    <!-- 税务业务分类是台账发放专用主数据，独立于岗位分类和系统字典，在台账页单独查询与新增。 -->
+    <!-- 税务业务分类是台账发放专用主数据，每次发放单独选择，不写入岗位配置。 -->
     <el-dialog v-model="taxCategoryManageVisible" title="税务业务分类" width="820px" append-to-body destroy-on-close>
       <el-alert
         class="mb-3"
-        title="这里维护台账发放专用的税务业务分类，不会写入岗位分类或系统字典。所得类型统一为劳务报酬所得。"
+        title="这里维护台账发放专用的税务业务分类；发放时按次选择，不保存为岗位配置，也不会写入岗位分类或系统字典。所得类型统一为劳务报酬所得。"
         type="info"
         :closable="false"
         show-icon
@@ -682,7 +692,6 @@ import {
 } from '@/api/recruitment';
 import { getBizNoChain, getBizNoChainByCompanyId, type BizNoChainVO } from '@/api/recruitment/serialRule';
 import {
-  bindJobTaxBusinessCategory,
   confirmAdminLedgerPayout,
   createTaxBusinessCategory,
   getAdminLedgerPayoutPreview,
@@ -723,7 +732,6 @@ const payoutLedgerId = ref<string | number>();
 const payoutPreview = ref<AdminLedgerPayoutPreview | null>(null);
 const taxCategories = ref<TaxBusinessCategory[]>([]);
 const selectedTaxCategoryId = ref<string | number>();
-const taxCategoryBinding = ref(false);
 const taxCategoryManageVisible = ref(false);
 const taxCategoryManageLoading = ref(false);
 const taxCategoryQuery = reactive({ keyword: '' });
@@ -737,6 +745,16 @@ const filteredTaxCategories = computed(() => {
   return taxCategories.value.filter((item) =>
     [item.categoryCode, item.categoryName].some((value) => String(value || '').toLowerCase().includes(keyword))
   );
+});
+const selectedTaxCategory = computed(() =>
+  taxCategories.value.find((item) => String(item.categoryId) === String(selectedTaxCategoryId.value))
+);
+// 分类只标记本次发放业务，税率仍由劳务报酬累计预扣规则和累计所得自动确定。
+const taxPolicySummary = computed(() => {
+  if (!selectedTaxCategory.value) {
+    return '请选择本次发放的税务业务分类；分类仅用于本次业务留痕，不会保存到岗位。';
+  }
+  return `${selectedTaxCategory.value.categoryName}用于本次发放业务留痕，统一按劳务报酬所得累计预扣；业务分类不会直接改变适用税率。`;
 });
 const payoutPasswordSetupVisible = ref(false);
 const payoutPasswordVerifyVisible = ref(false);
@@ -1392,13 +1410,13 @@ function resetTaxCategoryQuery() {
   appliedTaxCategoryKeyword.value = '';
 }
 
-async function loadPayoutPreview() {
+async function loadPayoutPreview(taxCategoryId = selectedTaxCategoryId.value) {
   if (payoutLedgerId.value == null) return;
   payoutLoading.value = true;
   try {
-    const res = await getAdminLedgerPayoutPreview(payoutLedgerId.value);
+    const res = await getAdminLedgerPayoutPreview(payoutLedgerId.value, taxCategoryId);
     payoutPreview.value = res.data || null;
-    selectedTaxCategoryId.value = payoutPreview.value?.taxCategoryId;
+    selectedTaxCategoryId.value = payoutPreview.value?.taxCategoryId ?? taxCategoryId;
   } catch {
     payoutPreview.value = null;
     ElMessage.error('获取发放计税预览失败');
@@ -1419,21 +1437,9 @@ async function openPayout(row: any) {
   await Promise.all([loadPayoutPreview(), loadTaxBusinessCategories()]);
 }
 
-async function bindCurrentJobTaxCategory() {
-  if (!payoutPreview.value?.jobId || selectedTaxCategoryId.value == null) {
-    ElMessage.warning('请选择税务业务分类');
-    return;
-  }
-  taxCategoryBinding.value = true;
-  try {
-    await bindJobTaxBusinessCategory(payoutPreview.value.jobId, selectedTaxCategoryId.value);
-    ElMessage.success('岗位税务业务分类已保存');
-    await loadPayoutPreview();
-  } catch {
-    ElMessage.error('保存岗位税务业务分类失败');
-  } finally {
-    taxCategoryBinding.value = false;
-  }
+async function handleTaxCategoryChange(categoryId: string | number) {
+  selectedTaxCategoryId.value = categoryId;
+  await loadPayoutPreview(categoryId);
 }
 
 function openTaxCategoryCreate() {
@@ -1498,6 +1504,17 @@ async function refreshPayoutCaptcha() {
 }
 
 async function preparePayoutConfirm() {
+  if (selectedTaxCategoryId.value == null) {
+    ElMessage.warning('请选择本次发放的税务业务分类');
+    return;
+  }
+  if (
+    payoutPreview.value?.taxCategoryId == null ||
+    String(payoutPreview.value.taxCategoryId) !== String(selectedTaxCategoryId.value)
+  ) {
+    ElMessage.warning('税务业务分类已变化，请等待计税预览刷新');
+    return;
+  }
   if (!payoutPreview.value?.canConfirm) {
     ElMessage.warning(payoutPreview.value?.blockingReason || '当前台账暂不满足发放条件');
     return;
@@ -1609,13 +1626,14 @@ async function submitPayoutPasswordVerify() {
 
 async function submitPayoutConfirm(ticket: string) {
   const preview = payoutPreview.value;
-  if (!preview?.previewId) return;
+  if (!preview?.previewId || preview.taxCategoryId == null) return;
   payoutSubmitting.value = true;
   try {
     // 幂等标识仅用于防重复请求；资金金额始终由后端根据台账重新计算。
     const idempotencyKey = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     await confirmAdminLedgerPayout({
       ledgerId: preview.ledgerId,
+      taxCategoryId: preview.taxCategoryId,
       previewId: preview.previewId,
       ticket,
       idempotencyKey
@@ -1625,7 +1643,7 @@ async function submitPayoutConfirm(ticket: string) {
     await Promise.all([loadData(), loadStatistics()]);
   } catch {
     ElMessage.error('发放未执行，请根据提示核对后重试');
-    await loadPayoutPreview();
+    await loadPayoutPreview(preview.taxCategoryId);
   } finally {
     payoutSubmitting.value = false;
   }
@@ -2034,9 +2052,15 @@ onMounted(() => {
   gap: 10px;
 }
 
-.tax-category-hint {
-  color: #909399;
-  font-size: 12px;
+.tax-policy-stack {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.payout-tax-detail {
+  border-top: 3px solid var(--el-color-primary);
+  border-radius: 4px;
 }
 
 .tax-category-manage-toolbar {

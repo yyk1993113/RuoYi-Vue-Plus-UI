@@ -75,11 +75,19 @@ export interface PayoutTradePasswordVerifyRequest {
   uuid?: string;
 }
 
-export function getAdminLedgerPayoutPreview(ledgerId: string | number) {
-  return request.get<AdminLedgerPayoutPreview>(`${baseUrl}/${ledgerId}/preview`);
+export function getAdminLedgerPayoutPreview(ledgerId: string | number, taxCategoryId?: string | number) {
+  return request.get<AdminLedgerPayoutPreview>(`${baseUrl}/${ledgerId}/preview`, {
+    params: taxCategoryId == null ? undefined : { taxCategoryId }
+  });
 }
 
-export function confirmAdminLedgerPayout(data: { ledgerId: string | number; previewId: string; ticket: string; idempotencyKey: string }) {
+export function confirmAdminLedgerPayout(data: {
+  ledgerId: string | number;
+  taxCategoryId: string | number;
+  previewId: string;
+  ticket: string;
+  idempotencyKey: string;
+}) {
   return request.post(`${baseUrl}/confirm`, data);
 }
 
@@ -111,8 +119,4 @@ export function listTaxBusinessCategories() {
 
 export function createTaxBusinessCategory(data: { categoryCode: string; categoryName: string; remark?: string }) {
   return request.post<string | number>(`${baseUrl}/tax-categories`, data);
-}
-
-export function bindJobTaxBusinessCategory(jobId: string | number, categoryId: string | number) {
-  return request.put(`${baseUrl}/jobs/${jobId}/tax-category`, { categoryId });
 }
