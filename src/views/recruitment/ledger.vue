@@ -324,7 +324,7 @@
     <el-dialog
       v-model="payoutVisible"
       title="单人劳务发放计税"
-      width="900px"
+      width="min(1180px, 94vw)"
       append-to-body
       :close-on-click-modal="false"
       :close-on-press-escape="!payoutSubmitting"
@@ -345,11 +345,15 @@
           <el-descriptions title="台账与人员" :column="3" border>
             <el-descriptions-item label="台账编号" :span="2">{{ payoutPreview.orderNo || '-' }}</el-descriptions-item>
             <el-descriptions-item label="预览有效期">{{ payoutPreview.expiresAt || '-' }}</el-descriptions-item>
-            <!-- 历史岗位可能已被删除且未留业务号；此时展示真实岗位 ID，避免用猜造编号掩盖数据缺口。 -->
-            <el-descriptions-item label="岗位编码">
-              {{ payoutPreview.jobNo || (payoutPreview.jobId ? `岗位ID ${payoutPreview.jobId}` : '-') }}
+            <!-- 岗位名称优先占据更宽区域；历史岗位未留编码时，ID 仅作为辅助标识展示。 -->
+            <el-descriptions-item label="岗位名称" :span="2">
+              <strong class="payout-job-name">{{ payoutPreview.jobName || '历史岗位（名称未留存）' }}</strong>
             </el-descriptions-item>
-            <el-descriptions-item label="岗位名称">{{ payoutPreview.jobName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="岗位标识">
+              <span class="payout-job-identifier">
+                {{ payoutPreview.jobNo || (payoutPreview.jobId ? `ID：${payoutPreview.jobId}` : '-') }}
+              </span>
+            </el-descriptions-item>
             <el-descriptions-item label="用工类型">{{ payoutPreview.jobTypeName || '-' }}</el-descriptions-item>
             <el-descriptions-item label="人员编码">{{ payoutPreview.jobSeekerNo || payoutPreview.userId || '-' }}</el-descriptions-item>
             <el-descriptions-item label="人员姓名">{{ payoutPreview.userName || '-' }}</el-descriptions-item>
@@ -410,9 +414,12 @@
             <el-descriptions-item label="企业本次应付合计">¥{{ formatMoney(payoutPreview.enterpriseTotalAmount) }}</el-descriptions-item>
             <el-descriptions-item label="子账户可用余额">{{ payoutBalanceText }}</el-descriptions-item>
             <el-descriptions-item label="实名核验">
-              <el-tag :type="payoutPreview.realNameVerified ? 'success' : 'danger'">{{
-                payoutPreview.realNameVerified ? '已通过' : '未通过'
-              }}</el-tag>
+              <div class="payout-verification-status">
+                <el-tag :type="payoutPreview.realNameVerified ? 'success' : 'danger'">{{
+                  payoutPreview.realNameVerified ? '已通过' : '未通过'
+                }}</el-tag>
+                <small v-if="!payoutPreview.realNameVerified">需身份证实名认证和人脸核验</small>
+              </div>
             </el-descriptions-item>
             <el-descriptions-item label="银行卡一致性核验">
               <el-tag :type="payoutPreview.bankCardVerified ? 'success' : 'danger'">{{
@@ -2032,6 +2039,34 @@ onMounted(() => {
 
 .payout-dialog-body {
   min-height: 180px;
+}
+
+.payout-dialog-body :deep(.el-descriptions__label.el-descriptions__cell.is-bordered-label) {
+  width: 150px;
+  min-width: 150px;
+  white-space: nowrap;
+}
+
+.payout-job-name {
+  color: var(--el-text-color-primary);
+  font-size: 15px;
+  word-break: break-word;
+}
+
+.payout-job-identifier {
+  word-break: break-all;
+}
+
+.payout-verification-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.payout-verification-status small {
+  color: var(--el-color-danger);
+  font-size: 12px;
 }
 
 .payout-section {
