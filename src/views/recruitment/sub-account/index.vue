@@ -896,7 +896,7 @@
     >
       <div v-loading="paymentAccountLoading" class="payment-account-dialog">
         <el-alert
-          title="关联结果仅表示主账号是否已和当前记账子账号关联成功，不代表银行卡本身状态；多主账号模式可同时关联多个。"
+          title="默认主账号根据开户成功的子账号归属记录判定：匹配显示正常，不匹配显示未绑定，本地开户记录异常时显示异常。"
           type="info"
           :closable="false"
           show-icon
@@ -975,25 +975,25 @@
               ><span /></el-radio>
             </template>
           </el-table-column>
-          <el-table-column label="子账号关联结果" min-width="210">
+          <el-table-column label="默认主账号关系" min-width="210">
             <template #default="{ row }">
               <div class="payment-account-status-cell">
                 <el-tooltip
-                  v-if="row.syncMessage"
+                  v-if="paymentAccountStatusDetail(row)"
                   :content="paymentAccountStatusDetail(row)"
                   placement="top"
                   :show-after="200"
                 >
-                  <el-tag :type="paymentAccountStatusType(row.syncStatus)" size="small">
-                    {{ paymentAccountStatusText(row.syncStatus) }}
+                  <el-tag :type="paymentAccountStatusType(paymentAccountDisplayStatus(row))" size="small">
+                    {{ paymentAccountStatusText(paymentAccountDisplayStatus(row)) }}
                   </el-tag>
                 </el-tooltip>
-                <el-tag v-else :type="paymentAccountStatusType(row.syncStatus)" size="small">
-                  {{ paymentAccountStatusText(row.syncStatus) }}
+                <el-tag v-else :type="paymentAccountStatusType(paymentAccountDisplayStatus(row))" size="small">
+                  {{ paymentAccountStatusText(paymentAccountDisplayStatus(row)) }}
                 </el-tag>
                 <span
-                  v-if="row.syncMessage"
-                  :class="['payment-account-status-reason', { 'is-error': row.syncStatus === 'FAILED' }]"
+                  v-if="paymentAccountStatusDetail(row)"
+                  :class="['payment-account-status-reason', { 'is-error': paymentAccountDisplayStatus(row) === 'ERROR' }]"
                 >
                   {{ paymentAccountStatusDetail(row) }}
                 </span>
@@ -2293,28 +2293,33 @@ async function submitPaymentAccounts() {
 
 function paymentAccountStatusText(status?: string) {
   const texts: Record<string, string> = {
-    UNASSIGNED: '未关联',
-    PENDING: '待关联',
-    ACCEPTED: '关联确认中',
-    UNKNOWN: '关联结果查询中',
-    SUCCESS: '关联成功',
-    FAILED: '关联失败'
+    SUCCESS: '正常',
+    UNASSIGNED: '未绑定',
+    ERROR: '异常'
   };
-  return texts[String(status || '')] || '未知';
+  return texts[String(status || '')] || '异常';
 }
 
-// 后端只返回已脱敏的银行错误；状态旁直接给出原因，避免运营人员只能看到“关联失败”。
+// 页面只保留父子账号关系三态；默认主账号与开户记录匹配才表示正常。
+function paymentAccountDisplayStatus(row: SettlementPaymentAccount) {
+  const status = String(row.syncStatus || '');
+  if (status === 'SUCCESS') return 'SUCCESS';
+  if (status === 'UNASSIGNED') return 'UNASSIGNED';
+  return 'ERROR';
+}
+
+// 后端只返回已脱敏的异常；正常和未绑定状态不追加干扰信息。
 function paymentAccountStatusDetail(row: SettlementPaymentAccount) {
+  if (paymentAccountDisplayStatus(row) !== 'ERROR') return '';
   const message = String(row.syncMessage || '').trim();
   const code = String(row.syncCode || '').trim();
   if (message && code && !message.includes(code)) return `${message}（返回码：${code}）`;
-  return message || (code ? `银行返回码：${code}` : '');
+  return message || (code ? `银行返回码：${code}` : '银行未返回明确的绑定结果');
 }
 
 function paymentAccountStatusType(status?: string): 'success' | 'warning' | 'danger' | 'info' {
   if (status === 'SUCCESS') return 'success';
-  if (status === 'FAILED') return 'danger';
-  if (status === 'ACCEPTED' || status === 'UNKNOWN' || status === 'PENDING') return 'warning';
+  if (status === 'ERROR') return 'danger';
   return 'info';
 }
 

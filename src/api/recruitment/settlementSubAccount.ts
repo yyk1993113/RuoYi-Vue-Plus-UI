@@ -149,8 +149,8 @@ export interface SettlementPaymentAccount {
   accountNoMasked: string;
   assigned: boolean;
   defaultAccount: boolean;
-  /** 主账号与当前记账子账号的银行关联状态，不表示银行卡账户本身状态。 */
-  syncStatus: 'UNASSIGNED' | 'PENDING' | 'ACCEPTED' | 'UNKNOWN' | 'SUCCESS' | 'FAILED' | string;
+  /** 开户成功子账号记录确认的所属主账号状态：SUCCESS/UNASSIGNED/ERROR。 */
+  syncStatus: 'SUCCESS' | 'UNASSIGNED' | 'ERROR' | string;
   syncCode?: string;
   syncMessage?: string;
 }

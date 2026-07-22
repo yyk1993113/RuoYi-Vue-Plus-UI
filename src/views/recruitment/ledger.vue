@@ -231,11 +231,22 @@
           <template #default="{ row }">{{ row.settleTime || '-' }}</template>
         </el-table-column>
         <el-table-column label="创建时间" prop="createTime" width="160" align="center" />
-        <el-table-column label="操作" width="140" fixed="right" align="center">
+        <el-table-column label="操作" width="190" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
             <!-- 标记已结算：仅「待结算」可操作 -->
             <el-button v-if="row.status === '0'" link type="success" icon="Money" @click="openSettle([row])">结算</el-button>
+            <!-- 发放是运营管理员独立流程，仅对已结算台账开放，不复用或修改原结算动作。 -->
+            <el-button
+              v-if="row.status === '1'"
+              v-hasPermi="['recruitment:ledger:payout']"
+              link
+              type="warning"
+              icon="Wallet"
+              @click="openPayout(row)"
+            >
+              发放
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -297,6 +308,189 @@
       <template #footer>
         <el-button @click="settleVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitting" @click="submitSettle">确认结算</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 发放预览中的金额和税务字段全部由后端返回，只读展示，确认请求不携带金额。 -->
+    <el-dialog
+      v-model="payoutVisible"
+      title="单人劳务发放计税"
+      width="900px"
+      append-to-body
+      :close-on-click-modal="false"
+      :close-on-press-escape="!payoutSubmitting"
+      :show-close="!payoutSubmitting"
+    >
+      <div v-loading="payoutLoading" class="payout-dialog-body">
+        <template v-if="payoutPreview">
+          <el-alert
+            v-if="!payoutPreview.canConfirm"
+            class="mb-3"
+            type="warning"
+            :closable="false"
+            show-icon
+            :title="payoutPreview.blockingReason || '当前台账暂不满足发放条件'"
+          />
+          <el-alert v-else class="mb-3" type="success" :closable="false" show-icon title="计税预览已生成，确认时后端会重新核算并校验预览是否变化。" />
+
+          <el-descriptions title="台账与人员" :column="3" border>
+            <el-descriptions-item label="台账编号" :span="2">{{ payoutPreview.orderNo || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="预览有效期">{{ payoutPreview.expiresAt || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="岗位编码">{{ payoutPreview.jobNo || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="岗位名称">{{ payoutPreview.jobName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="用工类型">{{ payoutPreview.jobTypeName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="人员编码">{{ payoutPreview.jobSeekerNo || payoutPreview.userId || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="人员姓名">{{ payoutPreview.userName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="账户类型">个人银行卡</el-descriptions-item>
+          </el-descriptions>
+
+          <div class="payout-section">
+            <div class="payout-section-title">税务业务分类</div>
+            <div class="tax-category-row">
+              <el-select v-model="selectedTaxCategoryId" placeholder="请选择岗位税务业务分类" filterable style="width: 320px">
+                <el-option
+                  v-for="item in taxCategories"
+                  :key="item.categoryId"
+                  :label="`${item.categoryName}（${item.categoryCode}）`"
+                  :value="item.categoryId"
+                />
+              </el-select>
+              <el-button
+                v-hasPermi="['recruitment:ledger:taxCategory']"
+                type="primary"
+                plain
+                :disabled="!selectedTaxCategoryId || !payoutPreview.jobId"
+                :loading="taxCategoryBinding"
+                @click="bindCurrentJobTaxCategory"
+              >
+                保存岗位配置
+              </el-button>
+              <el-button v-hasPermi="['recruitment:ledger:taxCategory']" link type="primary" @click="openTaxCategoryCreate"> 新增分类 </el-button>
+              <span class="tax-category-hint">所得类型固定为劳务报酬所得</span>
+            </div>
+          </div>
+
+          <el-descriptions class="payout-section" title="资金明细" :column="3" border>
+            <el-descriptions-item label="人员税前劳务报酬">¥{{ formatMoney(payoutPreview.grossAmount) }}</el-descriptions-item>
+            <el-descriptions-item label="企业白名单抽佣比例">{{ formatRate(payoutPreview.commissionRate) }}</el-descriptions-item>
+            <el-descriptions-item label="企业手续费">¥{{ formatMoney(payoutPreview.enterpriseFeeAmount) }}</el-descriptions-item>
+            <el-descriptions-item label="代扣个人所得税">¥{{ formatMoney(payoutPreview.individualTaxAmount) }}</el-descriptions-item>
+            <el-descriptions-item label="人员实发金额">
+              <strong class="amount-lg">¥{{ formatMoney(payoutPreview.workerNetAmount) }}</strong>
+            </el-descriptions-item>
+            <el-descriptions-item label="企业本次应付合计">¥{{ formatMoney(payoutPreview.enterpriseTotalAmount) }}</el-descriptions-item>
+            <el-descriptions-item label="子账户可用余额">{{ payoutBalanceText }}</el-descriptions-item>
+            <el-descriptions-item label="实名核验">
+              <el-tag :type="payoutPreview.realNameVerified ? 'success' : 'danger'">{{
+                payoutPreview.realNameVerified ? '已通过' : '未通过'
+              }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="银行卡一致性核验">
+              <el-tag :type="payoutPreview.bankCardVerified ? 'success' : 'danger'">{{
+                payoutPreview.bankCardVerified ? '已通过' : '未通过'
+              }}</el-tag>
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <el-collapse class="payout-section">
+            <el-collapse-item title="查看完整计税明细" name="tax-detail">
+              <el-descriptions :column="2" border>
+                <el-descriptions-item label="所得类型">{{ payoutPreview.incomeTypeName || '劳务报酬所得' }}</el-descriptions-item>
+                <el-descriptions-item label="计税规则版本">{{ payoutPreview.taxRuleVersion || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="本次前累计收入">¥{{ formatMoney(payoutPreview.cumulativeGrossBefore) }}</el-descriptions-item>
+                <el-descriptions-item label="本次前累计已扣税">¥{{ formatMoney(payoutPreview.cumulativeTaxBefore) }}</el-descriptions-item>
+                <el-descriptions-item label="连续计税月数">{{ payoutPreview.continuousMonths || 0 }} 个月</el-descriptions-item>
+                <el-descriptions-item label="累计费用扣除">¥{{ formatMoney(payoutPreview.deductionAmount) }}</el-descriptions-item>
+                <el-descriptions-item label="累计应纳税所得额">¥{{ formatMoney(payoutPreview.cumulativeTaxableIncome) }}</el-descriptions-item>
+                <el-descriptions-item label="适用税率">{{ formatRate(payoutPreview.taxRate) }}</el-descriptions-item>
+                <el-descriptions-item label="速算扣除数">¥{{ formatMoney(payoutPreview.quickDeduction) }}</el-descriptions-item>
+                <el-descriptions-item label="计算公式" :span="2">{{ payoutPreview.taxFormula || '-' }}</el-descriptions-item>
+              </el-descriptions>
+            </el-collapse-item>
+          </el-collapse>
+        </template>
+        <el-empty v-else-if="!payoutLoading" description="未获取到发放计税预览" />
+      </div>
+      <template #footer>
+        <el-button :disabled="payoutSubmitting" @click="payoutVisible = false">关闭</el-button>
+        <el-button type="primary" :disabled="!payoutPreview?.canConfirm" :loading="payoutSubmitting" @click="preparePayoutConfirm">
+          确认发放
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="taxCategoryCreateVisible" title="新增税务业务分类" width="500px" append-to-body>
+      <el-form label-width="92px">
+        <el-form-item label="分类编码" required>
+          <el-input v-model="taxCategoryCreateForm.categoryCode" maxlength="64" placeholder="例如 SKILL_LABOR" @input="normalizeTaxCategoryCode" />
+        </el-form-item>
+        <el-form-item label="分类名称" required>
+          <el-input v-model="taxCategoryCreateForm.categoryName" maxlength="100" placeholder="例如 技能劳务类" />
+        </el-form-item>
+        <el-form-item label="所得类型">
+          <el-input model-value="劳务报酬所得" disabled />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="taxCategoryCreateForm.remark" type="textarea" :rows="3" maxlength="500" show-word-limit />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="taxCategoryCreateVisible = false">取消</el-button>
+        <el-button type="primary" :loading="taxCategoryCreating" @click="submitTaxCategoryCreate">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="payoutPasswordSetupVisible" title="设置管理员支付密码" width="460px" append-to-body :close-on-click-modal="false">
+      <el-alert class="mb-3" type="warning" :closable="false" show-icon title="支付密码按管理员账号分别设置，仅用于资金操作确认。" />
+      <el-form label-width="100px">
+        <el-form-item label="支付密码" required>
+          <el-input v-model="payoutPasswordSetupForm.password" type="password" maxlength="6" show-password placeholder="请输入6位数字" />
+        </el-form-item>
+        <el-form-item label="确认密码" required>
+          <el-input v-model="payoutPasswordSetupForm.confirmPassword" type="password" maxlength="6" show-password placeholder="请再次输入" />
+        </el-form-item>
+        <el-form-item v-if="payoutCaptcha.enabled" label="图形验证码" required>
+          <div class="payout-captcha-row">
+            <el-input v-model="payoutCaptcha.code" maxlength="4" placeholder="请输入验证码" @keyup.enter="submitPayoutPasswordSetup" />
+            <button type="button" class="payout-captcha-image" :disabled="payoutCaptcha.loading" @click="refreshPayoutCaptcha">
+              <img v-if="payoutCaptcha.image" :src="payoutCaptcha.image" alt="图形验证码" />
+              <span v-else>{{ payoutCaptcha.loading ? '加载中' : '刷新' }}</span>
+            </button>
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="payoutPasswordSetupVisible = false">取消</el-button>
+        <el-button type="primary" :loading="payoutPasswordSubmitting" @click="submitPayoutPasswordSetup">确认设置</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="payoutPasswordVerifyVisible" title="验证管理员支付密码" width="430px" append-to-body :close-on-click-modal="false">
+      <el-alert class="mb-3" type="info" :closable="false" show-icon title="验证通过后将对当前预览进行二次确认，凭证不可重复使用。" />
+      <el-form label-width="90px" @submit.prevent>
+        <el-form-item label="支付密码" required>
+          <el-input
+            v-model="payoutPasswordVerify"
+            type="password"
+            maxlength="6"
+            show-password
+            placeholder="请输入6位数字"
+            @keyup.enter="submitPayoutPasswordVerify"
+          />
+        </el-form-item>
+        <el-form-item v-if="payoutCaptcha.enabled" label="图形验证码" required>
+          <div class="payout-captcha-row">
+            <el-input v-model="payoutCaptcha.code" maxlength="4" placeholder="请输入验证码" @keyup.enter="submitPayoutPasswordVerify" />
+            <button type="button" class="payout-captcha-image" :disabled="payoutCaptcha.loading" @click="refreshPayoutCaptcha">
+              <img v-if="payoutCaptcha.image" :src="payoutCaptcha.image" alt="图形验证码" />
+              <span v-else>{{ payoutCaptcha.loading ? '加载中' : '刷新' }}</span>
+            </button>
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="payoutPasswordVerifyVisible = false">取消</el-button>
+        <el-button type="primary" :loading="payoutPasswordSubmitting" @click="submitPayoutPasswordVerify">验证并继续</el-button>
       </template>
     </el-dialog>
 
@@ -402,7 +596,10 @@
 <script setup name="LedgerManagement" lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import CryptoJS from 'crypto-js';
+import { encrypt } from '@/utils/jsencrypt';
+import { getCodeImg } from '@/api/login';
 import {
   listLedger,
   getLedgerStatistics,
@@ -418,6 +615,18 @@ import {
   type LedgerVO
 } from '@/api/recruitment';
 import { getBizNoChain, getBizNoChainByCompanyId, type BizNoChainVO } from '@/api/recruitment/serialRule';
+import {
+  bindJobTaxBusinessCategory,
+  confirmAdminLedgerPayout,
+  createTaxBusinessCategory,
+  getAdminLedgerPayoutPreview,
+  getPayoutTradePasswordStatus,
+  listTaxBusinessCategories,
+  setupPayoutTradePassword,
+  verifyPayoutTradePassword,
+  type AdminLedgerPayoutPreview,
+  type TaxBusinessCategory
+} from '@/api/recruitment/ledgerPayout';
 import { unwrapList, formatMoney } from './helpers';
 // 台账结算状态(0待结算/1已结算/2已取消) 与 发票绑定状态(0未绑定/1已绑定) → el-tag 文案/颜色，映射集中在 constants.ts
 import { invoiceStatusMeta, ledgerStatusMeta, ledgerInvoiceStatusMeta, jobTypeMeta } from './constants';
@@ -439,6 +648,30 @@ const settleableSelection = computed(() => selectedRows.value.filter((r) => r.st
 const settleVisible = ref(false);
 const settleTargets = ref<any[]>([]);
 const settleRemark = ref('');
+
+// 管理员单人发放与原“标记已结算”状态隔离；所有金额只保存后端预览，不在浏览器计算。
+const payoutVisible = ref(false);
+const payoutLoading = ref(false);
+const payoutSubmitting = ref(false);
+const payoutLedgerId = ref<string | number>();
+const payoutPreview = ref<AdminLedgerPayoutPreview | null>(null);
+const taxCategories = ref<TaxBusinessCategory[]>([]);
+const selectedTaxCategoryId = ref<string | number>();
+const taxCategoryBinding = ref(false);
+const taxCategoryCreateVisible = ref(false);
+const taxCategoryCreating = ref(false);
+const taxCategoryCreateForm = reactive({ categoryCode: '', categoryName: '', remark: '' });
+const payoutPasswordSetupVisible = ref(false);
+const payoutPasswordVerifyVisible = ref(false);
+const payoutPasswordSubmitting = ref(false);
+const payoutPasswordVerify = ref('');
+const payoutPasswordSetupForm = reactive({ password: '', confirmPassword: '' });
+const payoutCaptcha = reactive({ enabled: true, image: '', uuid: '', code: '', loading: false });
+const payoutBalanceText = computed(() => {
+  if (payoutPreview.value?.availableBalance == null) return '暂不可用';
+  const currency = payoutPreview.value.currency ? ` ${payoutPreview.value.currency}` : '';
+  return `¥${formatMoney(payoutPreview.value.availableBalance)}${currency}`;
+});
 const pendingAmountLoading = ref(false);
 const pendingAmountPartial = ref(false);
 const chainNo = ref('');
@@ -1047,6 +1280,259 @@ async function submitSettle() {
   }
 }
 
+function formatRate(value?: number | null) {
+  return value == null ? '-' : `${Number(value).toFixed(2)}%`;
+}
+
+async function loadTaxBusinessCategories() {
+  try {
+    const res = await listTaxBusinessCategories();
+    taxCategories.value = Array.isArray(res.data) ? res.data : [];
+  } catch {
+    taxCategories.value = [];
+  }
+}
+
+async function loadPayoutPreview() {
+  if (payoutLedgerId.value == null) return;
+  payoutLoading.value = true;
+  try {
+    const res = await getAdminLedgerPayoutPreview(payoutLedgerId.value);
+    payoutPreview.value = res.data || null;
+    selectedTaxCategoryId.value = payoutPreview.value?.taxCategoryId;
+  } catch {
+    payoutPreview.value = null;
+    ElMessage.error('获取发放计税预览失败');
+  } finally {
+    payoutLoading.value = false;
+  }
+}
+
+async function openPayout(row: any) {
+  if (!row?.ledgerId || row.status !== '1') {
+    ElMessage.warning('仅已结算台账可以发起发放预览');
+    return;
+  }
+  payoutLedgerId.value = row.ledgerId;
+  payoutPreview.value = null;
+  selectedTaxCategoryId.value = undefined;
+  payoutVisible.value = true;
+  await Promise.all([loadPayoutPreview(), loadTaxBusinessCategories()]);
+}
+
+async function bindCurrentJobTaxCategory() {
+  if (!payoutPreview.value?.jobId || selectedTaxCategoryId.value == null) {
+    ElMessage.warning('请选择税务业务分类');
+    return;
+  }
+  taxCategoryBinding.value = true;
+  try {
+    await bindJobTaxBusinessCategory(payoutPreview.value.jobId, selectedTaxCategoryId.value);
+    ElMessage.success('岗位税务业务分类已保存');
+    await loadPayoutPreview();
+  } catch {
+    ElMessage.error('保存岗位税务业务分类失败');
+  } finally {
+    taxCategoryBinding.value = false;
+  }
+}
+
+function openTaxCategoryCreate() {
+  taxCategoryCreateForm.categoryCode = '';
+  taxCategoryCreateForm.categoryName = '';
+  taxCategoryCreateForm.remark = '';
+  taxCategoryCreateVisible.value = true;
+}
+
+function normalizeTaxCategoryCode(value: string) {
+  taxCategoryCreateForm.categoryCode = String(value || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9_]/g, '');
+}
+
+async function submitTaxCategoryCreate() {
+  const categoryCode = taxCategoryCreateForm.categoryCode.trim();
+  const categoryName = taxCategoryCreateForm.categoryName.trim();
+  if (!/^[A-Z][A-Z0-9_]{1,63}$/.test(categoryCode)) {
+    ElMessage.warning('分类编码须以大写字母开头，至少2位，仅含字母、数字或下划线');
+    return;
+  }
+  if (!categoryName) {
+    ElMessage.warning('请输入分类名称');
+    return;
+  }
+  taxCategoryCreating.value = true;
+  try {
+    const res = await createTaxBusinessCategory({
+      categoryCode,
+      categoryName,
+      remark: taxCategoryCreateForm.remark.trim() || undefined
+    });
+    await loadTaxBusinessCategories();
+    selectedTaxCategoryId.value = res.data;
+    taxCategoryCreateVisible.value = false;
+    ElMessage.success('税务业务分类已新增，请保存岗位配置');
+  } catch {
+    ElMessage.error('新增税务业务分类失败');
+  } finally {
+    taxCategoryCreating.value = false;
+  }
+}
+
+function isValidPayoutPassword(value: string) {
+  return /^\d{6}$/.test(value) && !/^(\d)\1{5}$/.test(value);
+}
+
+async function refreshPayoutCaptcha() {
+  payoutCaptcha.loading = true;
+  try {
+    const res = await getCodeImg();
+    payoutCaptcha.enabled = res.data?.captchaEnabled === undefined ? true : Boolean(res.data.captchaEnabled);
+    payoutCaptcha.uuid = res.data?.uuid || '';
+    payoutCaptcha.image = payoutCaptcha.enabled && res.data?.img ? `data:image/gif;base64,${res.data.img}` : '';
+    payoutCaptcha.code = '';
+  } catch {
+    payoutCaptcha.image = '';
+    ElMessage.error('获取图形验证码失败');
+  } finally {
+    payoutCaptcha.loading = false;
+  }
+}
+
+async function preparePayoutConfirm() {
+  if (!payoutPreview.value?.canConfirm) {
+    ElMessage.warning(payoutPreview.value?.blockingReason || '当前台账暂不满足发放条件');
+    return;
+  }
+  try {
+    const res = await getPayoutTradePasswordStatus();
+    if (!res.data?.configured) {
+      payoutPasswordSetupForm.password = '';
+      payoutPasswordSetupForm.confirmPassword = '';
+      payoutPasswordSetupVisible.value = true;
+      await refreshPayoutCaptcha();
+      return;
+    }
+    payoutPasswordVerify.value = '';
+    payoutPasswordVerifyVisible.value = true;
+    await refreshPayoutCaptcha();
+  } catch {
+    ElMessage.error('获取支付密码状态失败');
+  }
+}
+
+async function submitPayoutPasswordSetup() {
+  const password = payoutPasswordSetupForm.password;
+  const confirmPassword = payoutPasswordSetupForm.confirmPassword;
+  if (!isValidPayoutPassword(password)) {
+    ElMessage.warning('支付密码须为6位数字，且不能为相同数字重复');
+    return;
+  }
+  if (password !== confirmPassword) {
+    ElMessage.warning('两次输入的支付密码不一致');
+    return;
+  }
+  if (payoutCaptcha.enabled && (!payoutCaptcha.code || !payoutCaptcha.uuid)) {
+    ElMessage.warning('请输入图形验证码');
+    return;
+  }
+  const encryptedPassword = encrypt(password);
+  const encryptedConfirmPassword = encrypt(confirmPassword);
+  if (!encryptedPassword || !encryptedConfirmPassword) {
+    ElMessage.error('支付密码传输加密失败，请刷新页面重试');
+    return;
+  }
+  payoutPasswordSubmitting.value = true;
+  try {
+    const passwordDigest = CryptoJS.SHA256(password).toString();
+    await setupPayoutTradePassword({
+      encryptedPassword,
+      encryptedConfirmPassword,
+      passwordDigest,
+      confirmPasswordDigest: passwordDigest,
+      code: payoutCaptcha.enabled ? payoutCaptcha.code.trim() : undefined,
+      uuid: payoutCaptcha.enabled ? payoutCaptcha.uuid : undefined
+    });
+    payoutPasswordSetupVisible.value = false;
+    payoutPasswordSetupForm.password = '';
+    payoutPasswordSetupForm.confirmPassword = '';
+    payoutPasswordVerify.value = '';
+    payoutPasswordVerifyVisible.value = true;
+    await refreshPayoutCaptcha();
+    ElMessage.success('管理员支付密码设置成功');
+  } catch {
+    ElMessage.error('设置管理员支付密码失败');
+    await refreshPayoutCaptcha();
+  } finally {
+    payoutPasswordSubmitting.value = false;
+  }
+}
+
+async function submitPayoutPasswordVerify() {
+  const preview = payoutPreview.value;
+  const password = payoutPasswordVerify.value;
+  if (!preview?.previewId || !isValidPayoutPassword(password)) {
+    ElMessage.warning('请输入正确的6位支付密码');
+    return;
+  }
+  if (payoutCaptcha.enabled && (!payoutCaptcha.code || !payoutCaptcha.uuid)) {
+    ElMessage.warning('请输入图形验证码');
+    return;
+  }
+  payoutPasswordSubmitting.value = true;
+  try {
+    const verifyRes = await verifyPayoutTradePassword({
+      passwordDigest: CryptoJS.SHA256(password).toString(),
+      ledgerId: preview.ledgerId,
+      previewId: preview.previewId,
+      code: payoutCaptcha.enabled ? payoutCaptcha.code.trim() : undefined,
+      uuid: payoutCaptcha.enabled ? payoutCaptcha.uuid : undefined
+    });
+    if (!verifyRes.data?.verified || !verifyRes.data.ticket) {
+      throw new Error('支付密码验证未通过');
+    }
+    payoutPasswordVerify.value = '';
+    payoutPasswordVerifyVisible.value = false;
+    await ElMessageBox.confirm(`确认按照实发金额 ¥${formatMoney(preview.workerNetAmount)} 向该人员发起银行转账？`, '确认发放', {
+      type: 'warning',
+      confirmButtonText: '确认发放',
+      cancelButtonText: '取消'
+    });
+    await submitPayoutConfirm(verifyRes.data.ticket);
+  } catch (error: any) {
+    if (error !== 'cancel' && error?.message !== 'cancel') {
+      ElMessage.error(error?.message || '支付密码验证失败');
+      await refreshPayoutCaptcha();
+    }
+  } finally {
+    payoutPasswordSubmitting.value = false;
+  }
+}
+
+async function submitPayoutConfirm(ticket: string) {
+  const preview = payoutPreview.value;
+  if (!preview?.previewId) return;
+  payoutSubmitting.value = true;
+  try {
+    // 幂等标识仅用于防重复请求；资金金额始终由后端根据台账重新计算。
+    const idempotencyKey = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    await confirmAdminLedgerPayout({
+      ledgerId: preview.ledgerId,
+      previewId: preview.previewId,
+      ticket,
+      idempotencyKey
+    });
+    ElMessage.success('发放请求已提交');
+    payoutVisible.value = false;
+    await Promise.all([loadData(), loadStatistics()]);
+  } catch {
+    ElMessage.error('发放未执行，请根据提示核对后重试');
+    await loadPayoutPreview();
+  } finally {
+    payoutSubmitting.value = false;
+  }
+}
+
 // ===== 意向结算相关方法 =====
 async function handleSettlementIntent(row: any) {
   settlementIntentVisible.value = true;
@@ -1426,6 +1912,59 @@ onMounted(() => {
   font-size: 12px;
   line-height: 1.5;
   word-break: break-word;
+}
+
+.payout-dialog-body {
+  min-height: 180px;
+}
+
+.payout-section {
+  margin-top: 18px;
+}
+
+.payout-section-title {
+  margin-bottom: 10px;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.tax-category-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.tax-category-hint {
+  color: #909399;
+  font-size: 12px;
+}
+
+.payout-captcha-row {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+}
+
+.payout-captcha-image {
+  display: flex;
+  flex: 0 0 120px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--el-color-primary);
+  background: #fff;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.payout-captcha-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .settlement-lead-drawer {
