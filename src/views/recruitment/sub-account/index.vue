@@ -896,7 +896,7 @@
     >
       <div v-loading="paymentAccountLoading" class="payment-account-dialog">
         <el-alert
-          title="企业端仅能选择银行已确认关联成功的账户；新增或调整后通常需要短暂等待银行查询确认。"
+          title="关联结果仅表示主账号是否已和当前记账子账号关联成功，不代表银行卡本身状态；多主账号模式可同时关联多个。"
           type="info"
           :closable="false"
           show-icon
@@ -914,10 +914,14 @@
           />
         </div>
         <el-table :data="paymentAccountRows" row-key="accountId" class="payment-account-table">
-          <el-table-column label="选择" width="72" align="center">
+          <el-table-column label="关联子账号" width="118" align="center">
             <template #default="{ row }">
-              <el-checkbox
+              <el-switch
                 :model-value="paymentAccountSelectedIds.includes(String(row.accountId))"
+                inline-prompt
+                active-text="关联"
+                inactive-text="关闭"
+                :disabled="paymentAccountSubmitting"
                 @change="(checked) => togglePaymentAccount(row.accountId, Boolean(checked))"
               />
             </template>
@@ -971,11 +975,29 @@
               ><span /></el-radio>
             </template>
           </el-table-column>
-          <el-table-column label="银行状态" width="120">
+          <el-table-column label="子账号关联结果" min-width="210">
             <template #default="{ row }">
-              <el-tag :type="paymentAccountStatusType(row.syncStatus)" size="small">
-                {{ paymentAccountStatusText(row.syncStatus) }}
-              </el-tag>
+              <div class="payment-account-status-cell">
+                <el-tooltip
+                  v-if="row.syncMessage"
+                  :content="paymentAccountStatusDetail(row)"
+                  placement="top"
+                  :show-after="200"
+                >
+                  <el-tag :type="paymentAccountStatusType(row.syncStatus)" size="small">
+                    {{ paymentAccountStatusText(row.syncStatus) }}
+                  </el-tag>
+                </el-tooltip>
+                <el-tag v-else :type="paymentAccountStatusType(row.syncStatus)" size="small">
+                  {{ paymentAccountStatusText(row.syncStatus) }}
+                </el-tag>
+                <span
+                  v-if="row.syncMessage"
+                  :class="['payment-account-status-reason', { 'is-error': row.syncStatus === 'FAILED' }]"
+                >
+                  {{ paymentAccountStatusDetail(row) }}
+                </span>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -2271,9 +2293,22 @@ async function submitPaymentAccounts() {
 
 function paymentAccountStatusText(status?: string) {
   const texts: Record<string, string> = {
-    UNASSIGNED: '未分配', PENDING: '待提交', ACCEPTED: '银行确认中', UNKNOWN: '查询中', SUCCESS: '已生效', FAILED: '失败'
+    UNASSIGNED: '未关联',
+    PENDING: '待关联',
+    ACCEPTED: '关联确认中',
+    UNKNOWN: '关联结果查询中',
+    SUCCESS: '关联成功',
+    FAILED: '关联失败'
   };
   return texts[String(status || '')] || '未知';
+}
+
+// 后端只返回已脱敏的银行错误；状态旁直接给出原因，避免运营人员只能看到“关联失败”。
+function paymentAccountStatusDetail(row: SettlementPaymentAccount) {
+  const message = String(row.syncMessage || '').trim();
+  const code = String(row.syncCode || '').trim();
+  if (message && code && !message.includes(code)) return `${message}（返回码：${code}）`;
+  return message || (code ? `银行返回码：${code}` : '');
 }
 
 function paymentAccountStatusType(status?: string): 'success' | 'warning' | 'danger' | 'info' {
@@ -2797,6 +2832,26 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
 
 .payment-account-table {
   margin-top: 16px;
+}
+
+.payment-account-status-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.payment-account-status-reason {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payment-account-status-reason.is-error {
+  color: var(--el-color-danger);
 }
 
 .payment-account-name-cell {
