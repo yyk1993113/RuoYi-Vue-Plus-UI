@@ -2,6 +2,18 @@ import request from '@/utils/request';
 
 const baseUrl = '/admin/recruitment/ledger-payout';
 
+export type PayoutRecipientSubjectType = 'NATURAL_PERSON' | 'INDIVIDUAL_BUSINESS' | 'ENTERPRISE';
+export type PayoutBusinessNature = 'SERVICE' | 'GOODS' | 'TRANSPORT';
+export type PayoutLaborRemunerationMode = 'GENERAL' | 'OTHER_CONTINUOUS';
+
+export interface AdminLedgerPayoutTaxContext {
+  taxCategoryId?: string | number;
+  recipientSubjectType?: PayoutRecipientSubjectType;
+  businessNature?: PayoutBusinessNature;
+  laborRelationship?: boolean;
+  laborRemunerationMode?: PayoutLaborRemunerationMode;
+}
+
 /** 管理员端单人发放预览；金额只展示后端计算结果，确认接口不接收任何金额字段。 */
 export interface AdminLedgerPayoutPreview {
   previewId: string;
@@ -18,6 +30,15 @@ export interface AdminLedgerPayoutPreview {
   userId?: string | number;
   userName?: string;
   jobSeekerNo?: string;
+  recipientSubjectType?: PayoutRecipientSubjectType;
+  recipientSubjectTypeName?: string;
+  businessNature?: PayoutBusinessNature;
+  businessNatureName?: string;
+  laborRelationship?: boolean;
+  laborRemunerationApplicable: boolean;
+  incomeDeterminationReason?: string;
+  laborRemunerationMode?: PayoutLaborRemunerationMode;
+  laborRemunerationModeName?: string;
   taxCategoryId?: string | number;
   taxCategoryCode?: string;
   taxCategoryName?: string;
@@ -32,7 +53,7 @@ export interface AdminLedgerPayoutPreview {
   cumulativeTaxableIncome: number;
   continuousMonths: number;
   deductionAmount: number;
-  taxRate: number;
+  taxRate?: number | null;
   quickDeduction: number;
   individualTaxAmount: number;
   workerNetAmount: number;
@@ -75,15 +96,19 @@ export interface PayoutTradePasswordVerifyRequest {
   uuid?: string;
 }
 
-export function getAdminLedgerPayoutPreview(ledgerId: string | number, taxCategoryId?: string | number) {
+export function getAdminLedgerPayoutPreview(ledgerId: string | number, params?: AdminLedgerPayoutTaxContext) {
   return request.get<AdminLedgerPayoutPreview>(`${baseUrl}/${ledgerId}/preview`, {
-    params: taxCategoryId == null ? undefined : { taxCategoryId }
+    params
   });
 }
 
 export function confirmAdminLedgerPayout(data: {
   ledgerId: string | number;
   taxCategoryId: string | number;
+  recipientSubjectType: PayoutRecipientSubjectType;
+  businessNature: PayoutBusinessNature;
+  laborRelationship: boolean;
+  laborRemunerationMode: PayoutLaborRemunerationMode;
   previewId: string;
   ticket: string;
   idempotencyKey: string;

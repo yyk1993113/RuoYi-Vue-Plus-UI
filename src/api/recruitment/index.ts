@@ -283,18 +283,21 @@ export interface LedgerStatistics {
 
 export interface LedgerVO {
   ledgerId?: number | string;
-  taskId?: number;
+  taskId?: number | string;
   // 岗位ID（后端 Ledger.jobId），操作/跳转用；展示编号优先用 jobNo
-  jobId?: number;
+  jobId?: number | string;
   jobNo?: string;
+  // 岗位展示字段由台账接口补齐；历史岗位删除时后端回退到服务意向快照。
+  jobName?: string;
+  jobType?: string;
   // 投递ID（后端 Ledger.applyId），操作/跳转用；展示编号优先用 applyNo
-  applyId?: number;
+  applyId?: number | string;
   applyNo?: string;
   taskNo?: string;
   jobSeekerNo?: string;
   companyId?: number | string;
   companyName?: string;
-  userId?: number;
+  userId?: number | string;
   userName?: string;
   // 台账编号（订单号），台账列表「台账编号」列用此字段
   orderNo?: string;
@@ -308,6 +311,12 @@ export interface LedgerVO {
   // 结算可追溯字段（运营标记已结算时回填）
   settleTime?: string;
   settleRemark?: string;
+  settlementIntentId?: number | string;
+  settlementIntentType?: string;
+  settlementNeedFollowUp?: string;
+  settlementFollowStatus?: string;
+  settlementFollowRemark?: string;
+  settlementCreateTime?: string;
 }
 
 // ========== 发票相关 ==========
@@ -1372,7 +1381,7 @@ export function getJob(jobId: number) {
 
 // 岗位完整字段详情（运营台审核用，含类目/学历/招聘人数/期望到岗时间/兼职工作时间/福利/团队介绍/附加条件）。
 // 对应后端 AdminJobDetailController.getJobFullDetail → GET /admin/recruitment/jobDetail/{jobId}，返回 R<JobFullVO>（数据走 res.data）。
-export function getJobFullDetail(jobId: number) {
+export function getJobFullDetail(jobId: number | string) {
   return request.get<JobFullVO>(`${baseUrl}/jobDetail/${jobId}`);
 }
 
