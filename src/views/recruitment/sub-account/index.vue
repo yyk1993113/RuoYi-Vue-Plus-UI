@@ -889,7 +889,7 @@
     <el-dialog
       v-model="paymentAccountVisible"
       :title="`${paymentAccountTarget?.companyName || ''} · 主账号设置`"
-      width="1000px"
+      width="min(1360px, 94vw)"
       append-to-body
       destroy-on-close
       @closed="clearPaymentAccountSensitiveValues"
