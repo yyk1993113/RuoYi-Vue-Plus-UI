@@ -1,5 +1,10 @@
 <template>
   <div class="p-2">
+    <el-card shadow="hover" class="mb-[10px] role-segment-card">
+      <el-tabs v-model="activeRoleSegment" class="role-segment-tabs" @tab-change="handleRoleSegmentChange">
+        <el-tab-pane v-for="segment in roleSegments" :key="segment.value" :label="segment.label" :name="segment.value" />
+      </el-tabs>
+    </el-card>
     <transition :enter-active-class="proxy?.animate.searchAnimate.enter" :leave-active-class="proxy?.animate.searchAnimate.leave">
       <div v-show="showSearch" class="mb-[10px]">
         <el-card shadow="hover">
@@ -49,21 +54,45 @@
             <el-button v-hasPermi="['system:role:remove']" type="danger" plain :disabled="ids.length === 0" @click="handleDelete()">删除</el-button>
           </el-col>
           <el-col :span="1.5">
+            <el-button v-hasPermi="['system:role:edit']" type="primary" plain :disabled="multiple" @click="handleBatchCategoryCode">
+              批量设置类别编码
+            </el-button>
+          </el-col>
+          <el-col :span="1.5">
             <el-button v-hasPermi="['system:role:export']" type="warning" plain icon="Download" @click="handleExport">导出</el-button>
           </el-col>
           <right-toolbar v-model:show-search="showSearch" @query-table="getList"></right-toolbar>
         </el-row>
       </template>
 
+      <div class="role-segment-summary mb-[10px]">
+        <el-alert :title="activeRoleSegmentMeta.desc" type="info" :closable="false" show-icon />
+      </div>
+
       <el-table ref="roleTableRef" border v-loading="loading" :data="roleList" @selection-change="handleSelectionChange">
-        <el-table-column type="selection" width="55" align="center" />
+        <el-table-column type="selection" width="55" align="center" :selectable="isSelectableRole" />
         <el-table-column v-if="false" label="角色编号" prop="roleId" width="120" />
-        <el-table-column label="角色名称" prop="roleName" :show-overflow-tooltip="true" width="150" />
+        <el-table-column label="角色名称" prop="roleName" :show-overflow-tooltip="true" width="170">
+          <template #default="scope">
+            <span>{{ scope.row.roleName }}</span>
+            <el-tag v-if="scope.row.templateMissing" type="warning" size="small" class="ml-1">未配置</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="权限字符" prop="roleKey" :show-overflow-tooltip="true" width="200" />
+        <el-table-column label="类别编码" prop="categoryCode" align="center" width="120">
+          <template #default="scope">
+            <el-tag v-if="scope.row.categoryCode" type="primary" size="small">
+              {{ promoterPostCategoryLabel(scope.row.categoryCode) }}
+            </el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="角色定位" prop="roleDesc" :show-overflow-tooltip="true" min-width="220" />
         <el-table-column label="显示顺序" prop="roleSort" width="100" />
         <el-table-column label="状态" align="center" width="100">
           <template #default="scope">
-            <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
+            <el-tag v-if="scope.row.templateMissing" type="warning" size="small">待创建</el-tag>
+            <el-switch v-else v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
           </template>
         </el-table-column>
         <el-table-column label="创建时间" align="center" prop="createTime">
@@ -74,17 +103,44 @@
 
         <el-table-column fixed="right" label="操作" width="180">
           <template #default="scope">
-            <el-tooltip v-if="scope.row.roleId !== 1" content="修改" placement="top">
-              <el-button v-hasPermi="['system:role:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
+            <el-tooltip v-if="scope.row.templateMissing" content="按该模板新增角色" placement="top">
+              <el-button v-hasPermi="['system:role:add']" link type="primary" icon="Plus" @click="handleAddTemplate(scope.row)">去新增</el-button>
             </el-tooltip>
-            <el-tooltip v-if="scope.row.roleId !== 1" content="删除" placement="top">
-              <el-button v-hasPermi="['system:role:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
+            <el-tooltip v-if="scope.row.roleId !== 1 && !scope.row.templateMissing" content="修改" placement="top">
+              <el-button
+                v-hasPermi="['system:role:edit']"
+                link
+                type="primary"
+                icon="Edit"
+                @click="handleUpdate(scope.row)"
+              ></el-button>
             </el-tooltip>
-            <el-tooltip v-if="scope.row.roleId !== 1" content="数据权限" placement="top">
-              <el-button v-hasPermi="['system:role:edit']" link type="primary" icon="CircleCheck" @click="handleDataScope(scope.row)"></el-button>
+            <el-tooltip v-if="scope.row.roleId !== 1 && !scope.row.templateMissing" content="删除" placement="top">
+              <el-button
+                v-hasPermi="['system:role:remove']"
+                link
+                type="primary"
+                icon="Delete"
+                @click="handleDelete(scope.row)"
+              ></el-button>
             </el-tooltip>
-            <el-tooltip v-if="scope.row.roleId !== 1" content="分配用户" placement="top">
-              <el-button v-hasPermi="['system:role:edit']" link type="primary" icon="User" @click="handleAuthUser(scope.row)"></el-button>
+            <el-tooltip v-if="scope.row.roleId !== 1 && !scope.row.templateMissing" content="数据权限" placement="top">
+              <el-button
+                v-hasPermi="['system:role:edit']"
+                link
+                type="primary"
+                icon="CircleCheck"
+                @click="handleDataScope(scope.row)"
+              ></el-button>
+            </el-tooltip>
+            <el-tooltip v-if="scope.row.roleId !== 1 && !scope.row.templateMissing" content="分配用户" placement="top">
+              <el-button
+                v-hasPermi="['system:role:edit']"
+                link
+                type="primary"
+                icon="User"
+                @click="handleAuthUser(scope.row)"
+              ></el-button>
             </el-tooltip>
           </template>
         </el-table-column>
@@ -98,6 +154,25 @@
         @pagination="getList"
       />
     </el-card>
+
+    <el-dialog v-model="batchCategoryCodeDialog.visible" title="批量设置类别编码" width="420px" append-to-body>
+      <el-form label-width="90px">
+        <el-form-item label="已选角色">
+          <span>{{ ids.length }} 个</span>
+        </el-form-item>
+        <el-form-item label="类别编码" required>
+          <el-select v-model="batchCategoryCodeForm.categoryCode" placeholder="请选择类别编码" class="w-full">
+            <el-option v-for="item in promoterPostCategoryOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="batchCategoryCodeDialog.visible = false">取 消</el-button>
+          <el-button type="primary" :loading="batchCategoryCodeSubmitting" @click="submitBatchCategoryCode">确 定</el-button>
+        </div>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="dialog.visible" :title="dialog.title" width="500px" append-to-body>
       <el-form ref="roleFormRef" :model="form" :rules="rules" label-width="100px">
@@ -192,16 +267,25 @@
 </template>
 
 <script setup name="Role" lang="ts">
-import { addRole, changeRoleStatus, dataScope, delRole, getRole, listRole, updateRole, deptTreeSelect } from '@/api/system/role';
+import { addRole, batchUpdateRoleCategoryCode, changeRoleStatus, dataScope, delRole, getRole, listRole, updateRole, deptTreeSelect } from '@/api/system/role';
 import { roleMenuTreeselect, treeselect as menuTreeselect } from '@/api/system/menu/index';
 import { RoleVO, RoleForm, RoleQuery, DeptTreeOption } from '@/api/system/role/types';
 import { MenuTreeOption, RoleMenuTree } from '@/api/system/menu/types';
+import { promoterPostCategoryLabel, promoterPostCategoryOptions, type PromoterPostCategoryCode } from '@/constants/promoterPostCategory';
 
 const router = useRouter();
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 const { sys_normal_disable } = toRefs<any>(proxy?.useDict('sys_normal_disable'));
 
-const roleList = ref<RoleVO[]>();
+type RoleSegment = 'admin' | 'business' | 'jobSeeker';
+type RoleDisplayRow = RoleVO & {
+  roleSegment?: RoleSegment;
+  roleDesc?: string;
+  templateMissing?: boolean;
+};
+
+const roleList = ref<RoleDisplayRow[]>();
+const allRoleList = ref<RoleDisplayRow[]>([]);
 const loading = ref(true);
 const showSearch = ref(true);
 const ids = ref<Array<string | number>>([]);
@@ -216,6 +300,56 @@ const deptExpand = ref(true);
 const deptNodeAll = ref(false);
 const deptOptions = ref<DeptTreeOption[]>([]);
 const openDataScope = ref(false);
+const batchCategoryCodeSubmitting = ref(false);
+const batchCategoryCodeDialog = reactive({ visible: false });
+const batchCategoryCodeForm = reactive<{ categoryCode: PromoterPostCategoryCode | '' }>({ categoryCode: '' });
+const COMPANY_RECRUITER_ROLE_KEY = 'B';
+const GENERAL_MANAGER_ROLE_NAME = '总经理';
+const GENERAL_MANAGER_ROLE_KEY = 'general_manager';
+
+const roleSegments: Array<{ value: RoleSegment; label: string; desc: string }> = [
+  {
+    value: 'admin',
+    label: '管理端角色',
+    desc: '平台内部运营后台角色，用于超管、运营、客服、审核、推广、开发等内部账号授权。'
+  },
+  {
+    value: 'business',
+    label: 'B端角色',
+    desc: '企业端组织内角色模板，用于入驻企业内部的企业超管、总经理、HR主管、招聘专员权限分层。'
+  },
+  {
+    value: 'jobSeeker',
+    label: 'C端角色',
+    desc: '求职者侧标签型角色，用于普通求职者、VIP、应届生等人群运营分层。'
+  }
+];
+const activeRoleSegment = ref<RoleSegment>('admin');
+const activeRoleSegmentMeta = computed(() => roleSegments.find((item) => item.value === activeRoleSegment.value) || roleSegments[0]);
+
+const roleSegmentTemplates: Record<RoleSegment, Array<{ roleName: string; roleKey: string; roleSort: number; roleDesc: string; matchKeys: string[] }>> = {
+  admin: [
+    { roleName: '超级管理员', roleKey: 'superadmin', roleSort: 1, roleDesc: '平台最高权限，负责系统配置、角色授权和全局数据管理。', matchKeys: ['superadmin', 'admin'] },
+    { roleName: '运营主管', roleKey: 'operations_manager', roleSort: 2, roleDesc: '管理运营团队和关键业务数据，负责跨模块运营决策。', matchKeys: ['operations_manager', 'operation_manager', 'operator_manager'] },
+    { roleName: '普通运营', roleKey: 'operator', roleSort: 3, roleDesc: '处理日常企业、岗位、投递、求职者运营工作。', matchKeys: ['operator'] },
+    { roleName: '客服', roleKey: 'customer_service', roleSort: 4, roleDesc: '负责企业和求职者咨询、投诉和售后处理。', matchKeys: ['customer_service', 'service'] },
+    { roleName: '审核员', roleKey: 'auditor', roleSort: 5, roleDesc: '负责企业资质、岗位内容、风险内容审核。', matchKeys: ['auditor', 'audit'] },
+    { roleName: '内部推广人员', roleKey: 'internal_promoter', roleSort: 6, roleDesc: '负责渠道推广、企业/求职者归因跟进。', matchKeys: ['internal_promoter', 'promoter'] },
+    { roleName: '开发人员', roleKey: 'developer', roleSort: 7, roleDesc: '用于开发调试、技术运维和问题排查授权。', matchKeys: ['developer', 'dev'] }
+  ],
+  business: [
+    { roleName: '企业超管', roleKey: 'B', roleSort: 1, roleDesc: '企业端最高权限，负责企业资料、成员、岗位、投递和套餐管理。', matchKeys: ['B', 'company_admin', 'enterprise_admin'] },
+    { roleName: '总经理', roleKey: 'general_manager', roleSort: 2, roleDesc: '查看企业招聘全局数据和关键岗位/投递效果。', matchKeys: ['general_manager'] },
+    { roleName: 'HR主管', roleKey: 'hr_manager', roleSort: 3, roleDesc: '管理招聘团队、岗位发布、简历筛选和面试流程。', matchKeys: ['hr_manager', 'hr_leader'] },
+    { roleName: '招聘专员', roleKey: 'recruiter', roleSort: 4, roleDesc: '负责岗位维护、候选人沟通、面试邀约等执行动作。', matchKeys: ['recruiter', 'hr_specialist'] }
+  ],
+  jobSeeker: [
+    { roleName: '普通求职者', roleKey: 'C', roleSort: 1, roleDesc: '小程序注册求职者基础身份，可浏览岗位并投递简历。', matchKeys: ['C', 'job_seeker', 'jobseeker'] },
+    { roleName: 'VIP', roleKey: 'vip_job_seeker', roleSort: 2, roleDesc: '购买会员或权益包的求职者，用于优先匹配和重点维护。', matchKeys: ['vip_job_seeker', 'vip'] },
+    { roleName: '应届生', roleKey: 'graduate_job_seeker', roleSort: 3, roleDesc: '应届毕业生标签角色，用于校园招聘、实习岗位等运营分层。', matchKeys: ['graduate_job_seeker', 'graduate'] },
+    { roleName: '高意向求职者', roleKey: 'high_intent_job_seeker', roleSort: 4, roleDesc: '投递和面试活跃度较高的人群，用于高薪岗位推荐和专属运营。', matchKeys: ['high_intent_job_seeker', 'high_intent'] }
+  ]
+};
 
 /** 数据范围选项*/
 const dataScopeOptions = ref([
@@ -274,12 +408,97 @@ const dialog = reactive<DialogOption>({
  */
 const getList = () => {
   loading.value = true;
-  listRole(proxy?.addDateRange(queryParams.value, dateRange.value)).then((res) => {
-    roleList.value = res.rows;
-    total.value = res.total;
+  const pageNum = queryParams.value.pageNum || 1;
+  const pageSize = queryParams.value.pageSize || 10;
+  const query = proxy?.addDateRange({ ...queryParams.value, pageNum: 1, pageSize: 10000 }, dateRange.value);
+  listRole(query).then((res) => {
+    allRoleList.value = (res.rows || []).map((row) => enrichRoleRow(row));
+    const segmentedRows = buildSegmentRoleRows(activeRoleSegment.value, allRoleList.value);
+    total.value = segmentedRows.length;
+    roleList.value = segmentedRows.slice((pageNum - 1) * pageSize, pageNum * pageSize);
     loading.value = false;
   });
 };
+
+const normalizeRoleKey = (value?: string) => String(value || '').trim().toLowerCase();
+
+const findRoleTemplate = (row: RoleVO, segment?: RoleSegment) => {
+  const groups = segment ? [segment] : (Object.keys(roleSegmentTemplates) as RoleSegment[]);
+  const rowKey = normalizeRoleKey(row.roleKey);
+  const rowName = String(row.roleName || '').trim();
+  for (const group of groups) {
+    const template = roleSegmentTemplates[group].find(
+      (item) => item.matchKeys.map((key) => normalizeRoleKey(key)).includes(rowKey) || item.roleName === rowName
+    );
+    if (template) return { group, template };
+  }
+  return undefined;
+};
+
+const inferRoleSegment = (row: RoleVO): RoleSegment => {
+  const matched = findRoleTemplate(row);
+  return matched?.group || 'admin';
+};
+
+const enrichRoleRow = (row: RoleVO): RoleDisplayRow => {
+  const roleSegment = inferRoleSegment(row);
+  const matched = findRoleTemplate(row, roleSegment);
+  return {
+    ...row,
+    roleSegment,
+    roleDesc: matched?.template.roleDesc || '未命中预置模板，按管理端自定义角色展示。'
+  };
+};
+
+const buildMissingRoleTemplate = (template: (typeof roleSegmentTemplates)[RoleSegment][number], segment: RoleSegment): RoleDisplayRow => ({
+  roleId: `template-${segment}-${template.roleKey}`,
+  roleName: template.roleName,
+  roleKey: template.roleKey,
+  roleSort: template.roleSort,
+  dataScope: '1',
+  menuCheckStrictly: true,
+  deptCheckStrictly: true,
+  status: '1',
+  delFlag: '0',
+  flag: false,
+  admin: false,
+  createTime: '',
+  roleSegment: segment,
+  roleDesc: template.roleDesc,
+  templateMissing: true
+});
+
+const buildSegmentRoleRows = (segment: RoleSegment, rows: RoleDisplayRow[]) => {
+  const segmentRows = rows.filter((row) => row.roleSegment === segment && !row.templateMissing);
+  if (segment === 'admin') {
+    return segmentRows.sort((a, b) => Number(a.roleSort || 0) - Number(b.roleSort || 0));
+  }
+  const templateRows = roleSegmentTemplates[segment].map((template) => {
+    const matched = segmentRows.find((row) => findRoleTemplate(row, segment)?.template.roleKey === template.roleKey);
+    return matched || buildMissingRoleTemplate(template, segment);
+  });
+  const customRows = segmentRows.filter((row) => !roleSegmentTemplates[segment].some((template) => template.roleKey === findRoleTemplate(row, segment)?.template.roleKey));
+  return [...templateRows, ...customRows].filter(matchesCurrentRoleQuery).sort((a, b) => Number(a.roleSort || 0) - Number(b.roleSort || 0));
+};
+
+const matchesCurrentRoleQuery = (row: RoleDisplayRow) => {
+  const roleName = queryParams.value.roleName?.trim();
+  const roleKey = queryParams.value.roleKey?.trim();
+  const status = queryParams.value.status;
+  if (roleName && !String(row.roleName || '').includes(roleName)) return false;
+  if (roleKey && !String(row.roleKey || '').includes(roleKey)) return false;
+  if (status && row.status !== status) return false;
+  if ((dateRange.value[0] || dateRange.value[1]) && row.templateMissing) return false;
+  return true;
+};
+
+const handleRoleSegmentChange = (value: string | number) => {
+  activeRoleSegment.value = value as RoleSegment;
+  queryParams.value.pageNum = 1;
+  getList();
+};
+
+const isSelectableRole = (row: RoleDisplayRow) => !row.templateMissing && Number(row.roleId) !== 1;
 
 /**
  * 搜索按钮操作
@@ -315,10 +534,37 @@ const handleExport = () => {
   );
 };
 /** 多选框选中数据 */
-const handleSelectionChange = (selection: RoleVO[]) => {
+const handleSelectionChange = (selection: RoleDisplayRow[]) => {
   ids.value = selection.map((item: RoleVO) => item.roleId);
   single.value = selection.length != 1;
   multiple.value = !selection.length;
+};
+
+/** 打开批量类别编码弹窗，复用岗位类别编码选项。 */
+const handleBatchCategoryCode = () => {
+  if (!ids.value.length) return;
+  batchCategoryCodeForm.categoryCode = '';
+  batchCategoryCodeDialog.visible = true;
+};
+
+/** 提交批量类别编码，成功后刷新当前角色分组列表。 */
+const submitBatchCategoryCode = async () => {
+  if (!batchCategoryCodeForm.categoryCode) {
+    proxy?.$modal.msgWarning('请选择类别编码');
+    return;
+  }
+  batchCategoryCodeSubmitting.value = true;
+  try {
+    await batchUpdateRoleCategoryCode(ids.value, batchCategoryCodeForm.categoryCode);
+    proxy?.$modal.msgSuccess('批量设置类别编码成功');
+    batchCategoryCodeDialog.visible = false;
+    ids.value = [];
+    single.value = true;
+    multiple.value = true;
+    getList();
+  } finally {
+    batchCategoryCodeSubmitting.value = false;
+  }
 };
 
 /** 角色状态修改 */
@@ -335,7 +581,7 @@ const handleStatusChange = async (row: RoleVO) => {
 
 /** 分配用户 */
 const handleAuthUser = (row: RoleVO) => {
-  router.push('/system/role-auth/user/' + row.roleId);
+  router.push('/organization/role-auth/user/' + row.roleId);
 };
 
 /** 查询菜单树结构 */
@@ -372,6 +618,18 @@ const handleAdd = () => {
   dialog.visible = true;
   dialog.title = '添加角色';
 };
+
+const handleAddTemplate = (row: RoleDisplayRow) => {
+  reset();
+  getMenuTreeselect();
+  form.value.roleName = row.roleName;
+  form.value.roleKey = row.roleKey;
+  form.value.roleSort = Number(row.roleSort || 1);
+  form.value.remark = row.roleDesc || '';
+  dialog.visible = true;
+  dialog.title = `添加${activeRoleSegmentMeta.value.label}`;
+};
+
 /** 修改角色 */
 const handleUpdate = async (row?: RoleVO) => {
   reset();
@@ -446,10 +704,18 @@ const getMenuAllCheckedKeys = (): any => {
   }
   return checkedKeys;
 };
+const normalizeRecruitmentRoleKey = () => {
+  const roleName = form.value.roleName?.trim() || '';
+  const roleKey = form.value.roleKey?.trim() || '';
+  form.value.roleName = roleName;
+  // B 是企业端招聘者身份角色；企业内“总经理”用 general_manager，避免 sys_role.role_key 全局冲突。
+  form.value.roleKey = roleName === GENERAL_MANAGER_ROLE_NAME && roleKey.toUpperCase() === COMPANY_RECRUITER_ROLE_KEY ? GENERAL_MANAGER_ROLE_KEY : roleKey;
+};
 /** 提交按钮 */
 const submitForm = () => {
   roleFormRef.value?.validate(async (valid: boolean) => {
     if (valid) {
+      normalizeRecruitmentRoleKey();
       form.value.menuIds = getMenuAllCheckedKeys();
       form.value.roleId ? await updateRole(form.value) : await addRole(form.value);
       proxy?.$modal.msgSuccess('操作成功');
@@ -501,3 +767,23 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style scoped lang="scss">
+.role-segment-card :deep(.el-card__body) {
+  padding: 0 16px;
+}
+
+.role-segment-tabs :deep(.el-tabs__header) {
+  margin: 0;
+}
+
+.role-segment-tabs :deep(.el-tabs__nav-wrap::after) {
+  height: 0;
+}
+
+.role-segment-summary {
+  display: grid;
+  gap: 8px;
+}
+
+</style>

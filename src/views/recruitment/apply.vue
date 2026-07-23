@@ -10,7 +10,7 @@
         </el-radio-group>
       </div>
       <div class="toolbar-right">
-        <el-button :icon="Refresh" circle @click="loadData" :loading="loading" />
+        <el-button :icon="Refresh" circle :loading="loading" @click="handleRefresh" />
       </div>
     </div>
 
@@ -55,22 +55,30 @@
     </el-row>
 
     <!-- ========== 搜索栏 ========== -->
-    <!--
-      数据来源说明（双模式，避免改后端）：
-      - 默认「常规检索」：岗位/求职者/企业名称等模糊条件 → GET /admin/recruitment/apply/list（带联表展示字段）。
-      - 一旦填入「投递编号 / 企业编号 / 投递时间范围」任一精确条件 → 切到
-        GET /admin/recruitment/apply2/list（原始 Apply 实体、按编号与时间区间精确过滤，不含联表名称）。
-      两套结果共用同一张表与分页；精确模式下名称列以编号兜底展示。
-    -->
+    <!-- 所有筛选统一走带联表展示字段的 apply/list，业务编号保持字符串传输，避免被误转成内部 Long ID。 -->
     <el-card shadow="hover" class="mb-4">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
-        <el-form-item label="投递编号" prop="applyId">
-          <el-input v-model="queryParams.applyId" placeholder="精确投递ID" clearable style="width: 150px" @keyup.enter="handleQuery" />
+        <el-form-item label="投递编号" prop="applyNo">
+          <el-input
+            v-model="queryParams.applyNo"
+            placeholder="精确投递编号"
+            clearable
+            style="width: 180px"
+            @input="queryParams.applyId = ''"
+            @keyup.enter="handleQuery"
+          />
         </el-form-item>
-        <el-form-item label="企业编号" prop="companyId">
-          <el-input v-model="queryParams.companyId" placeholder="精确企业ID" clearable style="width: 150px" @keyup.enter="handleQuery" />
+        <el-form-item label="企业编号" prop="companyNo">
+          <el-input
+            v-model="queryParams.companyNo"
+            placeholder="精确企业编号"
+            clearable
+            style="width: 180px"
+            @input="queryParams.companyId = ''"
+            @keyup.enter="handleQuery"
+          />
         </el-form-item>
-        <el-form-item label="投递时间" prop="dateRange">
+        <el-form-item label="投递时间">
           <el-date-picker
             v-model="dateRange"
             type="daterange"
@@ -79,7 +87,7 @@
             start-placeholder="开始日期"
             end-placeholder="结束日期"
             style="width: 240px"
-            @change="handleQuery"
+            @change="handleDateRangeChange"
           />
         </el-form-item>
         <el-form-item label="岗位名称" prop="jobName">
@@ -89,7 +97,6 @@
             clearable
             style="width: 160px"
             @keyup.enter="handleQuery"
-            :disabled="isPreciseMode"
           />
         </el-form-item>
         <el-form-item label="求职者" prop="userName">
@@ -99,7 +106,6 @@
             clearable
             style="width: 130px"
             @keyup.enter="handleQuery"
-            :disabled="isPreciseMode"
           />
         </el-form-item>
         <el-form-item label="企业" prop="companyName">
@@ -109,7 +115,6 @@
             clearable
             style="width: 130px"
             @keyup.enter="handleQuery"
-            :disabled="isPreciseMode"
           />
         </el-form-item>
         <el-form-item label="状态" prop="status">
@@ -121,7 +126,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="已读状态" prop="isRead">
-          <el-select v-model="queryParams.isRead" placeholder="全部" clearable style="width: 100px" :disabled="isPreciseMode">
+          <el-select v-model="queryParams.isRead" placeholder="全部" clearable style="width: 100px">
             <el-option label="未读" value="0" />
             <el-option label="已读" value="1" />
           </el-select>
@@ -132,11 +137,6 @@
           <el-button type="success" plain icon="Download" @click="handleExport">导出</el-button>
         </el-form-item>
       </el-form>
-      <!-- 精确模式提示：明确当前命中的是 apply2 精确检索，名称列以编号兜底 -->
-      <div v-if="isPreciseMode" class="precise-tip">
-        <el-icon><InfoFilled /></el-icon>
-        当前为「精确检索」模式（投递编号 / 企业编号 / 时间范围），结果按编号与投递时间过滤，名称列以编号兜底；名称模糊条件已暂时禁用。
-      </div>
     </el-card>
 
     <!-- ========== 数据表格 ========== -->
@@ -144,17 +144,17 @@
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column label="投递编码" prop="applyNo" width="190" align="center" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.applyNo || row.applyId || '-' }}
+            {{ row.applyNo || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="求职者信息" min-width="160">
           <template #default="{ row }">
             <div class="user-cell">
-              <el-avatar :size="34" :src="row.avatarUrl || row.avatar" style="background: #2b7fff; flex-shrink: 0">
+              <el-avatar :size="34" :src="candidateAvatarSrc(row)" style="background: #2b7fff; flex-shrink: 0">
                 {{ (row.userName || 'U').charAt(0) }}
               </el-avatar>
               <div class="user-detail">
-                <div class="name">{{ row.userName || (row.userId ? '用户#' + row.userId : '未知用户') }}</div>
+                <div class="name">{{ row.userName || '未知用户' }}</div>
                 <div class="phone">{{ displayPhone(row) }}</div>
               </div>
             </div>
@@ -163,14 +163,14 @@
         <el-table-column label="岗位信息" min-width="180">
           <template #default="{ row }">
             <div class="job-cell">
-              <div class="job-name">{{ row.jobName || (row.jobId ? '岗位#' + row.jobId : '-') }}</div>
+              <div class="job-name">{{ row.jobName || '-' }}</div>
               <div class="salary">{{ formatSalary(row.salaryMin, row.salaryMax, row.salaryUnit) }}</div>
             </div>
           </template>
         </el-table-column>
         <el-table-column label="企业" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.companyName || (row.companyId ? '企业#' + row.companyId : '-') }}
+            {{ row.companyName || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="投递时间" prop="applyTime" width="160" align="center" />
@@ -214,17 +214,17 @@
         <!-- 头部概览：求职者 + 岗位 + 当前状态 -->
         <div class="header-section">
           <div class="header-left">
-            <el-avatar :size="70" class="user-avatar">
+            <el-avatar :size="70" :src="candidateAvatarSrc(seeker)" class="user-avatar">
               {{ (seeker.realName || seeker.userName || 'U').charAt(0) }}
             </el-avatar>
             <div class="user-info">
               <div class="top">
-                <span class="name">{{ seeker.realName || seeker.nickName || seeker.userName || '用户#' + (detail.userId || '') }}</span>
+                <span class="name">{{ seeker.realName || seeker.nickName || seeker.userName || '未知用户' }}</span>
                 <el-tag v-if="seeker.education" size="small" effect="plain" class="edu-tag">{{ seeker.education }}</el-tag>
                 <el-tag v-if="seeker.isRecruitmentSilenced === '1'" size="small" type="danger" effect="dark">已禁言</el-tag>
               </div>
-              <div class="job-title">{{ job.jobName || '岗位#' + (detail.jobId || '') }}</div>
-              <div class="company-sub">{{ company.companyName || '企业#' + (detail.companyId || '') }}</div>
+              <div class="job-title">{{ job.jobName || '-' }}</div>
+              <div class="company-sub">{{ company.companyName || '-' }}</div>
             </div>
           </div>
           <div class="header-right">
@@ -269,7 +269,7 @@
                   </div>
                   <div class="grid-item">
                     <span class="label">性别 / 年龄</span>
-                    <span class="value">{{ seeker.sex || '-' }} / {{ seeker.age != null ? seeker.age : '-' }}</span>
+                    <span class="value">{{ formatSex(seeker.sex) }} / {{ seeker.age != null ? seeker.age : '-' }}</span>
                   </div>
                 </div>
 
@@ -307,7 +307,6 @@
                   >
                     <div class="flow-title">{{ item.title }}</div>
                     <div v-if="item.content" class="flow-content">{{ item.content }}</div>
-                    <el-tag size="small" effect="plain" class="flow-source">{{ item.source === 'apply' ? '系统' : '通知' }}</el-tag>
                   </el-timeline-item>
                 </el-timeline>
                 <el-empty v-else description="暂无状态流水" :image-size="60" />
@@ -361,14 +360,6 @@
                 <div class="block-title mt-6">流转信息</div>
                 <ul class="meta-info">
                   <li>
-                    <span class="label">投递ID</span>
-                    <span class="value">#{{ detail.applyId }}</span>
-                  </li>
-                  <li>
-                    <span class="label">企业ID</span>
-                    <span class="value">#{{ detail.companyId || '-' }}</span>
-                  </li>
-                  <li>
                     <span class="label">已读状态</span>
                     <span class="value">
                       <el-tag size="small" :type="detail.isRead === '1' ? 'success' : 'warning'">
@@ -414,7 +405,7 @@
                   <div v-if="detail.fulfillment && detail.fulfillment.tasks && detail.fulfillment.tasks.length" class="task-list">
                     <div v-for="t in detail.fulfillment.tasks" :key="t.taskId" class="task-item">
                       <div class="task-head">
-                        <span>任务 #{{ t.taskId }}</span>
+                        <span>{{ t.taskNo || t.platformServiceName || '履约任务' }}</span>
                         <el-tag size="small" :type="taskTagType(t.status)">{{ t.statusName || t.status }}</el-tag>
                       </div>
                       <div class="task-meta">
@@ -447,10 +438,9 @@
 
 <script setup lang="ts">
 /**
- * 运营台·投递查询增强页
+ * 运营台·投递管理页
  * 数据来源：
- *  - 列表（常规模糊）：GET /admin/recruitment/apply/list（listApply，带联表展示字段）。
- *  - 列表（精确）：GET /admin/recruitment/apply2/list（listApply2，投递编号/企业编号/时间区间精确过滤）。
+ *  - 列表：GET /admin/recruitment/apply/list（listApply，统一支持业务编号、名称、状态与时间组合筛选）。
  *  - 统计卡片：GET /admin/recruitment/apply/statistics（getApplyStatistics）。
  *  - 详情弹窗：GET /admin/recruitment/apply2/detail（getApply2Detail），返回状态流水/面试/交换/选用聚合 VO。
  * 副作用：详情按 applyId 拉取全景数据；导出复用既有 /apply/export。
@@ -466,23 +456,22 @@ import {
   CollectionTag,
   OfficeBuilding,
   ChatLineRound,
-  InfoFilled,
   Histogram,
   Calendar,
   Briefcase,
   Location,
   Clock
 } from '@element-plus/icons-vue';
-import { listApply, listApply2, getApplyStatistics, getApply2Detail } from '@/api/recruitment';
-import type { ApplyDetailVO } from '@/api/recruitment';
+import { listApply, getApplyStatistics, getApply2Detail } from '@/api/recruitment';
+import type { ApplyDetailVO, ApplyQuery, ApplyVO } from '@/api/recruitment';
 import { download } from '@/utils/request';
-import { unwrapList, splitToArray, formatSalary } from './helpers';
+import { unwrapList, splitToArray, formatSalary, formatSex } from './helpers';
 import { applyStatusMeta } from './constants';
 
 const route = useRoute();
 const loading = ref(false);
 const total = ref(0);
-const tableData = ref<any[]>([]);
+const tableData = ref<ApplyVO[]>([]);
 const detailVisible = ref(false);
 const detailLoading = ref(false);
 // 投递全景详情（apply2/detail 聚合 VO）
@@ -490,15 +479,16 @@ const detail = ref<ApplyDetailVO | null>(null);
 const queryFormRef = ref();
 const timeRange = ref('7');
 // 投递时间范围（el-date-picker daterange）→ 拆成 beginTime / endTime 传后端
-const dateRange = ref<[string, string] | []>([]);
+const dateRange = ref<[string, string] | [] | null>(createRecentDateRange(7));
 
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
-  // 精确条件（命中即走 apply2/list）
+  // applyId/companyId 仅供其他页面通过路由聚焦内部记录；输入框查询始终使用对外业务编号。
   applyId: '',
+  applyNo: '',
   companyId: '',
-  // 常规模糊条件（apply/list）
+  companyNo: '',
   jobName: '',
   userName: '',
   companyName: '',
@@ -515,11 +505,6 @@ const statistics = reactive({
   unreadCount: 0
 });
 
-// 是否命中精确检索模式：填了投递编号 / 企业编号 / 时间范围任一即为 true
-const isPreciseMode = computed(() => {
-  return !!(queryParams.applyId || queryParams.companyId || (dateRange.value && dateRange.value.length === 2));
-});
-
 // 详情 VO 的安全子对象访问（避免模板里到处判空）
 const seeker = computed(() => detail.value?.jobSeeker || ({} as NonNullable<ApplyDetailVO['jobSeeker']>));
 const company = computed(() => detail.value?.company || ({} as NonNullable<ApplyDetailVO['company']>));
@@ -529,33 +514,61 @@ function displayPhone(row?: { phone?: string }) {
   return row?.phone || '-';
 }
 
+function imageUrl(value?: string | number) {
+  const url = String(value || '').trim();
+  return /^(https?:\/\/|\/)/.test(url) ? url : '';
+}
+
+// 候选人头像优先使用后端签好的 URL；过滤历史数字 OSS ID，避免 Element Avatar 发起无效请求。
+function candidateAvatarSrc(row?: { resumeAvatarUrl?: string; avatarUrl?: string; avatar?: string | number }) {
+  return imageUrl(row?.resumeAvatarUrl || row?.avatarUrl || row?.avatar);
+}
+
+function formatLocalDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// “近 N 天”包含今天，开始日按 N - 1 天前计算，避免实际多查一天。
+function createRecentDateRange(days: number): [string, string] {
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(start.getDate() - (days - 1));
+  return [formatLocalDate(start), formatLocalDate(end)];
+}
+
+function buildListQuery(): ApplyQuery {
+  const [beginTime, endTime] = dateRange.value || [];
+  return {
+    pageNum: queryParams.pageNum,
+    pageSize: queryParams.pageSize,
+    applyId: queryParams.applyId || undefined,
+    applyNo: queryParams.applyNo.trim() || undefined,
+    companyId: queryParams.companyId || undefined,
+    companyNo: queryParams.companyNo.trim() || undefined,
+    jobName: queryParams.jobName.trim() || undefined,
+    userName: queryParams.userName.trim() || undefined,
+    companyName: queryParams.companyName.trim() || undefined,
+    status: queryParams.status || undefined,
+    isRead: queryParams.isRead || undefined,
+    beginTime,
+    endTime
+  };
+}
+
 async function loadData() {
   loading.value = true;
   try {
-    let res: any;
-    if (isPreciseMode.value) {
-      // 精确模式：apply2/list（原始实体，按编号 + 时间区间过滤）
-      const params: any = {
-        pageNum: queryParams.pageNum,
-        pageSize: queryParams.pageSize,
-        status: queryParams.status || undefined,
-        applyId: queryParams.applyId ? Number(queryParams.applyId) : undefined,
-        companyId: queryParams.companyId ? Number(queryParams.companyId) : undefined
-      };
-      if (dateRange.value && dateRange.value.length === 2) {
-        params.beginTime = dateRange.value[0];
-        params.endTime = dateRange.value[1];
-      }
-      res = await listApply2(params);
-    } else {
-      // 常规模式：apply/list（带联表展示字段）
-      res = await listApply(queryParams as any);
-    }
-    const list = unwrapList(res);
+    const res = await listApply(buildListQuery());
+    const list = unwrapList<ApplyVO>(res);
     tableData.value = list.rows;
     total.value = list.total;
-  } catch (error) {
-    console.error('加载数据失败:', error);
+  } catch {
+    // 请求拦截器负责提示错误；这里清空旧结果，避免用户误把上一次数据当成当前筛选结果。
+    tableData.value = [];
+    total.value = 0;
   } finally {
     loading.value = false;
   }
@@ -565,8 +578,8 @@ async function loadStatistics() {
   try {
     const res = await getApplyStatistics();
     Object.assign(statistics, res.data || {});
-  } catch (error) {
-    console.error('加载统计失败:', error);
+  } catch {
+    // 统计卡片保留上一次成功值；统一请求拦截器负责展示错误信息。
   }
 }
 
@@ -577,10 +590,13 @@ function handleQuery() {
 
 function resetQuery() {
   queryFormRef.value?.resetFields();
-  dateRange.value = [];
+  timeRange.value = '7';
+  dateRange.value = createRecentDateRange(7);
   queryParams.pageNum = 1;
   queryParams.applyId = '';
+  queryParams.applyNo = '';
   queryParams.companyId = '';
+  queryParams.companyNo = '';
   queryParams.jobName = '';
   queryParams.userName = '';
   queryParams.companyName = '';
@@ -589,20 +605,37 @@ function resetQuery() {
   loadData();
 }
 
-function handleTimeRangeChange() {
+function handleTimeRangeChange(value: string | number | boolean | undefined) {
+  const days = Number(value);
+  if (!Number.isFinite(days) || days <= 0) return;
+  dateRange.value = createRecentDateRange(days);
   queryParams.pageNum = 1;
   loadData();
 }
 
+function handleDateRangeChange() {
+  // 手动日期不再冒充预设区间；清空单选高亮但保留用户选中的日期。
+  timeRange.value = '';
+  handleQuery();
+}
+
+function handleRefresh() {
+  return Promise.all([loadData(), loadStatistics()]);
+}
+
 // 拉取单条投递全景详情（apply2/detail）
-async function handleDetail(row: any) {
+async function handleDetail(row: ApplyVO) {
+  if (!row.applyId) {
+    ElMessage.warning('当前记录缺少投递ID，无法查看详情');
+    return;
+  }
   detail.value = null;
   detailVisible.value = true;
   detailLoading.value = true;
   try {
     const res = await getApply2Detail(row.applyId);
     detail.value = res.data || null;
-  } catch (error) {
+  } catch {
     ElMessage.error('获取投递详情失败');
     detailVisible.value = false;
   } finally {
@@ -613,20 +646,45 @@ async function handleDetail(row: any) {
 async function applyRouteFocus() {
   const qApplyId = route.query.applyId;
   if (typeof qApplyId === 'string' && qApplyId) {
-    queryParams.applyId = qApplyId;
-    await handleDetail({ applyId: qApplyId });
+    if (/^\d+$/.test(qApplyId)) {
+      queryParams.applyId = qApplyId;
+      await handleDetail({ applyId: Number(qApplyId) });
+    } else {
+      // 兼容历史链接误把业务投递编号放在 applyId 查询参数中的情况。
+      queryParams.applyNo = qApplyId;
+    }
+  }
+  const qApplyNo = route.query.applyNo;
+  if (typeof qApplyNo === 'string' && qApplyNo) {
+    queryParams.applyNo = qApplyNo;
+  }
+  const qCompanyId = route.query.companyId;
+  if (typeof qCompanyId === 'string' && qCompanyId) {
+    queryParams.companyId = qCompanyId;
+  }
+  const qCompanyName = route.query.companyName;
+  if (typeof qCompanyName === 'string' && qCompanyName) {
+    queryParams.companyName = qCompanyName;
+  }
+  const qUserName = route.query.userName;
+  if (typeof qUserName === 'string' && qUserName) {
+    queryParams.userName = qUserName;
+  }
+  const qStatus = route.query.status;
+  if (typeof qStatus === 'string' && qStatus) {
+    queryParams.status = qStatus;
   }
 }
 
-onMounted(() => {
-  applyRouteFocus();
-  loadData();
-  loadStatistics();
+onMounted(async () => {
+  // 先应用跨页路由筛选，再发列表请求，避免初始请求与路由参数写入并发导致结果闪回。
+  await applyRouteFocus();
+  await Promise.all([loadData(), loadStatistics()]);
 });
 
 function handleExport() {
   // 导出复用既有常规导出端点（精确条件未覆盖时按当前模糊条件导出）
-  download('/admin/recruitment/apply/export', queryParams, `投递记录_${new Date().getTime()}.xlsx`);
+  download('/admin/recruitment/apply/export', buildListQuery(), `投递记录_${new Date().getTime()}.xlsx`);
 }
 
 // 状态流水节点 → 时间轴圆点配色
@@ -715,19 +773,6 @@ function handlePrint() {
 
 .ml-auto {
   margin-left: auto;
-}
-
-/* 精确模式提示条 */
-.precise-tip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  padding: 8px 12px;
-  font-size: 12px;
-  color: #2b7fff;
-  background: #eef5ff;
-  border-radius: 6px;
 }
 
 /* 统计卡片 */
@@ -1019,10 +1064,6 @@ function handlePrint() {
   color: #606266;
   margin-top: 2px;
 }
-.flow-source {
-  margin-top: 4px;
-}
-
 /* 面试记录 / 通用记录列表 */
 .record-list {
   display: flex;

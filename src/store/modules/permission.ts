@@ -10,11 +10,16 @@ import ParentView from '@/components/ParentView/index.vue';
 import InnerLink from '@/layout/components/InnerLink/index.vue';
 import { defineComponent, h, ref } from 'vue';
 import { createCustomNameComponent } from '@/utils/createCustomNameComponent';
+import { hasOperationsManagerRole } from '@/utils/role';
 import { ElNotification } from 'element-plus/es';
 
 // 匹配views里面所有的.vue文件
 const modules = import.meta.glob('./../../views/**/*.vue');
-const isAdminRole = () => useUserStore().roles.some((role) => ['superadmin', 'admin'].includes(role));
+// 运营主管需要保留平台首页；其他非管理角色仍落到其首个获授权业务页面。
+const canViewPlatformHome = () => {
+  const { roles } = useUserStore();
+  return roles.some((role) => ['superadmin', 'admin'].includes(role)) || hasOperationsManagerRole(roles);
+};
 const filterNonAdminConstantRoutes = (source: RouteRecordRaw[]): RouteRecordRaw[] => {
   return source.reduce<RouteRecordRaw[]>((result, route) => {
     if (route.path === '/index' || route.name === 'Index') {
@@ -31,7 +36,7 @@ const filterNonAdminConstantRoutes = (source: RouteRecordRaw[]): RouteRecordRaw[
     return result;
   }, []);
 };
-const getVisibleConstantRoutes = () => (isAdminRole() ? constantRoutes : filterNonAdminConstantRoutes(constantRoutes));
+const getVisibleConstantRoutes = () => (canViewPlatformHome() ? constantRoutes : filterNonAdminConstantRoutes(constantRoutes));
 
 export const usePermissionStore = defineStore('permission', () => {
   const routes = ref<RouteRecordRaw[]>([]);

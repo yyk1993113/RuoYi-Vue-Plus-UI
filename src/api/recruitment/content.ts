@@ -2,8 +2,8 @@ import request from '@/utils/request';
 
 // ========== 运营台·内容配置（首页内容位） ==========
 // 对接后端 AdminContentController（基路径 /admin/content，@SaCheckRole(superadmin/operator)，仅运营角色）。
-// 含六类首页内容位：轮播图 banner / 金刚区 kingkong / 平台公告 notice / 技能课程 course / 求职干货 article / 求职服务 jobService。
-// 六类接口风格完全一致：list(GET 分页) / get(GET 详情) / add(POST) / update(PUT) / del(DELETE 批量) / changeStatus(POST 切上下架/显隐)。
+// 含七类首页内容位：轮播图 banner / 金刚区 kingkong / 平台公告 notice / 线下招聘会 fair / 技能课程 course / 求职干货 article / 求职服务 jobService。
+// 七类接口风格完全一致：list(GET 分页) / get(GET 详情) / add(POST) / update(PUT) / del(DELETE 批量) / changeStatus(POST 切上下架/显隐)。
 //
 // 说明：本模块刻意与同目录 index.ts 分文件维护——
 //   1) index.ts 正由其它运营台任务并行扩写，分文件可规避写冲突；
@@ -58,16 +58,43 @@ export interface HomeNoticeVO {
   remark?: string;
 }
 
+// 线下招聘会 rec_fair_event
+export interface FairEventVO {
+  fairId?: number;
+  title?: string; // 招聘会标题
+  posterUrl?: string; // 海报图片URL
+  startTime?: string; // 开始时间
+  endTime?: string; // 结束时间
+  venue?: string; // 举办场馆
+  address?: string; // 详细地址
+  summary?: string; // 活动摘要
+  content?: string; // 活动详情
+  sort?: number;
+  status?: string; // 状态 0:下架 1:上架
+  createTime?: string;
+  remark?: string;
+}
+
 // 技能课程 rec_course
 export interface CourseVO {
   courseId?: number;
   title?: string; // 标题
   coverUrl?: string; // 封面图URL
+  coverOssId?: string | number; // 封面图OSS ID
+  summary?: string; // 课程摘要
   tags?: string; // 标签（多个用逗号分隔）
   lessonCount?: number; // 节数
   studyCount?: number; // 学习人数
   price?: number; // 价格（元，0 表示免费）
   content?: string; // 课程内容/详情
+  videoOssId?: string | number; // 主视频OSS ID
+  videoUrl?: string; // 主视频播放URL
+  videoDuration?: number; // 视频时长（秒）
+  videoSize?: number; // 视频大小（字节）
+  videoContentType?: string; // 视频 MIME 类型
+  featured?: string; // 是否精选 0:否 1:是
+  featuredSort?: number; // 精选排序
+  viewCount?: number; // 浏览/观看次数
   sort?: number;
   status?: string; // 状态 0:下架 1:上架
   createTime?: string;
@@ -79,9 +106,13 @@ export interface ArticleVO {
   articleId?: number;
   title?: string; // 标题
   coverUrl?: string; // 封面图URL
+  coverOssId?: string | number; // 封面图OSS ID
+  summary?: string; // 文章摘要
   tags?: string; // 标签（多个用逗号分隔）
   readCount?: number; // 阅读数
   content?: string; // 正文内容
+  featured?: string; // 是否精选 0:否 1:是
+  featuredSort?: number; // 精选排序
   sort?: number;
   status?: string; // 状态 0:下架 1:上架
   createTime?: string;
@@ -193,6 +224,32 @@ export function changeHomeNoticeHomeVisible(data: { noticeId: number; homeVisibl
   return request.post(`${contentUrl}/notice/changeHomeVisible`, data);
 }
 
+// ---------- 线下招聘会 Fair ----------
+
+export function listFairEvent(query: ContentQuery) {
+  return request.get<any>(`${contentUrl}/fair/list`, { params: query });
+}
+
+export function getFairEvent(fairId: number) {
+  return request.get<any>(`${contentUrl}/fair/${fairId}`);
+}
+
+export function addFairEvent(data: FairEventVO) {
+  return request.post(`${contentUrl}/fair`, data);
+}
+
+export function updateFairEvent(data: FairEventVO) {
+  return request.put(`${contentUrl}/fair`, data);
+}
+
+export function delFairEvent(fairIds: number | number[]) {
+  return request.delete(`${contentUrl}/fair/${fairIds}`);
+}
+
+export function changeFairEventStatus(data: { fairId: number; status: string }) {
+  return request.post(`${contentUrl}/fair/changeStatus`, data);
+}
+
 // ---------- 技能课程 Course ----------
 
 export function listCourse(query: ContentQuery) {
@@ -217,6 +274,17 @@ export function delCourse(courseIds: number | number[]) {
 
 export function changeCourseStatus(data: { courseId: number; status: string }) {
   return request.post(`${contentUrl}/course/changeStatus`, data);
+}
+
+export interface ContentMediaPresignRequest {
+  mediaType: 'image' | 'video';
+  fileName: string;
+  contentType?: string;
+  fileSize: number;
+}
+
+export function presignContentMedia(data: ContentMediaPresignRequest) {
+  return request.post(`${contentUrl}/media/presign`, data);
 }
 
 // ---------- 求职干货 Article ----------

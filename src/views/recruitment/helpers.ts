@@ -45,6 +45,31 @@ export function formatDateTime(value?: string | null): string {
 }
 
 /**
+ * 将账号表与简历表的两套性别编码统一为中文，未知或异常值不直接暴露机器码。
+ * 账号口径：0男 / 1女 / 2未知；简历口径：M男 / F女。
+ */
+export function formatSex(value?: string | null): string {
+  const normalized = String(value ?? '')
+    .trim()
+    .toUpperCase();
+  return (
+    {
+      '0': '男',
+      '1': '女',
+      '2': '未知',
+      M: '男',
+      F: '女',
+      MALE: '男',
+      FEMALE: '女',
+      UNKNOWN: '未知',
+      男: '男',
+      女: '女',
+      未知: '未知'
+    } as Record<string, string>
+  )[normalized] || '-';
+}
+
+/**
  * 岗位薪资展示：只接受结构化 salaryMin / salaryMax / salaryUnit。
  */
 export function formatSalary(min?: number | string | null, max?: number | string | null, unit?: string | null): string {

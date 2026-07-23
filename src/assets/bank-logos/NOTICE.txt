@@ -1,0 +1,11 @@
+China bank logo glyph font
+Source: bank-logo-iconfont 0.0.1 (https://www.npmjs.com/package/bank-logo-iconfont)
+License: MIT
+
+Bank of Jiangsu SVG
+Source: https://companieslogo.com/bank-of-jiangsu/logo/
+The logo remains a trademark of its respective owner and is used only to identify the bank.
+
+Hengfeng Bank PNG
+Source: https://www.veryicon.com/icons/business/bank-logo-collection/hengfeng-bank-logo.html
+License stated by source: Free for personal and commercial purpose.

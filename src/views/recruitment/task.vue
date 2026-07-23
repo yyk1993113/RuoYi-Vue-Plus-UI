@@ -91,9 +91,9 @@
     <!-- ========== 数据表格（只读：仅「详情」）========== -->
     <el-card shadow="hover">
       <el-table v-loading="loading" :data="tableData" border stripe>
-        <el-table-column label="履约编码" prop="taskNo" width="190" align="center" show-overflow-tooltip>
+        <el-table-column label="履约编号" prop="taskNo" width="190" align="center" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.taskNo || row.taskId || '-' }}
+            {{ row.taskNo || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="求职者信息" min-width="150">
@@ -154,7 +154,7 @@
         <template v-if="currentTask">
           <!-- 基础信息 -->
           <el-descriptions :column="2" border>
-            <el-descriptions-item label="任务ID">{{ currentTask.taskId }}</el-descriptions-item>
+            <el-descriptions-item label="履约编号">{{ currentTask.taskNo || currentTask.taskId || '-' }}</el-descriptions-item>
             <el-descriptions-item label="状态">
               <el-tag :type="taskStatusMeta(currentTask.status).type">{{ taskStatusMeta(currentTask.status).label }}</el-tag>
             </el-descriptions-item>
@@ -240,7 +240,7 @@
               </el-descriptions-item>
               <template v-if="currentTask.ledgerId">
                 <el-descriptions-item label="台账编号">
-                  <el-button link type="primary" @click="goLedger(currentTask.orderNo)">{{ currentTask.orderNo || currentTask.ledgerId }}</el-button>
+                  <el-button link type="primary" @click="goLedger(currentTask.orderNo)">{{ currentTask.orderNo || '查看台账' }}</el-button>
                 </el-descriptions-item>
                 <el-descriptions-item label="结算状态">
                   <el-tag :type="ledgerStatusMeta(currentTask.ledgerStatus).type">{{ ledgerStatusMeta(currentTask.ledgerStatus).label }}</el-tag>

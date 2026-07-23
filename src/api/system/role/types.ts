@@ -18,6 +18,7 @@ export interface RoleVO extends BaseEntity {
   roleId: string | number;
   roleName: string;
   roleKey: string;
+  categoryCode?: string;
   roleSort: number;
   dataScope: string;
   menuCheckStrictly: boolean;
@@ -40,6 +41,7 @@ export interface RoleQuery extends PageQuery {
 export interface RoleForm {
   roleName: string;
   roleKey: string;
+  categoryCode?: string;
   roleSort: number;
   status: string;
   menuCheckStrictly: boolean;

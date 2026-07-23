@@ -8,6 +8,7 @@ import { isRelogin } from '@/utils/request';
 import { useUserStore } from '@/store/modules/user';
 import { useSettingsStore } from '@/store/modules/settings';
 import { usePermissionStore } from '@/store/modules/permission';
+import { hasOperationsManagerRole } from '@/utils/role';
 
 NProgress.configure({ showSpinner: false });
 
@@ -20,9 +21,11 @@ const isWhiteList = (path: string) => {
 // 会话失效（无效会话/会话已过期）属于预期登出，不再弹错误提示，避免登录页噪音；其余异常正常提示。
 const isInvalidSessionError = (err: unknown) => String(err).includes('无效的会话') || String(err).includes('会话已过期');
 
-// 非管理员落地首个可访问页的支撑函数（来自渠道推广分支）：
-// 管理员保留停留在首页，普通用户进入 / 或 /index 时自动落到其首个可访问业务页。
-const isAdminUser = () => useUserStore().roles.some((role) => ['superadmin', 'admin'].includes(role));
+// 超管和运营主管保留平台首页；普通角色进入 / 或 /index 时落到其首个获授权业务页。
+const canViewPlatformHome = () => {
+  const { roles } = useUserStore();
+  return roles.some((role) => ['superadmin', 'admin'].includes(role)) || hasOperationsManagerRole(roles);
+};
 
 const joinRoutePath = (parentPath: string, childPath: string) => {
   if (childPath.startsWith('/')) return childPath;
@@ -48,7 +51,7 @@ const firstAccessiblePath = (routes: any[], parentPath = ''): string => {
   return '/user/profile';
 };
 
-const shouldLeaveHome = (path: string) => !isAdminUser() && (path === '/' || path === '/index');
+const shouldLeaveHome = (path: string) => !canViewPlatformHome() && (path === '/' || path === '/index');
 
 router.beforeEach(async (to) => {
   NProgress.start();

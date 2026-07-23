@@ -82,6 +82,7 @@
               <el-cascader
                 v-model="form.regionPath"
                 :options="regionOptions"
+                :props="{ checkStrictly: true }"
                 filterable
                 clearable
                 placeholder="请选择省 / 市 / 区县"
@@ -202,6 +203,22 @@
             </div>
           </div>
         </el-form-item>
+
+        <!-- 灵活用工岗位必须保留排班口径；复制发布时由完整详情接口原样回填，避免新岗位丢失工作时间。 -->
+        <el-row v-if="isFlexibleJob" :gutter="24">
+          <el-col :span="12">
+            <el-form-item label="工作时间类型" prop="workTimeType" :required="isFlexibleJob">
+              <el-select v-model="form.workTimeType" placeholder="请选择工作时间类型" clearable style="width: 100%">
+                <el-option v-for="opt in workTimeTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="工作时间" prop="workTime" :required="isFlexibleJob">
+              <el-input v-model="form.workTime" placeholder="如：周一至周五 09:00-18:00，或每周六日全天" maxlength="200" show-word-limit />
+            </el-form-item>
+          </el-col>
+        </el-row>
 
         <!-- 模块3：岗位详情 -->
         <el-divider content-position="left">
@@ -406,6 +423,8 @@ function emptyForm() {
     experience: '',
     education: '',
     recruitNumber: undefined as number | undefined,
+    workTime: '',
+    workTimeType: '',
     description: '',
     benefits: '',
     highlights: '',
@@ -416,6 +435,15 @@ function emptyForm() {
 
 const form = reactive(emptyForm());
 const currentJobTypeLabel = computed(() => labelOf(jobTypeOptions, form.jobType) || '临时用工');
+// 兼职、临时工、项目制均属于灵活用工，发布时需带上工作时间类型与具体安排。
+const isFlexibleJob = computed(() => ['1', '2', '3'].includes(String(form.jobType)));
+
+const workTimeTypeOptions = [
+  { value: '0', label: '固定班次' },
+  { value: '1', label: '排班/轮班' },
+  { value: '2', label: '弹性时间' },
+  { value: '3', label: '按需/临时' }
+];
 
 // 对齐 B 端：新发布非全职岗位前采集服务意向，随 CreateJobRequest 透传给后端。
 const settlementIntentOptions = [
@@ -499,11 +527,30 @@ const rules = {
   jobName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
   jobType: [{ required: true, message: '请选择用工性质', trigger: 'change' }],
   category: [{ required: true, validator: validateStandardPosition, trigger: 'change' }],
-  regionPath: [{ required: true, type: 'array', min: 3, message: '请选择省市区', trigger: 'change' }],
+  // 兼容原岗位仅保存省或省市的部分路径，复制发布时无需补选区县。
+  regionPath: [{ required: true, type: 'array', min: 1, message: '请至少选择省份', trigger: 'change' }],
   workAddress: [{ required: true, message: '请输入工作地点', trigger: 'blur' }],
   experience: [{ required: true, message: '请选择经验要求', trigger: 'change' }],
   education: [{ required: true, message: '请选择学历要求', trigger: 'change' }],
   recruitNumber: [{ required: true, message: '请输入招聘人数', trigger: 'change' }],
+  workTimeType: [
+    {
+      validator: (_rule: any, value: any, callback: (error?: Error) => void) => {
+        if (isFlexibleJob.value && !value) callback(new Error('请选择工作时间类型'));
+        else callback();
+      },
+      trigger: 'change'
+    }
+  ],
+  workTime: [
+    {
+      validator: (_rule: any, value: any, callback: (error?: Error) => void) => {
+        if (isFlexibleJob.value && !String(value || '').trim()) callback(new Error('请描述具体工作时间'));
+        else callback();
+      },
+      trigger: 'blur'
+    }
+  ],
   description: [{ required: true, message: '请输入岗位描述', trigger: 'blur' }],
   salaryMin: [
     {
@@ -674,6 +721,10 @@ function buildPayload(status: string) {
     payload.salaryMin = form.salaryMin;
     payload.salaryMax = form.salaryMax;
   }
+  if (isFlexibleJob.value) {
+    payload.workTime = form.workTime;
+    payload.workTimeType = form.workTimeType;
+  }
   return payload;
 }
 
@@ -828,7 +879,7 @@ function restoreLocalDraft() {
     lastAutoSavedText.value = '已恢复上次未提交的草稿';
     // 恢复企业名以便选择器回显
     if (form.companyId) {
-      companyOptions.value = [{ companyId: form.companyId, companyName: saved.__companyName || `企业#${form.companyId}` }];
+      companyOptions.value = [{ companyId: form.companyId, companyName: saved.__companyName || '已选企业' }];
     }
   } catch {
     /* ignore */
@@ -852,7 +903,7 @@ async function loadCopyFrom(jobId: string) {
     const res = await getJobFullDetail(jobId as any);
     const d: any = res.data || {};
     form.companyId = d.companyId ?? undefined;
-    if (d.companyId) companyOptions.value = [{ companyId: d.companyId, companyName: d.companyName || `企业#${d.companyId}` }];
+    if (d.companyId) companyOptions.value = [{ companyId: d.companyId, companyName: d.companyName || '已选企业' }];
     form.jobName = d.jobName || d.positionName || '';
     form.jobType = d.jobType != null ? String(d.jobType) : '0';
     applyPositionSnapshot(d.positionId, d.positionName, d.categoryId, d.categoryName || d.category);
@@ -869,6 +920,8 @@ async function loadCopyFrom(jobId: string) {
     form.experience = d.experience != null ? String(d.experience) : '';
     form.education = d.education != null ? String(d.education) : '';
     form.recruitNumber = d.recruitNumber ?? undefined;
+    form.workTime = d.workTime ?? '';
+    form.workTimeType = d.workTimeType != null ? String(d.workTimeType) : '';
     form.description = d.description ?? '';
     form.benefits = d.benefits ?? '';
     form.highlights = d.highlights ?? '';

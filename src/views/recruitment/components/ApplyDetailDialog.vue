@@ -10,17 +10,17 @@
       <!-- 头部概览：求职者 + 岗位 + 当前状态 -->
       <div class="header-section">
         <div class="header-left">
-          <el-avatar :size="70" class="user-avatar">
+          <el-avatar :size="70" :src="candidateAvatarSrc(seeker)" class="user-avatar">
             {{ (seeker.realName || seeker.userName || 'U').charAt(0) }}
           </el-avatar>
           <div class="user-info">
             <div class="top">
-              <span class="name">{{ seeker.realName || seeker.nickName || seeker.userName || '用户#' + (detail.userId || '') }}</span>
+              <span class="name">{{ seeker.realName || seeker.nickName || seeker.userName || '未知用户' }}</span>
               <el-tag v-if="seeker.education" size="small" effect="plain" class="edu-tag">{{ seeker.education }}</el-tag>
               <el-tag v-if="seeker.isRecruitmentSilenced === '1'" size="small" type="danger" effect="dark">已禁言</el-tag>
             </div>
-            <div class="job-title">{{ job.jobName || '岗位#' + (detail.jobId || '') }}</div>
-            <div class="company-sub">{{ company.companyName || '企业#' + (detail.companyId || '') }}</div>
+            <div class="job-title">{{ job.jobName || job.jobNo || '-' }}</div>
+            <div class="company-sub">{{ company.companyName || company.companyNo || '-' }}</div>
           </div>
         </div>
         <div class="header-right">
@@ -65,7 +65,7 @@
                 </div>
                 <div class="grid-item">
                   <span class="label">性别 / 年龄</span>
-                  <span class="value">{{ seeker.sex || '-' }} / {{ seeker.age != null ? seeker.age : '-' }}</span>
+                  <span class="value">{{ formatSex(seeker.sex) }} / {{ seeker.age != null ? seeker.age : '-' }}</span>
                 </div>
               </div>
 
@@ -103,7 +103,6 @@
                 >
                   <div class="flow-title">{{ item.title }}</div>
                   <div v-if="item.content" class="flow-content">{{ item.content }}</div>
-                  <el-tag size="small" effect="plain" class="flow-source">{{ item.source === 'apply' ? '系统' : '通知' }}</el-tag>
                 </el-timeline-item>
               </el-timeline>
               <el-empty v-else description="暂无状态流水" :image-size="60" />
@@ -157,12 +156,12 @@
               <div class="block-title mt-6">流转信息</div>
               <ul class="meta-info">
                 <li>
-                  <span class="label">投递ID</span>
-                  <span class="value">#{{ detail.applyId }}</span>
+                  <span class="label">投递编号</span>
+                  <span class="value">{{ detail.applyNo || '-' }}</span>
                 </li>
                 <li>
-                  <span class="label">企业ID</span>
-                  <span class="value">#{{ detail.companyId || '-' }}</span>
+                  <span class="label">企业编号</span>
+                  <span class="value">{{ company.companyNo || '-' }}</span>
                 </li>
                 <li>
                   <span class="label">已读状态</span>
@@ -210,7 +209,7 @@
                 <div v-if="detail.fulfillment && detail.fulfillment.tasks && detail.fulfillment.tasks.length" class="task-list">
                   <div v-for="t in detail.fulfillment.tasks" :key="t.taskId" class="task-item">
                     <div class="task-head">
-                      <span>任务 #{{ t.taskId }}</span>
+                      <span>{{ t.taskNo || '履约任务' }}</span>
                       <el-tag size="small" :type="taskTagType(t.status)">{{ t.statusName || t.status }}</el-tag>
                     </div>
                     <div class="task-meta">
@@ -246,7 +245,7 @@ import { ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { getApply2Detail } from '@/api/recruitment';
 import type { ApplyDetailVO } from '@/api/recruitment';
-import { splitToArray, formatSalary } from '../helpers';
+import { splitToArray, formatSalary, formatSex } from '../helpers';
 import { applyStatusMeta } from '../constants';
 
 const visible = ref(false);
@@ -262,10 +261,20 @@ function displayPhone(row?: { phone?: string }) {
   return row?.phone || '-';
 }
 
+function imageUrl(value?: string | number) {
+  const url = String(value || '').trim();
+  return /^(https?:\/\/|\/)/.test(url) ? url : '';
+}
+
+// 详情头像来自 apply2/detail 的 jobSeeker 聚合字段，过滤旧数字 ID 保持文字兜底可用。
+function candidateAvatarSrc(row?: { resumeAvatarUrl?: string; avatarUrl?: string; avatar?: string | number }) {
+  return imageUrl(row?.resumeAvatarUrl || row?.avatarUrl || row?.avatar);
+}
+
 /** 对外暴露：按 applyId 打开并加载详情 */
 const open = async (applyId?: number) => {
   if (!applyId) {
-    ElMessage.warning('缺少投递ID，无法查看详情');
+    ElMessage.warning('缺少投递信息，无法查看详情');
     return;
   }
   detail.value = null;
@@ -558,10 +567,6 @@ function handlePrint() {
   color: #606266;
   margin-top: 2px;
 }
-.flow-source {
-  margin-top: 4px;
-}
-
 /* 面试记录 / 通用记录列表 */
 .record-list {
   display: flex;

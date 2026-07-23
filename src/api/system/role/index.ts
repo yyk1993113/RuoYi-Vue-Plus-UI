@@ -82,6 +82,15 @@ export const changeRoleStatus = (roleId: string | number, status: string) => {
   });
 };
 
+/** 批量设置角色的类别编码，与岗位类别编码保持一致。 */
+export const batchUpdateRoleCategoryCode = (roleIds: Array<string | number>, categoryCode: string) => {
+  return request({
+    url: '/system/role/batchCategoryCode',
+    method: 'put',
+    data: { roleIds, categoryCode }
+  });
+};
+
 /**
  * 删除角色
  */

@@ -29,12 +29,13 @@ const TASK_STATUS: Record<string, StatusMeta> = {
 };
 export const taskStatusMeta = (status?: string | null): StatusMeta => resolve(TASK_STATUS, status, { label: '未知', type: 'info' });
 
-// ========== 发票状态 invoice：0未开票 / 1已开票 / 2已作废 ==========
-// 来源：invoice.vue 表格列与详情弹窗的 el-tag 阶梯；原 v-else 兜底为「已作废 / danger」。
+// ========== 发票状态 invoice：0未开票 / 1已开票 / 2已作废 / 3红冲 ==========
+// 来源：invoice.vue 表格列与详情弹窗的 el-tag 阶梯；红冲为运营上传发票弹窗新增常用状态。
 const INVOICE_STATUS: Record<string, StatusMeta> = {
   '0': { label: '未开票', type: 'warning' },
   '1': { label: '已开票', type: 'success' },
-  '2': { label: '已作废', type: 'danger' }
+  '2': { label: '已作废', type: 'danger' },
+  '3': { label: '红冲', type: 'danger' }
 };
 export const invoiceStatusMeta = (status?: string | null): StatusMeta => resolve(INVOICE_STATUS, status, INVOICE_STATUS['2']);
 
@@ -88,13 +89,14 @@ const CERT_STATUS: Record<string, StatusMeta> = {
 };
 export const certStatusMeta = (status?: string | null): StatusMeta => resolve(CERT_STATUS, status, CERT_STATUS['2']);
 
-// ========== 岗位状态 job：0待审核 / 1已上架 / 2已下架 / 6驳回 ==========
+// ========== 岗位状态 job：0待审核 / 1已上架 / 2已下架 / 3草稿 / 6驳回 ==========
 // 来源：job.vue 表格列与详情弹窗的 el-tag 阶梯；原 v-else 兜底为「已下架 / info」。
 // 6=驳回：平台审核未通过，区别于企业自主下架(2)；小程序企业端据此展示驳回原因并提供「修改重新提交」。
 const JOB_STATUS: Record<string, StatusMeta> = {
   '0': { label: '待审核', type: 'warning' },
   '1': { label: '已上架', type: 'success' },
   '2': { label: '已下架', type: 'info' },
+  '3': { label: '草稿', type: 'warning' },
   '6': { label: '驳回', type: 'danger' }
 };
 export const jobStatusMeta = (status?: string | null): StatusMeta => resolve(JOB_STATUS, status, JOB_STATUS['2']);

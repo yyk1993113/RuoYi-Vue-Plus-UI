@@ -19,9 +19,6 @@
         <el-form-item label="操作人" prop="operName">
           <el-input v-model="queryParams.operName" placeholder="操作人名称" clearable style="width: 150px" @keyup.enter="handleQuery" />
         </el-form-item>
-        <el-form-item label="操作人ID" prop="operId">
-          <el-input v-model="queryParams.operId" placeholder="操作人ID" clearable style="width: 130px" @keyup.enter="handleQuery" />
-        </el-form-item>
         <el-form-item label="操作动作" prop="action">
           <el-select v-model="queryParams.action" placeholder="全部" clearable filterable allow-create style="width: 140px">
             <el-option v-for="item in actionOptions" :key="item" :label="item" :value="item" />
@@ -57,12 +54,10 @@
     <!-- ========== 数据表格 ========== -->
     <el-card shadow="hover">
       <el-table v-loading="loading" :data="tableData" border stripe>
-        <el-table-column label="日志ID" prop="logId" width="180" align="center" show-overflow-tooltip />
         <el-table-column label="操作人" min-width="140">
           <template #default="{ row }">
             <div class="oper-cell">
               <div class="name">{{ row.operName || '未知' }}</div>
-              <div class="oper-id">ID: {{ row.operId ?? '-' }}</div>
             </div>
           </template>
         </el-table-column>
@@ -109,8 +104,7 @@
     <!-- ========== 日志详情对话框 ========== -->
     <el-dialog v-model="detailVisible" title="审计日志详情" width="640px" append-to-body>
       <el-descriptions v-if="currentLog" :column="1" border>
-        <el-descriptions-item label="日志ID">{{ currentLog.logId }}</el-descriptions-item>
-        <el-descriptions-item label="操作人">{{ currentLog.operName || '-' }}（ID: {{ currentLog.operId ?? '-' }}）</el-descriptions-item>
+        <el-descriptions-item label="操作人">{{ currentLog.operName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="操作时间">{{ currentLog.operTime || '-' }}</el-descriptions-item>
         <el-descriptions-item label="操作动作">
           <el-tag size="small" :type="actionTagType(currentLog.action)">{{ currentLog.action || '-' }}</el-tag>

@@ -1,0 +1,77 @@
+﻿招商银行《交易管家（新）》NTDMALST 查询报文
+
+
+一、查询目标
+
+企业名称：绿地科技有限公司
+银企直联用户：N002986193
+主结算账号：755936043610302
+记账子单元编号：3878365186
+接口代码：NTDMALST（查询记账子单元信息）
+
+二、HTTP 请求
+
+环境：招商银行测试环境
+请求方式：POST
+请求地址：http://cdctest.cmburl.cn/cdcserver/api/v2
+Content-Type：application/x-www-form-urlencoded; charset=UTF-8
+
+实际传输表单：
+
+UID=N002986193&ALG=SM&DATA=${SM4_ENCRYPTED_BASE64_DATA}&FUNCODE=NTDMALST
+
+说明：
+1. DATA 不是明文 JSON，而是完成 SM2 签名后，再使用 SM4 加密并进行 Base64 编码的结果。
+2. ${SM4_ENCRYPTED_BASE64_DATA} 必须在每次请求时实时生成，不能复用历史值。
+3. 本文件不包含用户 SM2 私钥、SM4 对称密钥或其他密钥材料。
+
+三、加密前完整业务报文
+
+{
+  "request": {
+    "body": {
+      "ntdmalstx": [
+        {
+          "accnbr": "755936043610302",
+          "dmanbr": "3878365186",
+          "rsv50z": ""
+        }
+      ]
+    },
+    "head": {
+      "funcode": "NTDMALST",
+      "userid": "N002986193",
+      "reqid": "${UNIQUE_REQUEST_ID}"
+    }
+  },
+  "signature": {
+    "sigdat": "${SM2_SIGNATURE_BASE64}",
+    "sigtim": "${yyyyMMddHHmmss}"
+  }
+}
+
+四、关键字段说明
+
+accnbr：主结算账号，固定为 755936043610302。
+dmanbr：指定查询的记账子单元编号，固定为 3878365186；查询全部子单元时传空字符串。
+rsv50z：续传字段，首次查询传空；银行返回非空值时用于下一页查询。
+reqid：每次请求唯一，由系统实时生成。
+sigdat：对规范化报文进行 SM2 签名后的 Base64 值。
+sigtim：签名时间，格式为 yyyyMMddHHmmss。
+
+注意：依据新版 API 文档，NTDMALST 请求不传 bbknbr 字段。
+
+五、本次银行返回
+
+HTTP 状态：403
+银行错误码：DCLQU04
+
+CDCServer: DCLQU04-用户N002986193无权限，请管理员用户登录企业网银，进入网银设置->企业管理->银企直联->接入设置菜单，选择对应的接入模式，确认用户是否有在可经办用户列中
+
+六、银行侧需要核对
+
+请确认用户 N002986193：
+1. 已加入当前银企直联接入模式的“可经办用户”列表；
+2. 已开通“记账子单元查询”权限；
+3. 已获准经办主结算账号 755936043610302；
+4. 已获准调用 NTDMALST 接口。

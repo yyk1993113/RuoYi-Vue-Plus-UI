@@ -3,6 +3,25 @@ import createPlugins from './vite/plugins';
 import autoprefixer from 'autoprefixer'; // css自动添加兼容性前缀
 import path from 'path';
 
+const chunkGroups: Array<{ name: string; tests: string[] }> = [
+  {
+    name: 'vendor-framework',
+    tests: ['/vue/', '/vue-router/', '/pinia/', '/@vueuse/core/', '/vue-i18n/', '/element-plus/', '/@element-plus/icons-vue/']
+  },
+  { name: 'vendor-charts', tests: ['/echarts/'] },
+  { name: 'vendor-excel', tests: ['/xlsx/', '/file-saver/'] },
+  { name: 'vendor-editor', tests: ['/quill/', '/@vueup/vue-quill/', '/highlight.js/'] },
+  { name: 'vendor-crypto', tests: ['/crypto-js/', '/jsencrypt/'] }
+];
+
+function manualChunks(id: string) {
+  if (!id.includes('node_modules')) return;
+  const normalizedId = id.replaceAll('\\', '/');
+  const matchedGroup = chunkGroups.find((group) => group.tests.some((test) => normalizedId.includes(test)));
+  // Only pin known large libraries; let Rollup place the remaining dependencies to avoid circular manual chunks.
+  return matchedGroup?.name;
+}
+
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd());
   // 开发代理目标由 .env.development 注入，默认走本机 ruoyi-gateway。
@@ -54,6 +73,16 @@ export default defineConfig(({ mode, command }) => {
           }
         ]
       }
+    },
+    build: {
+      // 手动拆分大依赖，避免 Rollup 在单个巨型 vendor chunk 上出现高内存峰值。
+      rollupOptions: {
+        output: {
+          manualChunks
+        }
+      },
+      reportCompressedSize: false,
+      chunkSizeWarningLimit: 1400
     },
     // 预编译
     optimizeDeps: {

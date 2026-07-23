@@ -20,7 +20,7 @@ import Layout from '@/layout/index.vue';
     title: 'title'                  // 设置该路由在侧边栏和面包屑中展示的名字
     icon: 'svg-name'                // 设置该路由的图标，对应路径src/assets/icons/svg
     breadcrumb: false               // 如果设置为false，则不会在breadcrumb面包屑中显示
-    activeMenu: '/system/user'      // 当路由设置了该属性，则会高亮相对应的侧边栏。
+    activeMenu: '/organization/user' // 当路由设置了该属性，则会高亮相对应的侧边栏。
   }
  */
 
@@ -168,6 +168,13 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         name: 'RecruitmentSerialRule',
         permissions: ['recruitment:serialRule:list'],
         meta: { title: '流水编号规则', icon: 'dict' }
+      },
+      {
+        path: 'promotion-reward',
+        component: () => import('@/views/recruitment/promotion-reward.vue'),
+        name: 'RecruitmentPromotionReward',
+        permissions: ['recruitment:promotionReward:list'],
+        meta: { title: '推广奖励', icon: 'money' }
       }
     ]
   }

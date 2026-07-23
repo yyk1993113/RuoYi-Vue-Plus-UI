@@ -104,7 +104,7 @@ const getList = async () => {
 // 返回按钮
 const handleClose = () => {
   const obj: RouteLocationNormalized = {
-    path: '/system/role',
+    path: '/organization/role',
     fullPath: '',
     hash: '',
     matched: [],

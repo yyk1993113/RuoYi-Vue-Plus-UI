@@ -165,7 +165,9 @@ service.interceptors.response.use(
       handleInvalidSession(msg);
       return Promise.reject('无效的会话，或者会话已过期，请重新登录。');
     } else if (code === HttpStatus.SERVER_ERROR) {
-      ElMessage({ message: msg, type: 'error' });
+      if (!(res.config as any)?.silent) {
+        ElMessage({ message: msg, type: 'error' });
+      }
       return Promise.reject(new Error(msg));
     } else if (code === HttpStatus.WARN) {
       ElMessage({ message: msg, type: 'warning' });

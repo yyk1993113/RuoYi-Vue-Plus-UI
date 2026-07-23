@@ -65,7 +65,14 @@ const props = defineProps({
   // 禁用组件（仅查看文件）
   disabled: propTypes.bool.def(false),
   // 上传接口路径：默认走系统 OSS；业务材料可指定为 /api/company/upload 以复用业务侧登录上传能力。
-  uploadUrl: propTypes.string.def('')
+  uploadUrl: propTypes.string.def(''),
+  // 业务页面可注入受领域权限保护的 OSS 回显方法；默认仍使用系统 OSS 查询接口。
+  resolveFiles: {
+    type: Function,
+    default: undefined
+  },
+  // 业务表单只解除材料关联时可关闭远端物理删除，避免要求系统文件删除权限。
+  deleteRemote: propTypes.bool.def(true)
 });
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
@@ -95,7 +102,7 @@ watch(
       if (Array.isArray(val)) {
         list = val;
       } else {
-        const res = await listByIds(val);
+        const res = props.resolveFiles ? await props.resolveFiles(val) : await listByIds(val);
         list = res.data.map((oss) => {
           return {
             name: oss.originalName,
@@ -179,7 +186,7 @@ const handleUploadSuccess = (res: any, file: UploadFile) => {
 // 删除文件
 const handleDelete = (index: number) => {
   const ossId = fileList.value[index].ossId;
-  delOss(ossId);
+  if (props.deleteRemote) delOss(ossId);
   fileList.value.splice(index, 1);
   emit('update:modelValue', listToString(fileList.value));
 };

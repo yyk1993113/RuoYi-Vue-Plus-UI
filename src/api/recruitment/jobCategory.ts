@@ -28,6 +28,8 @@ export interface JobPositionVO {
   categoryId?: string | number;
   categoryName?: string; // 后端联树回填，列表展示用
   name?: string;
+  /** 企业发布岗位时选择该具体职位后显示的岗位描述模板（纯文本）。 */
+  descriptionTemplate?: string;
   sort?: number;
   status?: number | string; // 0正常 1停用
   createTime?: string;

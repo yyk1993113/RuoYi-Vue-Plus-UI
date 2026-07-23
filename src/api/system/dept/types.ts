@@ -4,6 +4,9 @@
 export interface DeptQuery extends PageQuery {
   deptName?: string;
   deptCategory?: string;
+  /** organization/dept 页签范围：平台内部部门或 B 端企业根节点 */
+  orgScope?: 'internal' | 'company';
+  certStatus?: 'not_submitted' | '0' | '1' | '2';
   status?: number;
 }
 
@@ -18,6 +21,8 @@ export interface DeptVO extends BaseEntity {
   deptId: number | string;
   deptName: string;
   deptCategory: string;
+  companyId?: number | string;
+  certStatus?: 'not_submitted' | '0' | '1' | '2';
   orderNum: number;
   leader: string;
   phone: string;
@@ -50,6 +55,7 @@ export interface DeptForm {
   deptId?: number | string;
   deptName?: string;
   deptCategory?: string;
+  companyId?: number | string;
   orderNum?: number;
   leader?: string;
   phone?: string;

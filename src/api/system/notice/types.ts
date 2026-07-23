@@ -6,6 +6,41 @@ export interface NoticeVO extends BaseEntity {
   status: string;
   remark: string;
   createByName: string;
+  businessCategory?: string;
+  pushRange?: string;
+  pushStatus?: string;
+  audienceType?: string;
+  targetAllScope?: string;
+  targetUserSegment?: string;
+  targetDeptIds?: string | Array<string | number>;
+  targetUserIds?: string | Array<string | number>;
+  targetRoleIds?: string | Array<string | number>;
+  targetTags?: string | string[];
+  readRate?: number | string;
+  unreadCount?: number | string;
+  scheduleTime?: string;
+  validEndTime?: string;
+  publishTime?: string;
+  forcePopup?: string;
+  isTop?: string;
+  isRed?: string;
+  excludeUsers?: string | Array<string | number>;
+  periodCycle?: string;
+  weekDay?: string;
+  sendTime?: string;
+  periodStartTime?: string;
+  periodEndTime?: string;
+  periodStatus?: string;
+  dataAudience?: string;
+  segmentTag?: string;
+  dataReportType?: string;
+  reportTemplate?: string;
+  autoPdf?: string;
+  unreadLayerSummary?: string;
+  targetUserCount?: number | string;
+  readCount?: number | string;
+  highIntentReadCount?: number | string;
+  sleepUnreadCount?: number | string;
 }
 
 export interface NoticeQuery extends PageQuery {
@@ -13,6 +48,16 @@ export interface NoticeQuery extends PageQuery {
   createByName: string;
   status: string;
   noticeType: string;
+  businessCategory?: string;
+  pushStatus?: string;
+  audienceType?: string;
+  periodCycle?: string;
+  dataAudience?: string;
+  segmentTag?: string;
+  periodStatus?: string;
+  keyword?: string;
+  isTop?: string;
+  isRed?: string;
 }
 
 export interface NoticeForm {
@@ -23,4 +68,75 @@ export interface NoticeForm {
   status: string;
   remark: string;
   createByName: string;
+  businessCategory?: string;
+  pushRange?: string;
+  pushStatus?: string;
+  audienceType?: string;
+  targetAllScope?: string;
+  targetUserSegment?: string;
+  targetDeptIds?: string | Array<string | number>;
+  targetUserIds?: string | Array<string | number>;
+  targetRoleIds?: string | Array<string | number>;
+  targetTags?: string | string[];
+  scheduleTime?: string;
+  validEndTime?: string;
+  publishTime?: string;
+  forcePopup?: string;
+  forceRead?: string;
+  channelInSite?: string;
+  channelApp?: string;
+  channelSms?: string;
+  excludeUsers?: string | Array<string | number>;
+  periodCycle?: string;
+  weekDay?: string;
+  sendTime?: string;
+  periodStartTime?: string;
+  periodEndTime?: string;
+  periodStatus?: string;
+  dataAudience?: string;
+  segmentTag?: string;
+  dataReportType?: string;
+  reportTemplate?: string;
+  autoPdf?: string;
+}
+
+export interface NoticePushHistoryVO {
+  historyId: number | string;
+  noticeId: number | string;
+  parentHistoryId?: number | string;
+  rootHistoryId?: number | string;
+  noticeTitle: string;
+  targetAudience: 'internal' | 'business' | 'jobSeeker' | 'mixed' | string;
+  periodCycle?: string;
+  triggerType: 'create' | 'manual' | 'scheduled' | 'retry' | string;
+  pushTime: string;
+  sendStatus: 'sending' | 'success' | 'partial' | 'failed' | string;
+  targetCount: number;
+  deliveredCount: number;
+  readCount: number;
+  deliveryRate: number | string;
+  readRate: number | string;
+  failureReason?: string;
+  retryCount: number;
+  maxRetryCount: number;
+  retryStatus: string;
+  nextRetryTime?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  completedTime?: string;
+}
+
+export interface NoticePushHistoryQuery extends PageQuery {
+  noticeTitle?: string;
+  sendStatus?: string;
+  failureOnly?: boolean;
+}
+
+export interface NoticePushHistoryStatistics {
+  totalCount: number;
+  successCount: number;
+  failureCount: number;
+  retryingCount: number;
+  deliveryRate: number | string;
+  readRate: number | string;
 }

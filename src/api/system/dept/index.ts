@@ -63,3 +63,21 @@ export const delDept = (deptId: number | string) => {
     method: 'delete'
   });
 };
+
+// 从企业管理中批量带入企业根节点；该入口只新增/绑定部门，不修改企业主体。
+export const importCompanyDepartments = (companyIds: Array<number | string>) => {
+  return request({
+    url: '/admin/recruitment/company-department/import',
+    method: 'post',
+    data: { companyIds }
+  });
+};
+
+// 部门页独立的企业录入入口；后端固定为新增并进入待审核，避免误更新既有企业。
+export const entryCompanyDepartment = (data: Record<string, unknown>) => {
+  return request({
+    url: '/admin/recruitment/company-department/entry',
+    method: 'post',
+    data
+  });
+};

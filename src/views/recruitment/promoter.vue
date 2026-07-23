@@ -593,6 +593,11 @@
                   <el-option label="合伙人" value="2" />
                 </el-select>
               </el-form-item>
+              <el-form-item v-if="detailObjectType === 'user'" label="完成度">
+                <el-select v-model="detailQuery.resumeCompletenessRange" placeholder="全部" clearable style="width: 150px">
+                  <el-option v-for="item in resumeCompletenessRangeOptions" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+              </el-form-item>
               <el-form-item label="状态">
                 <el-select v-model="detailQuery.status" placeholder="全部" clearable style="width: 150px">
                   <el-option v-for="item in detailStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
@@ -651,6 +656,18 @@
                     <el-tag :type="identityTypeTag(row.identityType)" size="small">{{
                       row.identityTypeName || identityTypeText(row.identityType)
                     }}</el-tag>
+                  </template>
+                </el-table-column>
+                <!-- 百分比由后端按小程序同源规则计算；空值表示后端尚未升级，0% 表示求职者未填写简历。 -->
+                <el-table-column v-if="detailObjectType === 'user'" label="简历完成度" prop="resumeCompleteness" width="160" align="center">
+                  <template #default="{ row }">
+                    <el-progress
+                      v-if="row.resumeCompleteness !== null && row.resumeCompleteness !== undefined"
+                      :percentage="normalizeResumeCompleteness(row.resumeCompleteness)"
+                      :stroke-width="8"
+                      :color="resumeCompletenessColor(row.resumeCompleteness)"
+                    />
+                    <span v-else class="text-gray-400">暂无数据</span>
                   </template>
                 </el-table-column>
                 <el-table-column label="状态" prop="statusName" width="120" align="center">
@@ -1164,8 +1181,21 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="岗位/角色" prop="roleName">
-          <el-select v-model="form.roleName" placeholder="请选择岗位/角色" clearable filterable style="width: 100%">
-            <el-option v-for="item in roleOptions" :key="item" :label="item" :value="item" />
+          <el-select
+            v-model="form.roleName"
+            placeholder="请选择岗位/角色"
+            clearable
+            filterable
+            :loading="roleOptionLoading"
+            :no-data-text="roleOptionLoadFailed ? '岗位/角色列表加载失败' : '暂无匹配岗位/角色'"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="item in roleOptions"
+              :key="`${item.optionType}-${item.optionId}`"
+              :label="`${item.optionType === 'post' ? '岗位' : '角色'} · ${item.optionName}`"
+              :value="item.optionName"
+            />
           </el-select>
         </el-form-item>
         <el-row v-if="isEdit" :gutter="12">
@@ -1495,10 +1525,10 @@
         <el-table-column label="时间" prop="createTime" width="160" />
         <el-table-column label="动作" prop="actionName" width="110" />
         <el-table-column label="原推广人" min-width="120">
-          <template #default="{ row }">{{ row.fromPromoterName || (row.fromPromoterId ? row.fromPromoterId : '-') }}</template>
+          <template #default="{ row }">{{ row.fromPromoterName || '-' }}</template>
         </el-table-column>
         <el-table-column label="新推广人/协作人" min-width="120">
-          <template #default="{ row }">{{ row.toPromoterName || (row.toPromoterId ? row.toPromoterId : '-') }}</template>
+          <template #default="{ row }">{{ row.toPromoterName || '-' }}</template>
         </el-table-column>
         <el-table-column label="操作人" prop="operatorName" width="110" />
         <el-table-column label="备注" prop="remark" min-width="120" show-overflow-tooltip />
@@ -1575,6 +1605,7 @@ import {
   listSeaCustomerCompany,
   listSeaCustomerUser,
   listPromoter,
+  listPromoterPostOptions,
   listExportTemplates,
   saveExportTemplate,
   delExportTemplate,
@@ -1584,6 +1615,7 @@ import {
   type PromotionHandoverVO,
   type PromotionAttributionQuery,
   type PromoterForm,
+  type PromoterPostOption,
   type PromoterIdentityPeriod,
   type PromoterQuery,
   type PromoterStatisticsGroup,
@@ -1594,6 +1626,7 @@ import {
   type PromoterVO
 } from '@/api/recruitment';
 import { download, globalHeaders } from '@/utils/request';
+import { hasOperationsManagerRole } from '@/utils/role';
 import { useUserStore } from '@/store/modules/user';
 import { unwrapList } from './helpers';
 import { companyStatusMeta } from './constants';
@@ -1695,7 +1728,10 @@ const queryFormRef = ref();
 const formRef = ref();
 const uploadRef = ref<UploadInstance>();
 const userStore = useUserStore();
-const isAdminUser = computed(() => userStore.roles.includes('superadmin'));
+// 推广管理的全量统计与客户管理由超管、运营主管共享；普通运营仍按后端菜单权限访问基础列表。
+const isAdminUser = computed(
+  () => userStore.roles.some((role) => ['superadmin', 'admin'].includes(role)) || hasOperationsManagerRole(userStore.roles)
+);
 const activeTab = ref<ActiveTab>(isAdminUser.value ? 'overview' : 'list');
 
 const statisticsLoading = ref(false);
@@ -2133,6 +2169,7 @@ const PROMOTER_METRIC_HINTS: Record<string, string> = {
   completed: '企业资料是否完整',
   jobCount: '企业名下岗位数量',
   authorized: '求职者是否已授权手机号',
+  resumeCompleteness: '求职者多份简历中的最高完成度百分比',
   resumeCompleted: '求职者是否已完成简历',
   applied: '求职者是否已产生投递',
   promotedAt: '首次通过推广进入的时间',
@@ -2286,6 +2323,7 @@ function flattenAttributionRows(rows: PromotionAttributionDetailVO[], objectType
     promoterName: r.promoterName || '-',
     promoterPhone: r.promoterPhone || '-',
     identityTypeName: r.identityTypeName || identityTypeText(r.identityType),
+    resumeCompleteness: formatResumeCompleteness(r.resumeCompleteness),
     statusName: detailStatusText(r, objectType),
     completed: r.completed || '-',
     jobCount: toCount(r.jobCount),
@@ -2314,6 +2352,7 @@ function buildAttributionExportColumns(objectType: DetailObjectType, includeProm
       { key: 'identityTypeName', label: '推广人身份' }
     );
   }
+  if (objectType === 'user' && includePromoter) cols.push({ key: 'resumeCompleteness', label: '简历完成度' });
   cols.push({ key: 'statusName', label: '状态' });
   if (objectType === 'company') {
     cols.push({ key: 'completed', label: '资料完整' }, { key: 'jobCount', label: '岗位数', numeric: true });
@@ -2354,7 +2393,10 @@ function buildAttributionExportGroups(objectType: DetailObjectType, includePromo
   const base = ['objectName', 'phone'];
   if (objectType === 'company') base.push('contactPerson');
   const source = includePromoter ? ['promoterName', 'promoterPhone', 'identityTypeName'] : [];
-  const stage = objectType === 'company' ? ['statusName', 'completed', 'jobCount'] : ['statusName', 'authorized', 'resumeCompleted', 'applied'];
+  const stage =
+    objectType === 'company'
+      ? ['statusName', 'completed', 'jobCount']
+      : [...(includePromoter ? ['resumeCompleteness'] : []), 'statusName', 'authorized', 'resumeCompleted', 'applied'];
   const time =
     objectType === 'company' ? ['promotedAt', 'createTime'] : ['promotedAt', 'authorizedTime', 'resumeCompletedTime', 'firstApplyTime', 'createTime'];
   const groups = [
@@ -2529,6 +2571,7 @@ const detailQuery = reactive<PromotionAttributionQuery>({
   promoterKeyword: '',
   identityType: '',
   status: '',
+  resumeCompletenessRange: '',
   keyword: ''
 });
 
@@ -2587,17 +2630,21 @@ const queryParams = reactive<PromoterQuery>({
   status: ''
 });
 
-const form = reactive<PromoterForm>({
-  promoterId: undefined,
-  name: '',
-  phonenumber: '',
-  identityType: '0',
-  roleName: '',
-  companyCount: 0,
-  jobSeekerCount: 0,
-  status: '1',
-  remark: ''
-});
+function createDefaultPromoterForm(): PromoterForm {
+  return {
+    promoterId: undefined,
+    name: '',
+    phonenumber: '',
+    identityType: '0',
+    roleName: '',
+    companyCount: 0,
+    jobSeekerCount: 0,
+    status: '1',
+    remark: ''
+  };
+}
+
+const form = reactive<PromoterForm>(createDefaultPromoterForm());
 
 const upload = reactive<ImportOption>({
   open: false,
@@ -2619,12 +2666,11 @@ const adjustForm = reactive<PromotionAttributionAdjustForm & { objectName?: stri
 
 // 渠道推广人员的数量字段由运营手工维护，后端按 company_count/job_seeker_count 原样落库。
 const nonNegativeCountRule = { type: 'number', min: 0, message: '数量不能小于0', trigger: 'change' } as const;
-const roleOptionsMap: Record<string, string[]> = {
-  // 身份类型为内部人员时，岗位角色作为二级分类使用。
-  '0': ['实习生', '销售岗', '拓展岗'],
-  '1': ['外部渠道'],
-  '2': ['合伙人']
-};
+// 三类推广身份分别缓存同类别编码下的启用岗位和角色。
+const promoterPostOptions = reactive<Record<string, PromoterPostOption[]>>({ '0': [], '1': [], '2': [] });
+const promoterPostOptionsLoaded = reactive<Record<string, boolean>>({ '0': false, '1': false, '2': false });
+const promoterPostOptionsFailed = reactive<Record<string, boolean>>({ '0': false, '1': false, '2': false });
+const promoterPostOptionsLoading = reactive(new Set<string>());
 
 const rules: FormRules = {
   name: [{ required: true, message: '请输入姓名/昵称', trigger: 'blur' }],
@@ -2640,7 +2686,9 @@ const rules: FormRules = {
 };
 
 const dialogTitle = computed(() => (isEdit.value ? '编辑推广人员' : '新增推广人员'));
-const roleOptions = computed(() => roleOptionsMap[form.identityType || '0'] || []);
+const roleOptions = computed(() => promoterPostOptions[form.identityType || '0'] || []);
+const roleOptionLoading = computed(() => promoterPostOptionsLoading.has(form.identityType || ''));
+const roleOptionLoadFailed = computed(() => promoterPostOptionsFailed[form.identityType || ''] || false);
 // 卡片同比/环比涨跌：current 为本期「新增(B+C)合计」，base 为后端按「同期至今」口径返回的对比基数。
 // base<=0 视为无可比基数（如去年同期尚无数据/从 0 起步），统一显示「—」，避免出现 +∞%。
 // trend: up 增长(绿) / down 下降(红) / flat 持平(灰) / new 从0新增(蓝，无可比基数但本期有量)
@@ -2748,6 +2796,13 @@ const detailStatusOptions = computed(() =>
       ]
 );
 
+// 推广管理以 70% 为“已完善”阈值，筛选由服务端作用于全量数据而非当前页。
+const resumeCompletenessRangeOptions = [
+  { label: '已完善（≥70%）', value: 'completed' },
+  { label: '完善中（1%-69%）', value: 'progress' },
+  { label: '未填写（0%）', value: 'blank' }
+] as const;
+
 const metricCards = computed(() => [
   { key: 'promoter', label: '推广人', value: statisticsData.totalPromoterCount || 0, sub: '当前筛选结果', tone: 'primary' },
   { key: 'company', label: 'B端企业', value: statisticsData.totalCompanyCount || 0, sub: '企业注册/线索量', tone: 'success' },
@@ -2839,6 +2894,24 @@ function detailStatusText(row: PromotionAttributionDetailVO, objectType: DetailO
 
 function yesNoTag(value?: string): TagType {
   return value === '是' ? 'success' : 'info';
+}
+
+function formatResumeCompleteness(value?: number | null): string {
+  if (value === null || value === undefined) return '-';
+  return `${normalizeResumeCompleteness(value)}%`;
+}
+
+function normalizeResumeCompleteness(value?: number | null): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.min(100, Math.max(0, Math.round(numeric)));
+}
+
+function resumeCompletenessColor(value?: number | null): string {
+  const numeric = normalizeResumeCompleteness(value);
+  if (numeric >= 70) return '#67c23a';
+  if (numeric > 0) return '#e6a23c';
+  return '#909399';
 }
 
 function toCount(value?: number) {
@@ -3541,32 +3614,36 @@ function openIdentityPeriodChartDrilldown(row: PromoterIdentityPeriod, identityT
 }
 
 function resetFormData() {
-  form.promoterId = undefined;
-  form.name = '';
-  form.phonenumber = '';
-  form.identityType = '0';
-  form.roleName = '';
-  form.companyCount = 0;
-  form.jobSeekerCount = 0;
-  form.status = '1';
-  form.remark = '';
+  // 编辑详情会动态带入推广码、租户等服务端字段；新增前必须删除，不能只重置可见项。
+  Object.keys(form).forEach((key) => Reflect.deleteProperty(form, key));
+  Object.assign(form, createDefaultPromoterForm());
 }
 
-function handleIdentityTypeChange(value: string | number | boolean | undefined) {
-  const type = String(value ?? '0');
-  const options = roleOptionsMap[type] || [];
-  form.roleName = options.length === 1 ? options[0] : '';
-}
-
-watch(
-  () => form.identityType,
-  (value) => {
-    const options = roleOptionsMap[value || '0'] || [];
-    if (form.roleName && !options.includes(form.roleName)) {
-      form.roleName = options.length === 1 ? options[0] : '';
-    }
+async function loadPromoterPostOptions(identityType: string) {
+  if (promoterPostOptionsLoaded[identityType] || promoterPostOptionsLoading.has(identityType)) return;
+  promoterPostOptionsLoading.add(identityType);
+  promoterPostOptionsFailed[identityType] = false;
+  try {
+    const response = await listPromoterPostOptions(identityType);
+    const rows = ((response as any)?.data || []) as PromoterPostOption[];
+    promoterPostOptions[identityType] = rows.filter((item) => String(item.optionName || '').trim());
+    promoterPostOptionsLoaded[identityType] = true;
+  } catch {
+    promoterPostOptionsFailed[identityType] = true;
+    ElMessage.error('岗位/角色列表加载失败，请稍后重试');
+  } finally {
+    promoterPostOptionsLoading.delete(identityType);
   }
-);
+}
+
+async function handleIdentityTypeChange(value: string | number | boolean | undefined) {
+  const type = String(value ?? '0');
+  form.roleName = '';
+  await loadPromoterPostOptions(type);
+  if (form.identityType !== type) return;
+  const options = promoterPostOptions[type] || [];
+  form.roleName = options.length === 1 ? options[0].optionName : '';
+}
 
 watch(statisticsSide, () => {
   scheduleActiveTabCharts();
@@ -3574,6 +3651,8 @@ watch(statisticsSide, () => {
 
 watch(detailObjectType, () => {
   detailQuery.status = '';
+  // 完成度仅属于 C 端求职者，切换到 B 端时清空，避免隐藏筛选继续影响后续查询。
+  detailQuery.resumeCompletenessRange = '';
   detailQuery.pageNum = 1;
 });
 
@@ -3950,6 +4029,7 @@ function buildAttributionDetailQuery(): PromotionAttributionQuery {
     promoterKeyword: detailQuery.promoterKeyword || undefined,
     identityType: detailQuery.identityType || undefined,
     status: detailQuery.status || undefined,
+    resumeCompletenessRange: detailObjectType.value === 'user' ? detailQuery.resumeCompletenessRange || undefined : undefined,
     keyword: detailQuery.keyword || undefined,
     beginTime: beginDate ? `${beginDate} 00:00:00` : undefined,
     endTime: endDate ? `${endDate} 23:59:59` : undefined
@@ -3982,6 +4062,7 @@ function resetAttributionQuery() {
   detailQuery.promoterKeyword = '';
   detailQuery.identityType = '';
   detailQuery.status = '';
+  detailQuery.resumeCompletenessRange = '';
   detailQuery.keyword = '';
   detailDateRange.value = [];
   loadAttributionDetails();
@@ -4112,7 +4193,7 @@ function openAdjustAttribution(row: PromotionAttributionDetailVO, context: 'deta
   adjustContext.value = context;
   adjustForm.objectType = row.objectType;
   adjustForm.objectId = row.objectId;
-  adjustForm.objectName = `${row.objectTypeName || detailObjectTypeName.value}：${row.objectName || row.objectId}`;
+  adjustForm.objectName = `${row.objectTypeName || detailObjectTypeName.value}：${row.objectName || '-'}`;
   adjustForm.promoterId = row.promoterId || undefined;
   // 回填已有协作人（后端明细已带出 collaborators）
   adjustForm.collaboratorIds = (row.collaborators || []).map((c) => c.promoterId!).filter((id) => id != null);
@@ -4136,7 +4217,7 @@ async function submitAdjustAttribution() {
   // 二次确认：是否绑定到所选推广人（未选则为清空归因）
   const picked = allPromoters.value.find((p) => String(p.promoterId) === String(adjustForm.promoterId));
   const confirmText = adjustForm.promoterId
-    ? `确认将「${adjustForm.objectName}」绑定到推广人「${picked?.name || adjustForm.promoterId}（${picked?.phonenumber || '-'}）」？`
+    ? `确认将「${adjustForm.objectName}」绑定到推广人「${picked?.name || '未命名推广人'}（${picked?.phonenumber || '-'}）」？`
     : `确认清空「${adjustForm.objectName}」的推广归因，转为自然流量？`;
   try {
     await ElMessageBox.confirm(confirmText, adjustForm.promoterId ? '绑定推广人' : '清空归因', {
@@ -4178,7 +4259,7 @@ const collaboratorCandidates = computed<PromoterVO[]>(() =>
 // 由推广人ID取展示label（姓名（手机号）），用于协作人转正列表
 function promoterLabel(promoterId: string | number) {
   const p = allPromoters.value.find((x) => String(x.promoterId) === String(promoterId));
-  return p ? `${p.name || '-'}（${p.phonenumber || '-'}）` : String(promoterId);
+  return p ? `${p.name || '-'}（${p.phonenumber || '-'}）` : '-';
 }
 
 // 协作人转正为主推广人（离职交接）：二次确认后调用归因接口的转正语义，成功后回刷
@@ -4290,6 +4371,7 @@ function handleAdd() {
   isEdit.value = false;
   resetFormData();
   dialogVisible.value = true;
+  void loadPromoterPostOptions(form.identityType || '0');
 }
 
 async function handleEdit(row: PromoterVO) {
@@ -4300,6 +4382,12 @@ async function handleEdit(row: PromoterVO) {
     Object.assign(form, res?.data || row);
   } catch {
     Object.assign(form, row);
+  }
+  const identityType = form.identityType || '0';
+  await loadPromoterPostOptions(identityType);
+  // 编辑时只保留当前身份类别中仍存在的启用岗位，防止提交已停用或已改类的历史岗位。
+  if (promoterPostOptionsLoaded[identityType] && !promoterPostOptions[identityType].some((item) => item.optionName === (form.roleName || ''))) {
+    form.roleName = '';
   }
   dialogVisible.value = true;
 }
@@ -4316,7 +4404,7 @@ function buildPromotionLink(row: PromoterVO) {
   if (row.promotionLink) {
     return row.promotionLink;
   }
-  const code = row.promotionCode || (row.promoterId ? String(row.promoterId) : '');
+  const code = row.promotionCode || '';
   if (!code) {
     return '';
   }
@@ -4349,7 +4437,7 @@ function handleDownloadQrCode(row: PromoterVO) {
     ElMessage.warning('请先保存推广员');
     return;
   }
-  const fileName = `推广二维码_${row.name || row.promoterId}.jpg`;
+  const fileName = `推广二维码_${row.name || '推广员'}.jpg`;
   download(`/admin/recruitment/promoter/${row.promoterId}/qrcode/download`, {}, fileName);
 }
 
@@ -4357,16 +4445,26 @@ async function submitForm() {
   await formRef.value?.validate();
   submitting.value = true;
   try {
-    const payload = {
-      ...form,
-      companyCount: form.companyCount ?? 0,
-      jobSeekerCount: form.jobSeekerCount ?? 0
-    };
     if (isEdit.value) {
+      const payload = {
+        ...form,
+        companyCount: form.companyCount ?? 0,
+        jobSeekerCount: form.jobSeekerCount ?? 0
+      };
       await updatePromoter(payload);
       ElMessage.success('修改成功');
     } else {
-      await addPromoter(payload);
+      // 新增仅发送可录入字段，推广码、租户和审计信息统一由后端生成。
+      await addPromoter({
+        name: form.name,
+        phonenumber: form.phonenumber,
+        identityType: form.identityType,
+        roleName: form.roleName,
+        companyCount: form.companyCount ?? 0,
+        jobSeekerCount: form.jobSeekerCount ?? 0,
+        status: form.status,
+        remark: form.remark
+      });
       ElMessage.success('新增成功，已生成专属推广链接');
     }
     dialogVisible.value = false;

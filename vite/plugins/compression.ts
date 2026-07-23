@@ -58,25 +58,24 @@ function createCompressionPlugin(kind: CompressionKind): Plugin {
       const files = await collectFiles(outputDir);
       const compressedEntries: Array<{ file: string; originalKb: string; compressedKb: string }> = [];
 
-      await Promise.all(
-        files.map(async (filePath) => {
-          const stat = await fs.stat(filePath);
-          if (stat.size < defaultThreshold) {
-            return;
-          }
+      // Compress serially so CI does not hold many large chunks in memory after Rollup finishes rendering.
+      for (const filePath of files) {
+        const stat = await fs.stat(filePath);
+        if (stat.size < defaultThreshold) {
+          continue;
+        }
 
-          const content = await fs.readFile(filePath);
-          const compressed = await handler.compress(content);
-          const outputFile = `${filePath}${handler.ext}`;
+        const content = await fs.readFile(filePath);
+        const compressed = await handler.compress(content);
+        const outputFile = `${filePath}${handler.ext}`;
 
-          await fs.writeFile(outputFile, compressed);
-          compressedEntries.push({
-            file: path.relative(outputDir, outputFile).replaceAll('\\', '/'),
-            originalKb: (stat.size / 1024).toFixed(2),
-            compressedKb: (compressed.byteLength / 1024).toFixed(2)
-          });
-        })
-      );
+        await fs.writeFile(outputFile, compressed);
+        compressedEntries.push({
+          file: path.relative(outputDir, outputFile).replaceAll('\\', '/'),
+          originalKb: (stat.size / 1024).toFixed(2),
+          compressedKb: (compressed.byteLength / 1024).toFixed(2)
+        });
+      }
 
       if (!compressedEntries.length) {
         return;

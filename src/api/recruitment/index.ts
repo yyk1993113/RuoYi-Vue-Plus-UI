@@ -24,6 +24,11 @@ export interface CompanyVO {
   // 营业执照图片地址（后端 company.business_license），资质图片预览用
   businessLicense?: string;
   status?: string;
+  // 业务归档状态 0:正常 1:已删除；活动列表默认只查正常企业。
+  deleted?: string;
+  deletedTime?: string;
+  deletedBy?: number;
+  deleteReason?: string;
   // 平台禁言状态 0:未禁言 1:禁言中（后端 company.is_silenced）
   isSilenced?: string;
   silenceReason?: string;
@@ -106,6 +111,10 @@ export interface JobFullVO {
   salaryUnit?: string;
   salaryUnitName?: string;
   location?: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  regionScope?: string;
   // 职位所属类目
   categoryId?: number | string;
   categoryName?: string;
@@ -166,15 +175,20 @@ export interface ApplyStatistics {
 
 export interface ApplyVO {
   applyId?: number;
-  /** 业务编码：来自 serialRule 的 APL 编码，列表展示优先使用。 */
+  /** 对外展示的投递业务编号，由流水号规则生成。 */
   applyNo?: string;
   jobId?: number;
   jobName?: string;
   salary?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryUnit?: string;
+  companyId?: number | string;
   companyName?: string;
   userId?: number | string;
   userName?: string;
   phonenumber?: string;
+  phone?: string;
   applyTime?: string;
   status?: string;
   statusName?: string;
@@ -183,6 +197,8 @@ export interface ApplyVO {
   createTime?: string;
   avatar?: string;
   avatarUrl?: string;
+  resumeAvatarUrl?: string;
+  exchangeStatus?: string;
   exchanged?: boolean;
   contactPerson?: string;
   contactPhone?: string;
@@ -266,15 +282,22 @@ export interface LedgerStatistics {
 }
 
 export interface LedgerVO {
-  ledgerId?: number;
-  taskId?: number;
-  // 岗位编号（后端 Ledger.jobId），台账列表展示用
-  jobId?: number;
-  // 投递编号（后端 Ledger.applyId），台账列表展示用
-  applyId?: number;
-  companyId?: number;
+  ledgerId?: number | string;
+  taskId?: number | string;
+  // 岗位ID（后端 Ledger.jobId），操作/跳转用；展示编号优先用 jobNo
+  jobId?: number | string;
+  jobNo?: string;
+  // 岗位展示字段由台账接口补齐；历史岗位删除时后端回退到服务意向快照。
+  jobName?: string;
+  jobType?: string;
+  // 投递ID（后端 Ledger.applyId），操作/跳转用；展示编号优先用 applyNo
+  applyId?: number | string;
+  applyNo?: string;
+  taskNo?: string;
+  jobSeekerNo?: string;
+  companyId?: number | string;
   companyName?: string;
-  userId?: number;
+  userId?: number | string;
   userName?: string;
   // 台账编号（订单号），台账列表「台账编号」列用此字段
   orderNo?: string;
@@ -288,6 +311,12 @@ export interface LedgerVO {
   // 结算可追溯字段（运营标记已结算时回填）
   settleTime?: string;
   settleRemark?: string;
+  settlementIntentId?: number | string;
+  settlementIntentType?: string;
+  settlementNeedFollowUp?: string;
+  settlementFollowStatus?: string;
+  settlementFollowRemark?: string;
+  settlementCreateTime?: string;
 }
 
 // ========== 发票相关 ==========
@@ -297,14 +326,26 @@ export interface InvoiceStatistics {
   pendingCount: number;
   issuedCount: number;
   cancelledCount: number;
+  totalAmount?: number;
+  pendingAmount?: number;
+  issuedAmount?: number;
+  cancelledAmount?: number;
+  monthNewCount?: number;
+  monthNewAmount?: number;
+  monthDeltaCount?: number;
+  monthDeltaAmount?: number;
 }
 
 export interface InvoiceVO {
-  invoiceId?: number;
-  ledgerId?: number;
-  companyId?: number;
+  invoiceId?: number | string;
+  invoiceNo?: string;
+  ledgerId?: number | string;
+  companyId?: number | string;
   companyName?: string;
   filePath?: string;
+  ossId?: number | string;
+  fileOssId?: number | string;
+  fileId?: number | string;
   status?: string;
   statusName?: string;
   createTime?: string;
@@ -314,24 +355,34 @@ export interface InvoiceVO {
 // 运营台-发票上传/绑定管理列表 VO（对应后端 InvoiceManageVO）。
 // 金额 amount / 绑定台账号 ledgerOrderNo 派生自绑定台账 ledger；createByName 为上传人昵称。
 export interface InvoiceManageVO {
-  invoiceId?: number;
-  ledgerId?: number;
+  invoiceId?: number | string;
+  invoiceNo?: string;
+  ledgerId?: number | string;
   ledgerOrderNo?: string;
-  companyId?: number;
+  companyId?: number | string;
   filePath?: string;
+  ossId?: number | string;
+  fileOssId?: number | string;
+  fileId?: number | string;
   status?: string;
   amount?: number;
   createBy?: number;
   createByName?: string;
   createTime?: string;
+  updateTime?: string;
+  remark?: string;
 }
 
 // 运营台-发票上传请求体（对应后端 InvoiceUploadRequest）。
 // filePath 必填；其余可空，绑定台账时金额与归属企业以台账为准。
 export interface InvoiceUploadForm {
+  invoiceNo?: string;
   filePath?: string;
-  ledgerId?: number;
-  companyId?: number;
+  ossId?: number | string;
+  fileOssId?: number | string;
+  fileId?: number | string;
+  ledgerId?: number | string;
+  companyId?: number | string;
   amount?: number;
   status?: string;
   remark?: string;
@@ -465,6 +516,8 @@ export interface CompanyQuery {
   contactPerson?: string;
   contactPhone?: string;
   status?: string;
+  // 业务归档状态筛选；后端未传时默认按未删除企业查询。
+  deleted?: string;
   userId?: number;
   isSilenced?: string;
   jobCount?: number | string;
@@ -495,13 +548,17 @@ export interface JobQuery {
 export interface ApplyQuery {
   pageNum?: number;
   pageSize?: number;
-  applyId?: number;
+  applyId?: number | string;
+  /** 对外展示的投递业务编号，精确匹配 apply.apply_no。 */
+  applyNo?: string;
   jobId?: number;
   jobName?: string;
   userId?: number | string;
   userName?: string;
   status?: string;
   companyName?: string;
+  /** 对外展示的企业业务编号，精确匹配 company.company_no。 */
+  companyNo?: string;
   isRead?: string;
   beginTime?: string;
   endTime?: string;
@@ -541,8 +598,14 @@ export interface LedgerQuery {
 export interface InvoiceQuery {
   pageNum?: number;
   pageSize?: number;
-  companyId?: number;
-  ledgerId?: number;
+  companyId?: number | string;
+  ledgerId?: number | string;
+  ledgerOrderNo?: string;
+  orderNo?: string;
+  createBy?: number | string;
+  createByName?: string;
+  beginTime?: string;
+  endTime?: string;
   status?: string;
 }
 
@@ -559,6 +622,8 @@ export interface AuditLogVO {
   logId?: number;
   operId?: number;
   operName?: string;
+  /** 后端按 operId 回查的当前角色名称，仅用于审计展示，不属于 rec_audit_log 落库字段。 */
+  operRole?: string;
   operTime?: string;
   action?: string;
   targetType?: string;
@@ -631,16 +696,22 @@ const baseUrl = '/admin/recruitment';
 
 export interface PromoterVO {
   promoterId?: string | number;
+  ownerUserId?: string | number;
   name?: string;
   phonenumber?: string;
   promotionCode?: string;
   promotionPage?: string;
   promotionLink?: string;
+  sourceType?: string;
   identityType?: string;
   roleName?: string;
   companyCount?: number;
   jobSeekerCount?: number;
   status?: string;
+  auditStatus?: string;
+  auditStatusName?: string;
+  auditTime?: string;
+  auditRemark?: string;
   remark?: string;
   createTime?: string;
 }
@@ -651,12 +722,22 @@ export interface PromoterQuery {
   name?: string;
   phonenumber?: string;
   identityType?: string;
+  sourceType?: string;
   roleName?: string;
   status?: string;
+  auditStatus?: string;
   params?: Record<string, any>;
 }
 
 export type PromoterForm = PromoterVO;
+
+export interface PromoterPostOption {
+  optionType: 'post' | 'role';
+  optionId: string | number;
+  optionName: string;
+  categoryCode: string;
+}
+
 export type PromoterStatisticsTimeUnit = 'day' | 'month' | 'quarter' | 'halfYear' | 'year';
 
 export interface PromoterStatisticsRow extends PromoterVO {
@@ -797,6 +878,7 @@ export interface PromotionAttributionQuery {
   promoterKeyword?: string;
   identityType?: string;
   status?: string;
+  resumeCompletenessRange?: '' | 'completed' | 'progress' | 'blank';
   keyword?: string;
   beginTime?: string;
   endTime?: string;
@@ -815,6 +897,8 @@ export interface PromotionAttributionDetailVO {
   identityType?: string;
   identityTypeName?: string;
   roleName?: string;
+  /** 后端按与小程序一致的规则计算，取求职者简历中的最高完成度（0-100）。 */
+  resumeCompleteness?: number | null;
   status?: string;
   statusName?: string;
   completed?: string;
@@ -869,6 +953,11 @@ export interface PromotionHandoverVO {
 
 export function listPromoter(query: PromoterQuery) {
   return request.get<any>(`${baseUrl}/promoter/list`, { params: query });
+}
+
+// 推广人员岗位/角色只读取与所选身份类别编码一致、且已启用的数据。
+export function listPromoterPostOptions(identityType: string) {
+  return request.get<PromoterPostOption[]>(`${baseUrl}/promoter/post-options`, { params: { identityType } });
 }
 
 export function getPromoterStatistics(query: PromoterQuery) {
@@ -984,14 +1073,93 @@ export function getPromoterWorkbench() {
 }
 
 export function getPromoterWorkbenchQrCode(target: 'C' | 'B') {
-  return request.get<Blob>(`${baseUrl}/promoter/workbench/qrcode`, {
+  // 二进制响应会在全局响应拦截器中直接解包为 Blob，第二个泛型同步声明真实返回类型。
+  return request.get<Blob, Blob>(`${baseUrl}/promoter/workbench/qrcode`, {
     params: { target },
     responseType: 'blob'
   });
 }
 
 export function listPromoterWorkbenchDetail(query: PromotionAttributionQuery & { metric: string; period: 'today' | 'total' }) {
-  return request.get<any>(`${baseUrl}/promoter/workbench/detail/list`, { params: query });
+  // TableDataInfo 的 rows/total 位于响应根节点；第二泛型声明拦截器解包后的真实结构，避免页面再误取 data。
+  return request.get<any, { rows: PromotionAttributionDetailVO[]; total: number }>(`${baseUrl}/promoter/workbench/detail/list`, {
+    params: query
+  });
+}
+
+// ---------- 推广奖励 ----------
+
+export interface PromotionRewardRuleVO {
+  ruleId?: string | number;
+  eventType?: string;
+  eventName?: string;
+  rewardAmount?: number;
+  status?: string;
+  remark?: string;
+  createTime?: string;
+  updateTime?: string;
+}
+
+export interface PromotionRewardVO {
+  rewardId?: string | number;
+  promoterId?: string | number;
+  promoterName?: string;
+  promoterPhone?: string;
+  eventType?: string;
+  eventName?: string;
+  rewardAmount?: number;
+  status?: string;
+  statusName?: string;
+  targetName?: string;
+  maskedPhone?: string;
+  createTime?: string;
+  settleTime?: string;
+  settleRemark?: string;
+}
+
+export interface PromotionRewardQuery {
+  pageNum?: number;
+  pageSize?: number;
+  promoterId?: string | number;
+  keyword?: string;
+  eventType?: string;
+  status?: string;
+  beginTime?: string;
+  endTime?: string;
+}
+
+export interface PromotionRewardSettleForm {
+  rewardIds: Array<string | number>;
+  status: '1' | '2';
+  remark?: string;
+}
+
+export interface PromotionPromoterAuditForm {
+  promoterId: string | number;
+  auditStatus: '1' | '2';
+  auditRemark?: string;
+}
+
+export function listPromotionRewardRules() {
+  return request.get<PromotionRewardRuleVO[]>(`${baseUrl}/promotion/rule/list`);
+}
+
+export function savePromotionRewardRule(data: PromotionRewardRuleVO) {
+  return data.ruleId
+    ? request.put<PromotionRewardRuleVO>(`${baseUrl}/promotion/rule`, data)
+    : request.post<PromotionRewardRuleVO>(`${baseUrl}/promotion/rule`, data);
+}
+
+export function listPromotionRewards(query: PromotionRewardQuery) {
+  return request.get<any>(`${baseUrl}/promotion/reward/list`, { params: query });
+}
+
+export function settlePromotionRewards(data: PromotionRewardSettleForm) {
+  return request.post(`${baseUrl}/promotion/reward/settle`, data);
+}
+
+export function auditPromotionPromoter(data: PromotionPromoterAuditForm) {
+  return request.post(`${baseUrl}/promotion/promoter/audit`, data);
 }
 
 // ---------- 企业管理 ----------
@@ -1005,9 +1173,14 @@ export function getCompany(companyId: number | string) {
   return request.get<any>(`${baseUrl}/company/${companyId}`);
 }
 
+// 企业详情/编辑按企业范围解析资质 OSS id，避免依赖系统文件管理权限。
+export function listCompanyMaterials(companyId: number | string, ossIds: string) {
+  return request.get<any>(`${baseUrl}/company/${companyId}/materials/${ossIds}`);
+}
+
 // 企业审核历史（聚合 rec_audit_log 操作留痕 + company_cert 认证历史）。
 // 对应后端 AdminJobDetailController.getCompanyAuditHistory，供详情弹窗的「历史审核记录」展示。
-export function getCompanyAuditHistory(companyId: number) {
+export function getCompanyAuditHistory(companyId: number | string) {
   return request.get<CompanyAuditHistoryVO>(`${baseUrl}/company/${companyId}/auditHistory`);
 }
 
@@ -1039,18 +1212,30 @@ export function getCompanyStatistics() {
   return request.get<any>(`${baseUrl}/company/statistics`);
 }
 
-// 删除企业（支持批量）。按 RuoYi-Vue-Plus 惯例走 DELETE /company/{ids}，
-// 多选时 ids 以逗号拼接传入路径，与 delJob 一致。后端接口待补。
+// 删除企业（支持批量）：后端执行业务归档，在线岗位自动下架，历史岗位/投递/履约/财务数据保留。
 export function delCompany(companyId: number | number[]) {
   return request.delete(`${baseUrl}/company/${companyId}`);
 }
 
-//新增企业
+// 恢复已删除企业（支持批量）：只恢复企业主体可见性，不自动恢复岗位上架状态。
+export function restoreCompany(companyId: number | number[]) {
+  const ids = Array.isArray(companyId) ? companyId : [companyId];
+  return request.post(`${baseUrl}/company/restore`, ids);
+}
+
+type CompanyArchiveFields = Pick<CompanyVO, 'deleted' | 'deletedTime' | 'deletedBy' | 'deleteReason'>;
+
+// 新增/编辑企业：归档字段由删除/恢复接口维护，普通保存请求不透传，避免误触发恢复或覆盖删除留痕。
 export const addOrUpdate = (data: UserForm) => {
+  const payload = { ...(data as UserForm & CompanyArchiveFields) };
+  delete payload.deleted;
+  delete payload.deletedTime;
+  delete payload.deletedBy;
+  delete payload.deleteReason;
   return request({
     url: `${baseUrl}/company/addOrUpdate`,
     method: 'post',
-    data: data
+    data: payload
   });
 };
 
@@ -1074,11 +1259,66 @@ export interface RecruitmentUserVO {
   /** 后端列表接口当前返回 phone；保留 phonenumber 兼容历史页面字段。 */
   phone: string;
   phonenumber?: string;
+  /** 授权登录手机号，来自账号表 sys_user.phonenumber。 */
+  accountPhone?: string;
   email: string;
   sex: string;
   sexName: string;
+  /** 账号性别原始码：0男 / 1女 / 2未知。 */
+  accountSex?: string;
+  accountSexName?: string;
+  /** 最新简历性别原始码：M男 / F女。 */
+  resumeSex?: string;
+  resumeSexName?: string;
   avatar: number;
   avatarUrl: string;
+  /** 最新简历头像 OSS ID；后端据此返回可访问的 resumeAvatarUrl。 */
+  resumeAvatarOssId?: number | string;
+  resumeAvatarUrl?: string;
+  resumeId?: number | string;
+  realName?: string;
+  resumePhone?: string;
+  /** 简历邮箱，区别于账号邮箱 email。 */
+  resumeEmail?: string;
+  wechat?: string;
+  birthDate?: string;
+  age?: number;
+  city?: string;
+  expectCity?: string;
+  expectPosition?: string;
+  expectPositionId?: number | string;
+  positionId?: number | string;
+  positionName?: string;
+  expectedDate?: string;
+  expectedIndustry?: string;
+  jobPreferenceRemark?: string;
+  jobStatus?: string;
+  jobStatusName?: string;
+  availableTimeSlots?: string;
+  weeklyHours?: number | string;
+  education?: string;
+  educationName?: string;
+  workYears?: number;
+  resumeCompleteness?: number;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryUnit?: string;
+  jobType?: string;
+  jobTypeName?: string;
+  employmentType?: string;
+  employmentTypeName?: string;
+  skills?: string;
+  summary?: string;
+  /** C 端在线简历扩展模块，均为后端原样透传的 JSON 字符串。 */
+  educationExperience?: string;
+  workExperience?: string;
+  projectExperience?: string;
+  certificates?: string;
+  otherInfo?: string;
+  portfolioUrl?: string;
+  githubUrl?: string;
+  volunteerExperience?: string;
+  awards?: string;
   status: string;
   statusName: string;
   isRecruitmentSilenced: string;
@@ -1141,7 +1381,7 @@ export function getJob(jobId: number) {
 
 // 岗位完整字段详情（运营台审核用，含类目/学历/招聘人数/期望到岗时间/兼职工作时间/福利/团队介绍/附加条件）。
 // 对应后端 AdminJobDetailController.getJobFullDetail → GET /admin/recruitment/jobDetail/{jobId}，返回 R<JobFullVO>（数据走 res.data）。
-export function getJobFullDetail(jobId: number) {
+export function getJobFullDetail(jobId: number | string) {
   return request.get<JobFullVO>(`${baseUrl}/jobDetail/${jobId}`);
 }
 
@@ -1174,6 +1414,10 @@ export function updateJobSettlementIntent(data: {
   settlementCreateTime?: string;
 }) {
   return request.post<JobFullVO>(`${baseUrl}/job/settlementIntent`, data);
+}
+
+export function markCompanySettlementIntentContacted(data: { intentId: number | string; remark?: string }) {
+  return request.post(`${baseUrl}/company/settlementIntent/contacted`, data);
 }
 
 // 运营代发岗位：POST /admin/recruitment/job/add，body 为 CreateJobRequest（含 companyId 指定归属企业）。
@@ -1217,12 +1461,12 @@ export function getApplyStatistics() {
 // 责任：在不动既有 /apply/** 的前提下，提供「多条件精确检索」与「单条投递全景详情」。
 // 与 /apply/list 区别：apply2/list 返回原始 Apply 实体（不含联表展示名），按编号/时间区间精确过滤。
 
-// 多条件精确检索入参（投递编号/企业编号/时间区间等，均可选）
+// 多条件精确检索入参（投递ID/企业ID/时间区间等，均可选）
 export interface Apply2Query {
   pageNum?: number;
   pageSize?: number;
-  applyId?: number; // 投递编号
-  companyId?: number; // 企业编号
+  applyId?: number; // 投递ID
+  companyId?: number; // 企业ID
   userId?: number;
   jobId?: number;
   status?: string;
@@ -1236,6 +1480,10 @@ export interface ApplyDetailJobSeeker {
   userName?: string;
   nickName?: string;
   realName?: string;
+  avatar?: string;
+  avatarUrl?: string;
+  resumeAvatarOssId?: number | string;
+  resumeAvatarUrl?: string;
   phonenumber?: string;
   email?: string;
   sex?: string;
@@ -1336,7 +1584,7 @@ export interface ApplyDetailVO {
   selection?: ApplySelectionResult;
 }
 
-// 多条件精确分页查询（投递编号/企业编号/时间区间）→ TableDataInfo<Apply> 原始实体
+// 多条件精确分页查询（投递ID/企业ID/时间区间）→ TableDataInfo<Apply> 原始实体
 export function listApply2(query: Apply2Query) {
   return request.get<any>(`${baseUrl}/apply2/list`, { params: query });
 }
@@ -1377,7 +1625,7 @@ export function listLedger(query: LedgerQuery) {
   return request.get<any>(`${baseUrl}/ledger/list`, { params: query });
 }
 
-export function getLedger(ledgerId: number) {
+export function getLedger(ledgerId: number | string) {
   return request.get<any>(`${baseUrl}/ledger/${ledgerId}`);
 }
 
@@ -1386,7 +1634,7 @@ export function getLedgerStatistics() {
 }
 
 // 标记台账已结算（单条/批量）：后端仅对「待结算」生效、限财务/超管、写审计
-export function settleLedger(data: { ledgerIds: number[]; remark?: string }) {
+export function settleLedger(data: { ledgerIds: Array<number | string>; remark?: string }) {
   return request.post(`${baseUrl}/ledger/settle`, data);
 }
 
@@ -1396,11 +1644,11 @@ export function listInvoice(query: InvoiceQuery) {
   return request.get<any>(`${baseUrl}/invoice/list`, { params: query });
 }
 
-export function getInvoice(invoiceId: number) {
+export function getInvoice(invoiceId: number | string) {
   return request.get<any>(`${baseUrl}/invoice/${invoiceId}`);
 }
 
-export function updateInvoiceStatus(data: { invoiceId: number; status: string }) {
+export function updateInvoiceStatus(data: { invoiceId: number | string; status: string }) {
   return request.post(`${baseUrl}/invoice/updateStatus`, data);
 }
 
@@ -1419,18 +1667,23 @@ export function listInvoiceManage(query: InvoiceQuery) {
   return request.get<any>(`${invoiceManageBaseUrl}/list`, { params: query });
 }
 
+// 发票上传/改绑时使用的台账选择列表，权限随发票管理接口走
+export function listInvoiceLedgerOptions(query: LedgerQuery) {
+  return request.get<any>(`${invoiceManageBaseUrl}/ledger-options`, { params: query });
+}
+
 // 上传发票文件并关联台账，返回新发票ID
 export function uploadInvoiceManage(data: InvoiceUploadForm) {
   return request.post<any>(`${invoiceManageBaseUrl}/upload`, data);
 }
 
 // 绑定（或改绑）发票到台账
-export function bindInvoiceManage(data: { invoiceId: number; ledgerId: number }) {
+export function bindInvoiceManage(data: { invoiceId: number | string; ledgerId: number | string }) {
   return request.post<any>(`${invoiceManageBaseUrl}/bind`, data);
 }
 
-// 变更发票开票状态（0未开票/1已开票/2已作废）
-export function markInvoiceManageStatus(data: { invoiceId: number; status: string }) {
+// 变更发票开票状态（0未开票/1已开票/2已作废/3红冲）
+export function markInvoiceManageStatus(data: { invoiceId: number | string; status: string }) {
   return request.post<any>(`${invoiceManageBaseUrl}/markStatus`, data);
 }
 

@@ -113,6 +113,12 @@
             <el-option label="已禁用" value="2" />
           </el-select>
         </el-form-item>
+        <el-form-item label="数据状态" prop="deleted">
+          <el-select v-model="queryParams.deleted" placeholder="全部" style="width: 140px" @change="handleQuery">
+            <el-option label="正常" value="0" />
+            <el-option label="已删除" value="1" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="禁言状态" prop="isSilenced">
           <el-select v-model="queryParams.isSilenced" placeholder="全部" clearable style="width: 150px">
             <el-option label="正常" value="0" />
@@ -183,14 +189,15 @@
       <template #header>
         <el-row :gutter="10">
           <el-col :span="1.5">
-            <el-button type="primary" plain icon="Plus" @click="add">新增</el-button>
+            <el-button v-if="canCompanyAudit" type="primary" plain icon="Plus" @click="add">新增</el-button>
           </el-col>
           <el-col :span="1.5">
             <el-button type="primary" plain icon="Refresh" @click="loadData">刷新</el-button>
           </el-col>
           <el-col :span="1.5">
             <!-- 批量删除：未勾选时点击给出提示，勾选后按所选 companyId 批量删除 -->
-            <el-button type="danger" plain icon="Delete" @click="handleBatchDelete">删除</el-button>
+            <el-button v-if="queryParams.deleted !== '1'" type="danger" plain icon="Delete" @click="handleBatchDelete">删除</el-button>
+            <el-button v-else type="success" plain icon="RefreshLeft" @click="handleBatchRestore">恢复</el-button>
           </el-col>
           <el-col :span="1.5">
             <el-button type="success" plain icon="Download" @click="handleExport">导出</el-button>
@@ -211,7 +218,10 @@
                 {{ row.companyName?.charAt(0) }}
               </el-avatar>
               <div class="company-detail">
-                <div class="name">{{ row.companyName }}</div>
+                <div class="name">
+                  {{ row.companyName }}
+                  <el-tag v-if="row.deleted === '1'" type="info" size="small" effect="plain">已删除</el-tag>
+                </div>
                 <div class="desc text-secondary">{{ row.description || '暂无描述' }}</div>
               </div>
             </div>
@@ -250,6 +260,12 @@
             <el-tag :type="companyAuditStatusMeta(row).type">{{ companyAuditStatusMeta(row).label }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="数据状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.deleted === '1'" type="info">已删除</el-tag>
+            <el-tag v-else type="success">正常</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="禁言状态" width="110" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.isSilenced === '1'" type="danger">
@@ -262,31 +278,48 @@
         <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
             <div style="display: flex; align-items: center; justify-content: center; gap: 8px">
-              <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
-              <el-button link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
-              <el-dropdown trigger="click">
-                <span class="el-dropdown-link">
-                  <el-button link type="primary"
-                    >管理<el-icon class="el-icon--right"><arrow-down /></el-icon
-                  ></el-button>
-                </span>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <!-- 人员：已认证企业的人员管理入口，置于菜单最上方（行为待接，后端接口待补） -->
-                    <el-dropdown-item v-if="row.status === '1'" icon="User" @click="handleStaff(row)">人员</el-dropdown-item>
-                    <el-dropdown-item v-if="row.status === '0'" icon="CircleCheck" @click="handleAudit(row, '1')">审核通过</el-dropdown-item>
-                    <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '2')">审核拒绝</el-dropdown-item>
-                    <el-dropdown-item v-if="row.status === '1'" icon="Lock" @click="handleStatusChange(row, '2')">禁用企业</el-dropdown-item>
-                    <el-dropdown-item v-if="row.status === '2'" icon="Unlock" @click="handleStatusChange(row, '1')">启用企业</el-dropdown-item>
-                    <el-dropdown-item divided icon="MuteNotification" @click="handleSilence(row)" v-if="row.isSilenced !== '1'">
-                      禁言企业
-                    </el-dropdown-item>
-                    <el-dropdown-item icon="MuteNotification" @click="handleUnsilence(row)" v-if="row.isSilenced === '1'">
-                      取消禁言
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <template v-if="row.deleted === '1'">
+                <el-button v-if="canCompanyQuery" link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
+                <el-button link type="success" icon="RefreshLeft" @click="handleRestore(row)">恢复</el-button>
+              </template>
+              <template v-else>
+                <el-button v-if="canCompanyQuery" link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
+                <el-button v-if="canCompanyAudit" link type="primary" icon="Edit" @click="handleEdit(row)">编辑</el-button>
+                <el-dropdown trigger="click">
+                  <span class="el-dropdown-link">
+                    <el-button link type="primary"
+                      >管理<el-icon class="el-icon--right"><arrow-down /></el-icon
+                    ></el-button>
+                  </span>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <!-- 人员：已认证企业的人员管理入口，置于菜单最上方（行为待接，后端接口待补） -->
+                      <el-dropdown-item v-if="row.status === '1'" icon="User" @click="handleStaff(row)">人员</el-dropdown-item>
+                      <el-dropdown-item v-if="row.status === '0' && canCompanyAudit" icon="CircleCheck" @click="handleAudit(row, '1')">
+                        审核通过
+                      </el-dropdown-item>
+                      <el-dropdown-item v-if="row.status === '0' && canCompanyAudit" icon="Close" @click="handleAudit(row, '2')">
+                        审核拒绝
+                      </el-dropdown-item>
+                      <el-dropdown-item v-if="hasPendingSettlementIntent(row)" icon="Phone" @click="handleSettlementContacted(row)">
+                        标记已联系
+                      </el-dropdown-item>
+                      <el-dropdown-item v-if="row.status === '1' && canCompanyChangeStatus" icon="Lock" @click="handleStatusChange(row, '2')">
+                        禁用企业
+                      </el-dropdown-item>
+                      <el-dropdown-item v-if="row.status === '2' && canCompanyChangeStatus" icon="Unlock" @click="handleStatusChange(row, '1')">
+                        启用企业
+                      </el-dropdown-item>
+                      <el-dropdown-item divided icon="MuteNotification" @click="handleSilence(row)" v-if="row.isSilenced !== '1'">
+                        禁言企业
+                      </el-dropdown-item>
+                      <el-dropdown-item icon="MuteNotification" @click="handleUnsilence(row)" v-if="row.isSilenced === '1'">
+                        取消禁言
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </template>
             </div>
           </template>
         </el-table-column>
@@ -304,12 +337,22 @@
           <el-descriptions-item label="企业状态">
             <el-tag :type="companyAuditStatusMeta(currentCompany).type">{{ companyAuditStatusMeta(currentCompany).label }}</el-tag>
           </el-descriptions-item>
+          <el-descriptions-item label="数据状态">
+            <el-tag v-if="currentCompany.deleted === '1'" type="info">已删除</el-tag>
+            <el-tag v-else type="success">正常</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="currentCompany.deleted === '1'" label="删除时间">{{ currentCompany.deletedTime || '-' }}</el-descriptions-item>
           <el-descriptions-item label="企业名称" :span="2">{{ currentCompany.companyName }}</el-descriptions-item>
           <el-descriptions-item label="企业描述" :span="2">{{ currentCompany.description || '无' }}</el-descriptions-item>
+          <el-descriptions-item label="统一社会信用代码">{{ currentCompany.socialCreditCode || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="法定代表人">{{ currentCompany.legalPersonName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="法人手机号">{{ currentCompany.legalPersonPhone || currentCompany.contactPhone || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="超管手机号">{{ currentCompany.adminPhone || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="注册地址" :span="2">{{ currentCompany.registeredAddress || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="办公地址" :span="2">{{ currentCompany.companyAddress || '-' }}</el-descriptions-item>
           <el-descriptions-item label="联系人">{{ currentCompany.contactPerson || '-' }}</el-descriptions-item>
           <el-descriptions-item label="联系电话">{{ currentCompany.contactPhone || '-' }}</el-descriptions-item>
           <el-descriptions-item label="联系微信">{{ currentCompany.contactWechat || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="创建人ID">{{ currentCompany.userId || '-' }}</el-descriptions-item>
           <el-descriptions-item label="职位数量">{{ currentCompany.jobCount || 0 }}</el-descriptions-item>
           <el-descriptions-item label="投递总数">{{ currentCompany.applyCount || 0 }}</el-descriptions-item>
           <el-descriptions-item label="禁言状态">
@@ -535,32 +578,61 @@
         <div class="edit-block">
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="营业执照正负本">
-                <imageUpload v-model="form.businessLicense" :limit="1" @update:modelValue="handleOssChange" />
+              <el-form-item label="营业执照副本">
+                <imageUpload
+                  v-model="form.businessLicense"
+                  :limit="1"
+                  :resolve-files="resolveCompanyMaterialFiles"
+                  :delete-remote="false"
+                  @update:modelValue="handleOssChange"
+                />
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="法人身份证附件">
-                <imageUpload v-model="form.idCardPhotoIds" :limit="2" @update:modelValue="handleOssIdCarPhotoChange" />
+                <imageUpload
+                  v-model="form.idCardPhotoIds"
+                  :limit="2"
+                  :resolve-files="resolveCompanyMaterialFiles"
+                  :delete-remote="false"
+                  @update:modelValue="handleOssIdCarPhotoChange"
+                />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="对公账户凭证">
-                <imageUpload v-model="form.bankAccountIds" :limit="1" @update:modelValue="handleOssBankAccountIdsChange" />
+                <imageUpload
+                  v-model="form.bankAccountIds"
+                  :limit="1"
+                  :resolve-files="resolveCompanyMaterialFiles"
+                  :delete-remote="false"
+                  @update:modelValue="handleOssBankAccountIdsChange"
+                />
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="办公场地实景">
-                <imageUpload v-model="form.companyAddressIds" @update:modelValue="handleOssCompanyAddressIdsChange" />
+                <imageUpload
+                  v-model="form.companyAddressIds"
+                  :resolve-files="resolveCompanyMaterialFiles"
+                  :delete-remote="false"
+                  @update:modelValue="handleOssCompanyAddressIdsChange"
+                />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="企业logo">
-                <imageUpload v-model="form.logoUrl" :limit="1" @update:modelValue="handleOsslogoUrlChange" />
+                <imageUpload
+                  v-model="form.logoUrl"
+                  :limit="1"
+                  :resolve-files="resolveCompanyMaterialFiles"
+                  :delete-remote="false"
+                  @update:modelValue="handleOsslogoUrlChange"
+                />
               </el-form-item>
             </el-col>
             <el-col :span="12">
@@ -571,6 +643,8 @@
                   :file-size="10"
                   :file-type="['pdf', 'jpg', 'jpeg', 'png', 'bmp', 'webp', 'gif']"
                   upload-url="/api/company/upload"
+                  :resolve-files="resolveCompanyMaterialFiles"
+                  :delete-remote="false"
                   @update:modelValue="handleOssRecruitmentAuthorizationIdsChange"
                 />
               </el-form-item>
@@ -581,7 +655,7 @@
       <template #footer>
         <!-- 提交中：当前操作按钮转圈，其余按钮禁用，防止重复/交叉提交 -->
         <el-button
-          v-if="form.status && form.status !== '4'"
+          v-if="canCompanyAudit && form.status && form.status !== '4'"
           type="primary"
           :loading="editSubmitting === 'save'"
           :disabled="!!editSubmitting && editSubmitting !== 'save'"
@@ -590,7 +664,7 @@
         >
         <!-- 存草稿仅限"新增（尚无状态）/ 草稿(4)"：已进入审核流（待审核/已认证/驳回）的企业不允许再回退为草稿 -->
         <el-button
-          v-if="!form.status || form.status === '4'"
+          v-if="canCompanyAudit && (!form.status || form.status === '4')"
           type="primary"
           :loading="editSubmitting === 'draft'"
           :disabled="!!editSubmitting && editSubmitting !== 'draft'"
@@ -598,7 +672,7 @@
           >存草稿</el-button
         >
         <el-button
-          v-if="form.status !== '1'"
+          v-if="canCompanyAudit && form.status !== '1'"
           type="primary"
           :loading="editSubmitting === 'submit'"
           :disabled="!!editSubmitting && editSubmitting !== 'submit'"
@@ -606,8 +680,12 @@
           >提交</el-button
         >
         <!-- 待审核(0)：运营可在编辑弹窗内直接发起审核，复用「企业审核」对话框（通过/驳回），不改保存/提交逻辑 -->
-        <el-button v-if="form.status === '0'" type="success" :disabled="!!editSubmitting" @click="handleAuditFromEdit('1')">审核通过</el-button>
-        <el-button v-if="form.status === '0'" type="danger" :disabled="!!editSubmitting" @click="handleAuditFromEdit('2')">审核拒绝</el-button>
+        <el-button v-if="canCompanyAudit && form.status === '0'" type="success" :disabled="!!editSubmitting" @click="handleAuditFromEdit('1')">
+          审核通过
+        </el-button>
+        <el-button v-if="canCompanyAudit && form.status === '0'" type="danger" :disabled="!!editSubmitting" @click="handleAuditFromEdit('2')">
+          审核拒绝
+        </el-button>
         <el-button :disabled="!!editSubmitting" @click="editVisible = false">取消</el-button>
       </template>
     </el-dialog>
@@ -652,7 +730,7 @@
       </el-form>
       <template #footer>
         <el-button @click="auditVisible = false">取消</el-button>
-        <el-button :type="auditForm.status === '2' ? 'danger' : 'primary'" :loading="auditSubmitting" @click="submitAudit">
+        <el-button v-if="canCompanyAudit" :type="auditForm.status === '2' ? 'danger' : 'primary'" :loading="auditSubmitting" @click="submitAudit">
           {{ auditForm.status === '2' ? '确认驳回' : '确认通过' }}
         </el-button>
       </template>
@@ -684,7 +762,7 @@
       </template>
     </el-dialog>
 
-    <!-- 人员管理弹窗：iframe 内嵌系统用户管理页(/system/user)，destroy-on-close 保证每次打开为最新状态 -->
+    <!-- 人员管理弹窗：iframe 内嵌组织架构用户管理页(/organization/user)，destroy-on-close 保证每次打开为最新状态 -->
     <el-dialog v-model="staffVisible" :title="staffTitle" width="90%" top="5vh" append-to-body destroy-on-close>
       <iframe v-if="staffUrl" :src="staffUrl" class="staff-iframe" frameborder="0"></iframe>
     </el-dialog>
@@ -775,7 +853,7 @@
           <div class="company-chain-summary">
             <div>
               <div class="summary-title">{{ chainCascade.company.companyName || '-' }}</div>
-              <div class="summary-subtitle">{{ chainCascade.company.companyNo || chainCascade.company.companyId || '-' }}</div>
+              <div class="summary-subtitle">{{ chainCascade.company.companyNo || '-' }}</div>
             </div>
             <el-tag v-if="chainCascade.ledgers.length" type="success" effect="plain">已形成台账</el-tag>
             <el-tag v-else type="warning" effect="plain">线索跟进中</el-tag>
@@ -804,7 +882,6 @@
           <div v-else class="company-chain-detail">
             <div class="chain-detail-title">{{ activeChainTitle }}</div>
             <el-descriptions v-if="chainActiveNode === 'company'" :column="2" border>
-              <el-descriptions-item label="企业ID">{{ chainCascade.company.companyId || '-' }}</el-descriptions-item>
               <el-descriptions-item label="企业编码">{{ chainCascade.company.companyNo || '-' }}</el-descriptions-item>
               <el-descriptions-item label="企业名称">{{ chainCascade.company.companyName || '-' }}</el-descriptions-item>
               <el-descriptions-item label="联系人">{{ chainCascade.company.contactPerson || '-' }}</el-descriptions-item>
@@ -814,7 +891,6 @@
             </el-descriptions>
 
             <el-table v-else-if="chainActiveNode === 'job'" :data="chainCascade.jobs" border height="360" @row-click="selectChainJob">
-              <el-table-column prop="jobId" label="岗位ID" width="170" show-overflow-tooltip />
               <el-table-column prop="jobName" label="岗位名称" min-width="180" show-overflow-tooltip />
               <el-table-column label="用工性质" width="110">
                 <template #default="{ row }">{{ jobTypeMeta(row.jobType).label }}</template>
@@ -828,7 +904,6 @@
             </el-table>
 
             <el-table v-else-if="chainActiveNode === 'apply'" :data="chainCascade.applies" border height="360" @row-click="selectChainApply">
-              <el-table-column prop="applyId" label="投递ID" width="170" show-overflow-tooltip />
               <el-table-column prop="userName" label="求职人" width="130" show-overflow-tooltip />
               <el-table-column prop="phone" label="手机号" width="140" show-overflow-tooltip />
               <el-table-column label="状态" width="110">
@@ -838,14 +913,12 @@
             </el-table>
 
             <el-table v-else-if="chainActiveNode === 'user'" :data="chainCascade.users" border height="360" @row-click="selectChainUser">
-              <el-table-column prop="userId" label="求职人ID" width="170" show-overflow-tooltip />
               <el-table-column prop="userName" label="姓名" min-width="160" show-overflow-tooltip />
               <el-table-column prop="phone" label="手机号" width="150" show-overflow-tooltip />
               <el-table-column prop="applyCount" label="投递数" width="100" />
             </el-table>
 
             <el-table v-else-if="chainActiveNode === 'task'" :data="chainCascade.tasks" border height="360" @row-click="selectChainTask">
-              <el-table-column prop="taskId" label="履约ID" width="170" show-overflow-tooltip />
               <el-table-column prop="workerName" label="求职人" width="130" show-overflow-tooltip />
               <el-table-column prop="jobName" label="岗位" min-width="170" show-overflow-tooltip />
               <el-table-column prop="statusName" label="状态" width="110" show-overflow-tooltip />
@@ -854,14 +927,7 @@
               </el-table-column>
             </el-table>
 
-            <el-table
-              v-else-if="chainActiveNode === 'ledger'"
-              :data="chainCascade.ledgers"
-              border
-              height="360"
-              @row-click="(row) => (chainCascade.selectedLedger = row)"
-            >
-              <el-table-column prop="ledgerId" label="台账ID" width="170" show-overflow-tooltip />
+            <el-table v-else-if="chainActiveNode === 'ledger'" :data="chainCascade.ledgers" border height="360" @row-click="selectChainLedger">
               <el-table-column prop="orderNo" label="台账编号" min-width="180" show-overflow-tooltip />
               <el-table-column label="金额" width="120">
                 <template #default="{ row }">¥{{ formatMoney(row.amount) }}</template>
@@ -872,6 +938,18 @@
               <el-table-column label="发票状态" width="110">
                 <template #default="{ row }">{{ ledgerInvoiceStatusMeta(row.invoiceStatus).label }}</template>
               </el-table-column>
+            </el-table>
+
+            <el-table v-else-if="chainActiveNode === 'invoice'" :data="chainCascade.invoices" border height="360">
+              <el-table-column prop="invoiceNo" label="发票编号" min-width="180" show-overflow-tooltip />
+              <el-table-column label="金额" width="120">
+                <template #default="{ row }">{{ row.amount != null ? `¥${formatMoney(row.amount)}` : '-' }}</template>
+              </el-table-column>
+              <el-table-column label="状态" width="110">
+                <template #default="{ row }">{{ invoiceStatusMeta(row.status).label }}</template>
+              </el-table-column>
+              <el-table-column prop="ledgerOrderNo" label="绑定台账" min-width="180" show-overflow-tooltip />
+              <el-table-column prop="createTime" label="上传时间" min-width="160" show-overflow-tooltip />
             </el-table>
 
             <el-empty v-else description="暂无详情" />
@@ -894,6 +972,7 @@ import {
   listCompany,
   getCompanyStatistics,
   getCompany,
+  listCompanyMaterials,
   getCompanyAuditHistory,
   auditCompany,
   changeCompanyStatus,
@@ -903,16 +982,19 @@ import {
   listJob,
   listTask,
   listLedger,
+  listInvoiceManage,
+  markCompanySettlementIntentContacted,
   type CompanyAuditHistoryVO,
   type CompanyCertVO,
+  type InvoiceManageVO,
   type JobVO,
   addOrUpdate,
   delCompany,
+  restoreCompany,
   listApply
 } from '@/api/recruitment';
 import ApplyDetailDialog from './components/ApplyDetailDialog.vue';
 import { download } from '@/utils/request';
-import { listByIds } from '@/api/system/oss';
 import { unwrapList, splitToArray, formatSalary, formatMoney } from './helpers';
 import {
   companyStatusMeta,
@@ -921,14 +1003,43 @@ import {
   jobStatusMeta,
   jobTypeMeta,
   ledgerStatusMeta,
-  ledgerInvoiceStatusMeta
+  ledgerInvoiceStatusMeta,
+  invoiceStatusMeta
 } from './constants';
 import { UserForm } from '@/api/system/user/types';
 import { updateUserProfile } from '@/api/system/user';
 import { RoleVO } from '@/api/system/role/types';
+import { useUserStore } from '@/store/modules/user';
 
 const router = useRouter();
 const route = useRoute();
+const userStore = useUserStore();
+
+// 企业按钮优先跟随后台菜单权限；保留原角色矩阵作为兼容兜底，避免已在岗账号因本次对齐突然失去操作入口。
+const hasPermissionOrLegacyRole = (permission: string, legacyRoles: string[]): boolean => {
+  return (
+    userStore.permissions.includes('*:*:*') ||
+    userStore.permissions.includes(permission) ||
+    legacyRoles.some((role) => userStore.roles.includes(role))
+  );
+};
+const canCompanyQuery = computed(() =>
+  hasPermissionOrLegacyRole('recruitment:company:query', [
+    'superadmin',
+    'operations_manager',
+    'auditor',
+    'finance',
+    'operator',
+    'customer_service',
+    'developer'
+  ])
+);
+const canCompanyAudit = computed(() =>
+  hasPermissionOrLegacyRole('recruitment:company:audit', ['superadmin', 'operations_manager', 'operator', 'auditor'])
+);
+const canCompanyChangeStatus = computed(() =>
+  hasPermissionOrLegacyRole('recruitment:company:changeStatus', ['superadmin', 'operations_manager', 'operator'])
+);
 
 interface CertMaterialFile {
   kind: 'image' | 'doc';
@@ -938,7 +1049,7 @@ interface CertMaterialFile {
   suffix?: string;
 }
 
-type ChainNodeKind = 'company' | 'job' | 'user' | 'apply' | 'task' | 'ledger';
+type ChainNodeKind = 'company' | 'job' | 'user' | 'apply' | 'task' | 'ledger' | 'invoice';
 
 interface CompanyChainStep {
   kind: ChainNodeKind;
@@ -964,7 +1075,7 @@ const silenceVisible = ref(false);
 const currentCompany = ref<any>(null);
 // 表格多选：勾选行的 companyId 集合，驱动批量删除按钮的可用态与删除请求
 const selectedIds = ref<number[]>([]);
-// 人员管理弹窗：iframe 内嵌 /system/user
+// 人员管理弹窗：iframe 内嵌 /organization/user
 const staffVisible = ref(false);
 const staffUrl = ref('');
 const staffTitle = ref('人员管理');
@@ -1001,11 +1112,13 @@ const chainCascade = reactive<{
   users: ChainUserItem[];
   tasks: any[];
   ledgers: any[];
+  invoices: InvoiceManageVO[];
   selectedJob: any | null;
   selectedApply: any | null;
   selectedUser: ChainUserItem | null;
   selectedTask: any | null;
   selectedLedger: any | null;
+  selectedInvoice: InvoiceManageVO | null;
 }>({
   company: null,
   jobs: [],
@@ -1013,11 +1126,13 @@ const chainCascade = reactive<{
   users: [],
   tasks: [],
   ledgers: [],
+  invoices: [],
   selectedJob: null,
   selectedApply: null,
   selectedUser: null,
   selectedTask: null,
-  selectedLedger: null
+  selectedLedger: null,
+  selectedInvoice: null
 });
 
 // 投递全景详情弹窗组件引用：点击投递行 → open(applyId)
@@ -1030,6 +1145,12 @@ const dateRange = ref<[string, string] | []>([]);
 const showMoreQuery = ref(false);
 
 const form = ref<Partial<UserForm>>({});
+
+// 编辑组件只解析当前企业实际关联的材料，避免借用系统文件管理权限。
+const resolveCompanyMaterialFiles = (ossIds: string) => {
+  const companyId = (form.value as any).companyId;
+  return companyId ? listCompanyMaterials(companyId, ossIds) : Promise.resolve({ data: [] });
+};
 
 const rules = reactive({
   companyName: [{ required: true, message: '请输入公司全称', trigger: 'blur' }],
@@ -1080,6 +1201,8 @@ const queryParams = reactive({
   contactPerson: '',
   contactPhone: '',
   status: '',
+  // deleted 是企业业务归档筛选；默认只展示正常企业，切到已删除时作为恢复列表使用。
+  deleted: '0',
   isSilenced: '',
   jobCount: undefined as number | undefined,
   applyCount: undefined as number | undefined,
@@ -1129,7 +1252,7 @@ const companyChainSteps = computed<CompanyChainStep[]>(() => {
   const company = chainCascade.company;
   if (!company) return [];
   return [
-    { kind: 'company', label: '企业', code: company.companyNo || String(company.companyId || '-'), desc: company.companyName },
+    { kind: 'company', label: '企业', code: company.companyNo || company.companyName || '-', desc: company.companyName },
     { kind: 'job', label: '岗位', code: `${chainCascade.jobs.length} 条`, desc: chainCascade.selectedJob?.jobName },
     { kind: 'apply', label: '投递', code: `${chainCascade.applies.length} 条`, desc: chainCascade.selectedApply?.userName },
     { kind: 'user', label: '求职人', code: `${chainCascade.users.length} 人`, desc: chainCascade.selectedUser?.userName },
@@ -1139,7 +1262,8 @@ const companyChainSteps = computed<CompanyChainStep[]>(() => {
       code: `${chainCascade.tasks.length} 条`,
       desc: chainCascade.selectedTask?.statusName || chainCascade.selectedTask?.status
     },
-    { kind: 'ledger', label: '台账', code: `${chainCascade.ledgers.length} 条`, desc: chainCascade.selectedLedger?.orderNo }
+    { kind: 'ledger', label: '台账', code: `${chainCascade.ledgers.length} 条`, desc: chainCascade.selectedLedger?.orderNo },
+    { kind: 'invoice', label: '发票', code: `${chainCascade.invoices.length} 张`, desc: chainCascade.selectedInvoice?.invoiceNo }
   ];
 });
 
@@ -1153,11 +1277,13 @@ function resetCompanyChainCascade() {
   chainCascade.users = [];
   chainCascade.tasks = [];
   chainCascade.ledgers = [];
+  chainCascade.invoices = [];
   chainCascade.selectedJob = null;
   chainCascade.selectedApply = null;
   chainCascade.selectedUser = null;
   chainCascade.selectedTask = null;
   chainCascade.selectedLedger = null;
+  chainCascade.selectedInvoice = null;
 }
 
 function formatChainSalary(job: any) {
@@ -1204,6 +1330,10 @@ function clearChainAfter(level: ChainNodeKind) {
   if (['company', 'job', 'apply', 'user', 'task'].includes(level)) {
     chainCascade.ledgers = [];
     chainCascade.selectedLedger = null;
+  }
+  if (['company', 'job', 'apply', 'user', 'task', 'ledger'].includes(level)) {
+    chainCascade.invoices = [];
+    chainCascade.selectedInvoice = null;
   }
 }
 
@@ -1308,10 +1438,47 @@ async function loadChainLedgers(query: { companyId: number | string; jobId?: num
     const res = await listLedger({ pageNum: 1, pageSize: 100, ...query });
     chainCascade.ledgers = unwrapList(res).rows;
     chainCascade.selectedLedger = chainCascade.ledgers[0] || null;
+    if (chainCascade.selectedLedger) {
+      await loadChainInvoices(chainCascade.selectedLedger);
+    } else {
+      chainCascade.invoices = [];
+      chainCascade.selectedInvoice = null;
+    }
   } catch (error) {
     chainCascade.ledgers = [];
     chainCascade.selectedLedger = null;
+    chainCascade.invoices = [];
+    chainCascade.selectedInvoice = null;
     ElMessage.warning('台账链路加载失败，请确认台账权限');
+  }
+}
+
+async function selectChainLedger(row: any) {
+  chainCascade.selectedLedger = row;
+  await loadChainInvoices(row);
+  chainActiveNode.value = 'invoice';
+}
+
+async function loadChainInvoices(ledger: any) {
+  if (!ledger?.ledgerId && !ledger?.orderNo) {
+    chainCascade.invoices = [];
+    chainCascade.selectedInvoice = null;
+    return;
+  }
+  try {
+    const res = await listInvoiceManage({
+      pageNum: 1,
+      pageSize: 100,
+      ledgerId: ledger.ledgerId,
+      ledgerOrderNo: ledger.orderNo,
+      orderNo: ledger.orderNo
+    });
+    chainCascade.invoices = unwrapList<InvoiceManageVO>(res).rows;
+    chainCascade.selectedInvoice = chainCascade.invoices[0] || null;
+  } catch (error) {
+    chainCascade.invoices = [];
+    chainCascade.selectedInvoice = null;
+    ElMessage.warning('发票链路加载失败，请确认发票权限');
   }
 }
 
@@ -1323,14 +1490,97 @@ async function loadData() {
   loading.value = true;
   try {
     const res = await listCompany(buildCompanyQueryParams());
-    const list = unwrapList(res);
-    tableData.value = list.rows;
-    total.value = list.total;
+    const payload = resolveCompanyListPayload(res);
+    tableData.value = payload.rows.map(normalizeCompanyRow);
+    total.value = payload.total;
   } catch (error) {
     ElMessage.error('加载数据失败');
   } finally {
     loading.value = false;
   }
+}
+
+function resolveCompanyListPayload(res: any): { rows: any[]; total: number } {
+  const picked = pickCompanyRows(res);
+  if (picked) {
+    return {
+      rows: picked.rows,
+      total: Number(picked.total ?? findListTotal(res) ?? picked.rows.length) || 0
+    };
+  }
+  const list = unwrapList(res);
+  return { rows: list.rows, total: list.total || findListTotal(res) || list.rows.length };
+}
+
+function pickCompanyRows(source: any): { rows: any[]; total?: number | string } | null {
+  const queue = [source];
+  const seen = new Set<any>();
+  let emptyResult: { rows: any[]; total?: number | string } | null = null;
+
+  while (queue.length) {
+    const item = queue.shift();
+    if (!item || typeof item !== 'object' || seen.has(item)) continue;
+    seen.add(item);
+
+    if (Array.isArray(item)) {
+      if (item.length > 0) return { rows: item };
+      if (!item.length && !emptyResult) emptyResult = { rows: item };
+      continue;
+    }
+
+    for (const key of ['rows', 'records', 'list', 'content']) {
+      const value = item[key];
+      if (Array.isArray(value)) {
+        const result = { rows: value, total: item.total };
+        if (value.length > 0) return result;
+        if (!value.length && !emptyResult) emptyResult = result;
+      }
+    }
+
+    for (const key of ['data', 'page', 'result']) {
+      if (item[key] && typeof item[key] === 'object') queue.push(item[key]);
+    }
+  }
+
+  return emptyResult;
+}
+
+function findListTotal(source: any): number {
+  const queue = [source];
+  const seen = new Set<any>();
+  while (queue.length) {
+    const item = queue.shift();
+    if (!item || typeof item !== 'object' || seen.has(item)) continue;
+    seen.add(item);
+    if (item.total !== undefined && item.total !== null && !Number.isNaN(Number(item.total))) {
+      return Number(item.total);
+    }
+    for (const key of ['data', 'page', 'result']) {
+      if (item[key] && typeof item[key] === 'object') queue.push(item[key]);
+    }
+  }
+  return 0;
+}
+
+function normalizeCompanyRow(row: any): any {
+  return {
+    ...row,
+    companyId: row.companyId ?? row.company_id,
+    companyNo: row.companyNo ?? row.company_no,
+    companyName: row.companyName ?? row.company_name,
+    logoUrl: row.logoUrl ?? row.logo_url,
+    description: row.description ?? row.company_desc,
+    contactPerson: row.contactPerson ?? row.contact_person,
+    contactPhone: row.contactPhone ?? row.contact_phone,
+    jobCount: row.jobCount ?? row.job_count ?? 0,
+    applyCount: row.applyCount ?? row.apply_count ?? 0,
+    feedbackCount: row.feedbackCount ?? row.feedback_count ?? 0,
+    noFeedbackCount: row.noFeedbackCount ?? row.no_feedback_count ?? 0,
+    isSilenced: row.isSilenced ?? row.is_silenced,
+    createTime: row.createTime ?? row.create_time,
+    deletedTime: row.deletedTime ?? row.deleted_time,
+    userId: row.userId ?? row.user_id
+  };
 }
 
 async function loadStatistics() {
@@ -1354,6 +1604,7 @@ function clearQueryFilters() {
   queryParams.contactPerson = '';
   queryParams.contactPhone = '';
   queryParams.status = '';
+  queryParams.deleted = '0';
   queryParams.isSilenced = '';
   queryParams.jobCount = undefined;
   queryParams.applyCount = undefined;
@@ -1414,11 +1665,19 @@ function companyAuditStatusMeta(company?: any) {
   return companyStatusMeta(company?.status);
 }
 
+function hasPendingSettlementIntent(row: any): boolean {
+  return Boolean(getSettlementIntentId(row));
+}
+
+function getSettlementIntentId(row: any): number | string | undefined {
+  return row?.settlementIntentId ?? row?.intentId ?? row?.settlement_intent_id ?? row?.intent_id;
+}
+
 // 授权书允许 PDF 或图片，必须保留文件元数据供下载卡片/图片预览判断。
 async function loadCompanyCertImages(company: any) {
   const isOssId = (t: string) => /^\d+$/.test(t); // 纯数字视为 OSS id，其余（含 http/相对路径）按 URL 直用
   const fields = [
-    { label: '营业执照正负本', value: company?.businessLicense, kind: 'image' as const },
+    { label: '营业执照副本', value: company?.businessLicense, kind: 'image' as const },
     { label: '法人身份证附件', value: company?.idCardPhotoIds, kind: 'image' as const },
     { label: '对公账户凭证', value: company?.bankAccountIds, kind: 'image' as const },
     { label: '办公场地实景', value: company?.companyAddressIds, kind: 'image' as const },
@@ -1437,7 +1696,7 @@ async function loadCompanyCertImages(company: any) {
     );
     const fileMap: Record<string, any> = {};
     if (idSet.size > 0) {
-      const res = await listByIds(Array.from(idSet).join(','));
+      const res = await listCompanyMaterials(company.companyId, Array.from(idSet).join(','));
       (res.data || []).forEach((o: any) => {
         fileMap[String(o.ossId)] = o;
       });
@@ -1506,7 +1765,7 @@ async function loadAuditHistory(companyId: number) {
   try {
     const res = await getCompanyAuditHistory(companyId);
     auditHistory.value = res.data || { auditLogs: [], certHistory: [] };
-    await hydrateCertHistoryFiles();
+    await hydrateCertHistoryFiles(companyId);
   } catch (error) {
     console.error('审核历史加载失败:', error);
   } finally {
@@ -1515,7 +1774,7 @@ async function loadAuditHistory(companyId: number) {
 }
 
 // 认证历史从后端取到的材料字段可能仍是 OSS id；这里统一解析，避免文档/图片展示拿到不可访问的裸 id。
-async function hydrateCertHistoryFiles() {
+async function hydrateCertHistoryFiles(companyId: number) {
   const certs = auditHistory.value.certHistory || [];
   const isOssId = (t: string) => /^\d+$/.test(t);
   const materialFields = ['businessLicense', 'legalPersonIdFront', 'legalPersonIdBack', 'bankAccountProof', 'authLetter', 'officePhotos'];
@@ -1528,7 +1787,7 @@ async function hydrateCertHistoryFiles() {
     );
   });
   if (idSet.size === 0) return;
-  const res = await listByIds(Array.from(idSet).join(','));
+  const res = await listCompanyMaterials(companyId, Array.from(idSet).join(','));
   const fileMap: Record<string, any> = {};
   (res.data || []).forEach((file: any) => {
     fileMap[String(file.ossId)] = file;
@@ -1669,6 +1928,21 @@ async function handleStatusChange(row: any, status: string) {
   }
 }
 
+async function handleSettlementContacted(row: any) {
+  const intentId = getSettlementIntentId(row);
+  if (!intentId) {
+    ElMessage.warning('缺少结算意向信息，无法标记已联系');
+    return;
+  }
+  try {
+    await markCompanySettlementIntentContacted({ intentId });
+    ElMessage.success('已标记为已联系');
+    loadData();
+  } catch (error) {
+    ElMessage.error('标记已联系失败');
+  }
+}
+
 // 企业线索按企业维度逐级查询：companyId -> jobId -> apply/userId -> taskId -> ledger。
 function getRowCompanyId(row: any) {
   return String(row?.company_id ?? row?.companyId ?? '').trim();
@@ -1677,7 +1951,7 @@ function getRowCompanyId(row: any) {
 async function openCompanyChain(row: any) {
   const companyId = getRowCompanyId(row);
   if (!companyId || companyId === '0') {
-    ElMessage.warning('该企业暂无企业ID，无法查询链路');
+    ElMessage.warning('该企业暂无可用信息，无法查询链路');
     return;
   }
   chainDrawerVisible.value = true;
@@ -1707,14 +1981,14 @@ async function openCompanyChain(row: any) {
   }
 }
 
-// 人员管理入口：用弹窗 + iframe 内嵌「用户管理」(/system/user)。
+// 人员管理入口：用弹窗 + iframe 内嵌「用户管理」(/organization/user)。
 // iframe 在弹窗内独立加载该路由，即使该路由 404 也只影响 iframe 内部，不会动到外层 Layout/左侧菜单。
 // 带上 companyId/deptId 作上下文透传，便于用户管理页后续按企业过滤。
 function handleStaff(row: any) {
   // deptName=企业名：企业审核通过时以企业名建的部门(deptName=companyName)，
   // 用户管理页据此默认选中对应单位并过滤用户；companyId 仅作上下文备用。
   const { href } = router.resolve({
-    path: '/system/user',
+    path: '/organization/user',
     query: { companyId: row.companyId, userId: row.userId, deptName: row.companyName }
   });
   // 兼容 history / hash 两种路由模式，统一拼成同源绝对地址供 iframe 加载
@@ -1828,10 +2102,6 @@ async function handleUnsilence(row: any) {
 }
 
 async function applyRouteFocus() {
-  const qStatus = route.query.status;
-  if (typeof qStatus === 'string' && qStatus) {
-    queryParams.status = qStatus;
-  }
   const qCompanyNo = route.query.companyNo;
   if (typeof qCompanyNo === 'string' && qCompanyNo) {
     queryParams.companyNo = qCompanyNo;
@@ -1857,7 +2127,7 @@ function handleSelectionChange(rows: any[]) {
   selectedIds.value = rows.map((r) => r.companyId);
 }
 
-// 批量删除：二次确认后按所选 companyId 删除（后端接口待补，前端已对接 delCompany）
+// 批量删除：后端执行软删除归档并下架在线岗位，企业从活动列表隐藏但历史业务数据保留。
 async function handleBatchDelete() {
   // 未勾选任何企业时给出提示，避免静默无反应
   if (selectedIds.value.length === 0) {
@@ -1865,19 +2135,61 @@ async function handleBatchDelete() {
     return;
   }
   try {
-    await ElMessageBox.confirm(`是否删除选中企业？`, '提示', {
+    await ElMessageBox.confirm('删除后企业将移入已删除列表，关联在线岗位会自动下架；投递、履约和财务历史会保留。是否继续？', '提示', {
       confirmButtonText: '确认',
       cancelButtonText: '取消',
       type: 'warning'
     });
     await delCompany(selectedIds.value);
-    ElMessage.success('删除成功');
+    ElMessage.success('已移入已删除列表');
     selectedIds.value = [];
     loadData();
     loadStatistics();
   } catch (error: any) {
     if (error !== 'cancel') {
       ElMessage.error('删除失败');
+    }
+  }
+}
+
+// 恢复只解除企业归档状态；岗位是否重新上架仍由岗位管理流程决定。
+async function handleRestore(row: any) {
+  try {
+    await ElMessageBox.confirm('确定要恢复该企业吗？恢复后企业会回到正常列表，但不会自动重新上架岗位。', '提示', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning'
+    });
+    await restoreCompany(row.companyId);
+    ElMessage.success('恢复成功');
+    loadData();
+    loadStatistics();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('恢复失败');
+    }
+  }
+}
+
+async function handleBatchRestore() {
+  if (selectedIds.value.length === 0) {
+    ElMessage.warning('请先选择要恢复的企业');
+    return;
+  }
+  try {
+    await ElMessageBox.confirm('确定要恢复选中的企业吗？恢复后不会自动重新上架岗位。', '提示', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning'
+    });
+    await restoreCompany(selectedIds.value);
+    ElMessage.success('恢复成功');
+    selectedIds.value = [];
+    loadData();
+    loadStatistics();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('恢复失败');
     }
   }
 }
@@ -1952,7 +2264,7 @@ const handleDraft = async () => {
  */
 const handleSave = async () => {
   if (!(form.value as any).companyId) {
-    ElMessage.warning('缺少企业ID，无法保存修改');
+    ElMessage.warning('缺少企业信息，无法保存修改');
     return;
   }
   formRef.value?.validate(async (valid: boolean) => {

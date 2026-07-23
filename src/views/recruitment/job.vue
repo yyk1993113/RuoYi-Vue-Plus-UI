@@ -214,7 +214,7 @@
         </el-table-column>
         <el-table-column label="意向结算" width="190" align="center">
           <template #default="{ row }">
-            <div v-if="canShowSettlementIntent(row) && row.settlementIntentId" class="job-settlement-cell">
+            <div v-if="canShowSettlementIntent(row)" class="job-settlement-cell">
               <el-button link type="primary" @click="handleSettlementIntent(row)">意向结算</el-button>
               <div class="job-settlement-tags">
                 <el-tag :type="settlementIntentMeta(row.settlementIntentType).type" size="small" effect="plain">
@@ -281,7 +281,7 @@
           <el-descriptions-item label="用工性质">
             <el-tag :type="jobTypeMeta(currentJob.jobType).type">{{ jobTypeMeta(currentJob.jobType).label }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="职位类目">{{ currentJob.categoryName || currentJob.category || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="职位类目">{{ jobCategoryText(currentJob) }}</el-descriptions-item>
           <el-descriptions-item label="薪资范围">{{
             formatSalary(currentJob.salaryMin, currentJob.salaryMax, currentJob.salaryUnit)
           }}</el-descriptions-item>
@@ -291,9 +291,7 @@
           <el-descriptions-item label="经验要求">{{ currentJob.experienceName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="学历要求">{{ currentJob.educationName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="期望到岗时间">{{ formatStartDate(currentJob.expectedStartDate) }}</el-descriptions-item>
-          <el-descriptions-item label="省市区">{{
-            [currentJob.province, currentJob.city, currentJob.district].filter(Boolean).join(' / ') || '-'
-          }}</el-descriptions-item>
+          <el-descriptions-item label="省市区">{{ jobRegionText(currentJob) }}</el-descriptions-item>
           <el-descriptions-item label="工作地点" :span="2">{{ currentJob.workAddress || '未知' }}</el-descriptions-item>
 
           <!-- 工作时间（仅在有数据时展示，兼容 JSON 数组与纯文本两种来源格式） -->
@@ -328,8 +326,8 @@
           <!-- 运营信息 -->
           <el-descriptions-item label="投递人数">{{ currentJob.applyCount || 0 }}</el-descriptions-item>
           <el-descriptions-item label="浏览人数">{{ currentJob.browseCount || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="发布时间">{{ currentJob.publishTime || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="创建时间">{{ currentJob.createTime || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="发布时间">{{ detailPublishTime }}</el-descriptions-item>
+          <el-descriptions-item v-if="detailCreateTime" label="创建时间">{{ detailCreateTime }}</el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ currentJob.remark || '暂无' }}</el-descriptions-item>
         </el-descriptions>
         <el-empty v-else-if="!detailLoading" description="暂无详情数据" />
@@ -392,7 +390,7 @@
       </template>
     </el-dialog>
 
-    <el-drawer v-model="settlementLeadVisible" title="意向结算线索" size="720px" append-to-body>
+    <el-drawer v-model="settlementLeadVisible" title="意向结算线索" size="860px" append-to-body>
       <div v-loading="settlementLeadLoading" class="settlement-lead-drawer">
         <template v-if="settlementLead">
           <div class="settlement-chain">
@@ -420,13 +418,18 @@
           </div>
           <el-descriptions class="settlement-chain-detail mt-4" :title="settlementLeadActiveStep?.title || '链路详情'" :column="2" border>
             <el-descriptions-item v-for="item in settlementLeadActiveDetails" :key="item.label" :label="item.label">
-              {{ item.value || '-' }}
+              {{ settlementLeadValueText(item.value) }}
             </el-descriptions-item>
           </el-descriptions>
         </template>
         <el-empty v-else-if="!settlementLeadLoading" description="暂无线索链路" />
       </div>
       <template #footer>
+        <el-button v-if="settlementLead?.jobId" type="primary" plain @click="openSettlementLeadJob">查看岗位</el-button>
+        <el-button v-if="settlementLead?.orderNo" type="success" plain @click="openSettlementLeadLedger">查看台账</el-button>
+        <el-button v-if="settlementLead?.orderNo || settlementLead?.ledgerId" type="warning" plain @click="openSettlementLeadInvoice"
+          >查看发票</el-button
+        >
         <el-button @click="settlementLeadVisible = false">关闭</el-button>
       </template>
     </el-drawer>
@@ -457,7 +460,7 @@
 
     <!-- 岗位编辑对话框：运营修正岗位核心信息。
          数据来源 getJobFullDetail 全量回显；提交走 PUT /admin/recruitment/job，只发送结构化薪资字段。 -->
-    <el-dialog v-model="editVisible" title="编辑岗位" width="880px" append-to-body>
+    <el-dialog v-model="editVisible" title="编辑岗位" width="1080px" append-to-body>
       <!-- 字段集与排序对齐 B 端发布岗位表单：名称/性质/类目/地点/薪资/经验/学历/人数/描述。
            表单按「基础信息 / 招聘要求 / 岗位详情」三段分组(el-divider 标题)，短字段双栏(el-col :span=12)以压缩弹窗高度。 -->
       <el-form
@@ -639,9 +642,9 @@
         </el-form-item>
 
         <!-- 工作时间（仅非全职展示）：兼职/临时工/项目制需采集工作时间类型与具体时间，全职不展示也不校验 -->
-        <el-row v-if="isEditPartTime" :gutter="20">
+        <el-row v-if="isEditPartTime" :gutter="20" class="edit-work-time-row">
           <el-col :span="12">
-            <el-form-item label="工作时间类型" prop="workTimeType" :required="isEditPartTime">
+            <el-form-item label="工作时间类型" prop="workTimeType" :required="isEditPartTime" label-width="126px">
               <el-select v-model="editForm.workTimeType" placeholder="请选择工作时间类型" clearable style="width: 100%">
                 <el-option v-for="opt in workTimeTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
               </el-select>
@@ -655,7 +658,7 @@
         </el-row>
 
         <!-- 模块3：岗位详情 -->
-        <el-divider content-position="left">
+        <el-divider content-position="left" class="job-detail-divider">
           <span class="section-title"
             ><el-icon><Tickets /></el-icon>岗位详情</span
           >
@@ -761,17 +764,17 @@
       <el-table :data="SelectApplyUsertableData" border stripe>
         <el-table-column label="投递编码" prop="applyNo" width="180" align="center" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.applyNo || row.applyId || '-' }}
+            {{ row.applyNo || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="求职者信息" min-width="160">
           <template #default="{ row }">
             <div class="user-cell">
-              <el-avatar :size="34" :src="row.avatarUrl || row.avatar" style="background: #2b7fff; flex-shrink: 0">
+              <el-avatar :size="34" :src="candidateAvatarSrc(row)" style="background: #2b7fff; flex-shrink: 0">
                 {{ (row.userName || 'U').charAt(0) }}
               </el-avatar>
               <div class="user-detail">
-                <div class="name">{{ row.userName || (row.userId ? '用户#' + row.userId : '未知用户') }}</div>
+                <div class="name">{{ row.userName || '未知用户' }}</div>
                 <div class="phone">{{ displayPhone(row) }}</div>
               </div>
             </div>
@@ -844,14 +847,15 @@ import {
   updateJobSettlementIntent,
   refreshJobRecommendCache,
   listApply2,
-  listApply
+  listApply,
+  listInvoiceManage
 } from '@/api/recruitment';
-import type { JobFullVO } from '@/api/recruitment';
+import type { InvoiceManageVO, JobFullVO } from '@/api/recruitment';
 import { getBizNoChainByCompanyId, type BizNoChainVO } from '@/api/recruitment/serialRule';
 import { download } from '@/utils/request';
 import { REGIONS } from '@/utils/region-data';
-import { unwrapList, formatSalary } from './helpers';
-import { jobStatusMeta, jobTypeMeta } from './constants';
+import { unwrapList, formatSalary, formatMoney } from './helpers';
+import { invoiceStatusMeta, jobStatusMeta, jobTypeMeta } from './constants';
 import JobPositionPicker from './components/JobPositionPicker.vue';
 
 const router = useRouter();
@@ -880,7 +884,9 @@ const settlementIntentForm = reactive({
 const settlementLeadVisible = ref(false);
 const settlementLeadLoading = ref(false);
 const settlementLead = ref<BizNoChainVO | null>(null);
+const settlementLeadContext = ref<any>(null);
 const settlementLeadActiveKey = ref('company');
+const settlementLeadInvoices = ref<InvoiceManageVO[]>([]);
 let jobChangedRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 let lastJobChangedEventKey = '';
 
@@ -971,6 +977,45 @@ function formatWorkTimeItem(value: unknown): string {
   return `${day}${day && range ? ' ' : ''}${range}`.trim() || primitiveText(value);
 }
 
+function cleanDetailText(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function normalizeDisplayText(value: unknown): string {
+  const text = cleanDetailText(value);
+  return text && !['-', '暂无', '未知', 'null', 'undefined'].includes(text) ? text : '';
+}
+
+function normalizeDateTimeText(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function mergeJobDetail(row: Partial<JobFullVO>, detail?: Partial<JobFullVO> | null): JobFullVO {
+  const merged = { ...row, ...(detail || {}) } as JobFullVO;
+  // 详情接口当前未稳定返回 createTime；列表行有值时保留列表值，避免详情空字段把时间冲掉。
+  merged.createTime = normalizeDateTimeText(detail?.createTime) || normalizeDateTimeText(row.createTime);
+  merged.publishTime = normalizeDateTimeText(detail?.publishTime) || normalizeDateTimeText(row.publishTime);
+  return merged;
+}
+
+function jobCategoryText(job?: JobFullVO | null): string {
+  const category = normalizeDisplayText(job?.categoryName) || normalizeDisplayText(job?.category);
+  const position = normalizeDisplayText(job?.positionName);
+  const seen = new Set<string>();
+  const parts = [category, position].filter((item) => {
+    if (!item || seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+  return parts.join(' / ') || '-';
+}
+
+function jobRegionText(job?: JobFullVO | null): string {
+  if (!job) return '-';
+  if (job.regionScope === 'nationwide') return '全国';
+  return [job.province, job.city, job.district].map(cleanDetailText).filter(Boolean).join(' / ') || '-';
+}
+
 // 工作时间：不同发布入口可能返回 JSON 数组、对象数组或纯文本，这里统一转成标签文案。
 const workTimeList = computed<string[]>(() => {
   const raw = currentJob.value?.workTime;
@@ -988,6 +1033,12 @@ const detailHighlights = computed(() => normalizeDetailText(currentJob.value?.hi
 const detailDescription = computed(() => normalizeDetailText(currentJob.value?.description, '暂无描述'));
 const detailTeamIntro = computed(() => normalizeDetailText(currentJob.value?.teamIntro));
 const detailAdditionalConditions = computed(() => normalizeDetailText(currentJob.value?.additionalConditions));
+const detailPublishTime = computed(() => normalizeDateTimeText(currentJob.value?.publishTime) || '-');
+const detailCreateTime = computed(() => {
+  const createTime = normalizeDateTimeText(currentJob.value?.createTime);
+  const publishTime = normalizeDateTimeText(currentJob.value?.publishTime);
+  return createTime && createTime !== publishTime ? createTime : '';
+});
 
 const settlementIntentMap: Record<string, { label: string; type: 'info' | 'primary' | 'success' | 'warning'; desc: string }> = {
   '1': {
@@ -1030,79 +1081,260 @@ function isPendingSettlementLead(row: any) {
   return !!row?.settlementIntentId && String(row?.settlementFollowStatus || '') === '0';
 }
 
+function hasSettlementIntentValue(value: unknown) {
+  return value !== undefined && value !== null && String(value) !== '';
+}
+
 function canShowSettlementIntent(row: any) {
-  return String(row?.status || '') === '1' && ['1', '2', '3'].includes(String(row?.jobType || ''));
+  return [
+    row?.settlementIntentId,
+    row?.settlementIntentType,
+    row?.settlementNeedFollowUp,
+    row?.settlementFollowStatus,
+    row?.settlementFollowRemark,
+    row?.settlementCreateTime
+  ].some(hasSettlementIntentValue);
 }
 
 function jobRowClassName({ row }: { row: any }) {
   return isComplianceSettlement(row) ? 'settlement-compliance-row' : '';
 }
 
+function settlementLeadJobTypeText(row: any) {
+  return row?.jobTypeName || jobTypeMeta(row?.jobType).label;
+}
+
+function settlementLeadSalaryText(row: any) {
+  return row?.salary || formatSalary(row?.salaryMin, row?.salaryMax, row?.salaryUnit);
+}
+
+function settlementLeadLocationText(row: any) {
+  const region = [row?.province, row?.city, row?.district].filter(Boolean).join(' / ');
+  return row?.workAddress || row?.location || region;
+}
+
+function settlementLeadFollowStatusText(row: any) {
+  const map: Record<string, string> = {
+    '0': '待联系',
+    '1': '已联系',
+    '2': '已关闭'
+  };
+  return map[String(row?.settlementFollowStatus ?? '')] || '';
+}
+
+function settlementLeadNeedFollowText(row: any) {
+  const value = String(row?.settlementNeedFollowUp ?? '');
+  if (value === '1') return '需要跟进';
+  if (value === '0') return '无需跟进';
+  return '';
+}
+
+function settlementLeadValueText(value: unknown) {
+  if (value === 0) return '0';
+  if (value == null) return '-';
+  const text = String(value).trim();
+  return text || '-';
+}
+
+function settlementLeadMoneyText(value?: number | string | null) {
+  if (value == null || value === '') return '';
+  return `¥${formatMoney(value)}`;
+}
+
+function settlementLeadStageText(chain?: BizNoChainVO | null) {
+  if (!chain) return '';
+  if (chain.orderNo || chain.ledgerId) return '已形成台账';
+  if (chain.taskNo || chain.taskId) return '已进入履约';
+  if (chain.applyNo || chain.applyId) return '已形成投递';
+  if (chain.jobNo || chain.jobId) return '岗位待转化';
+  return '企业线索';
+}
+
+function settlementLeadApplyNextText(chain?: BizNoChainVO | null) {
+  if (!chain?.applyNo && !chain?.applyId) return '等待候选人投递或企业录用';
+  if (chain.taskNo || chain.taskId) return '已进入履约节点，可继续查看履约进度';
+  return '已投递，等待录用后生成履约';
+}
+
+function settlementLeadTaskProgressText(chain?: BizNoChainVO | null) {
+  if (!chain?.taskNo && !chain?.taskId) return '暂无履约记录';
+  if (chain.orderNo || chain.ledgerId) return '履约已关联台账';
+  return '已生成履约，等待核验或结算';
+}
+
+function settlementLeadTaskSettleText(chain?: BizNoChainVO | null) {
+  if (!chain?.taskNo && !chain?.taskId) return '投递录用后先生成履约';
+  if (chain.orderNo || chain.ledgerId) return '已进入台账结算';
+  return '待核验通过后生成台账';
+}
+
+function settlementLeadLedgerProgressText(chain?: BizNoChainVO | null) {
+  if (!chain?.orderNo && !chain?.ledgerId) return '暂无台账记录';
+  return '台账已生成，进入结算/开票跟进';
+}
+
+function settlementLeadInvoiceSummary() {
+  if (!settlementLead.value?.orderNo && !settlementLead.value?.ledgerId) return '生成台账后再跟进发票';
+  if (!settlementLeadInvoices.value.length) return '暂无关联发票';
+  const totalAmount = settlementLeadInvoices.value.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  return `${settlementLeadInvoices.value.length} 张 / ¥${formatMoney(totalAmount)}`;
+}
+
+function settlementLeadInvoiceDetailText() {
+  if (!settlementLead.value?.orderNo && !settlementLead.value?.ledgerId) return '生成台账后再跟进发票';
+  if (!settlementLeadInvoices.value.length) return '暂无关联发票';
+  return settlementLeadInvoices.value
+    .map((item) => {
+      const status = invoiceStatusMeta(item.status).label;
+      const amount = item.amount != null ? `¥${formatMoney(item.amount)}` : '金额-';
+      return `${item.invoiceNo || '未编号发票'} / ${status} / ${amount}`;
+    })
+    .join('\n');
+}
+
+async function loadSettlementLeadInvoices(chain?: BizNoChainVO | null) {
+  settlementLeadInvoices.value = [];
+  if (!chain?.orderNo && !chain?.ledgerId) return;
+  try {
+    const res = await listInvoiceManage({
+      pageNum: 1,
+      pageSize: 100,
+      ledgerId: chain.ledgerId,
+      ledgerOrderNo: chain.orderNo,
+      orderNo: chain.orderNo
+    });
+    settlementLeadInvoices.value = unwrapList<InvoiceManageVO>(res).rows;
+  } catch (error) {
+    settlementLeadInvoices.value = [];
+    console.warn('线索关联发票加载失败', error);
+  }
+}
+
 const settlementLeadSteps = computed(() => {
   const chain = settlementLead.value;
+  const context = settlementLeadContext.value || {};
   if (!chain) return [];
+  const settlementLabel = settlementIntentMeta(context?.settlementIntentType).label;
+  const settlementShortLabel = settlementIntentShortLabel(context?.settlementIntentType);
+  const leadStatus = settlementLeadFollowStatusText(context);
+  const needFollow = settlementLeadNeedFollowText(context);
+  const chainStage = settlementLeadStageText(chain);
   return [
     {
       key: 'company',
       title: '企业',
-      code: chain.companyNo || chain.companyId,
+      code: chain.companyNo || chain.companyName,
       desc: chain.companyName,
+      done: !!(chain.companyNo || chain.companyId || chain.companyName),
       emptyText: '未关联企业',
       details: [
         { label: '企业名称', value: chain.companyName },
         { label: '企业编号', value: chain.companyNo },
-        { label: '企业ID', value: chain.companyId }
+        { label: '服务意向', value: settlementIntentShortLabel(context?.settlementIntentType) },
+        { label: '线索状态', value: settlementLeadFollowStatusText(context) },
+        { label: '跟进要求', value: settlementLeadNeedFollowText(context) },
+        { label: '选择时间', value: normalizeDateTimeText(context?.settlementCreateTime) },
+        { label: '跟进备注', value: context?.settlementFollowRemark }
       ]
     },
     {
       key: 'job',
       title: '岗位',
-      code: chain.jobNo || chain.jobId,
+      code: chain.jobNo || chain.jobName,
       desc: chain.jobName,
+      done: !!(chain.jobNo || chain.jobId || chain.jobName),
       emptyText: '未关联岗位',
       details: [
         { label: '岗位名称', value: chain.jobName },
         { label: '岗位编号', value: chain.jobNo },
-        { label: '岗位ID', value: chain.jobId }
+        { label: '所属企业', value: context?.companyName || chain.companyName },
+        { label: '用工性质', value: settlementLeadJobTypeText(context) },
+        { label: '服务意向', value: settlementIntentMeta(context?.settlementIntentType).label },
+        { label: '线索状态', value: settlementLeadFollowStatusText(context) },
+        { label: '薪资范围', value: settlementLeadSalaryText(context) },
+        { label: '工作地点', value: settlementLeadLocationText(context) },
+        { label: '招聘人数', value: context?.recruitNumber },
+        { label: '投递人数', value: context?.applyCount },
+        { label: '发布时间', value: normalizeDateTimeText(context?.publishTime) },
+        { label: '选择时间', value: normalizeDateTimeText(context?.settlementCreateTime) },
+        { label: '跟进备注', value: context?.settlementFollowRemark }
       ]
     },
     {
       key: 'apply',
       title: '投递',
-      code: chain.applyNo || chain.applyId,
+      code: chain.applyNo || (chain.applyId ? '已形成投递' : ''),
       desc: chain.jobSeekerName,
+      done: !!(chain.applyNo || chain.applyId),
       emptyText: '暂无投递',
       details: [
         { label: '投递编号', value: chain.applyNo },
-        { label: '投递ID', value: chain.applyId },
+        { label: '当前阶段', value: chainStage },
         { label: '求职者', value: chain.jobSeekerName },
-        { label: '求职者编号', value: chain.jobSeekerNo }
+        { label: '求职者编号', value: chain.jobSeekerNo },
+        { label: '关联岗位', value: chain.jobName },
+        { label: '所属企业', value: chain.companyName },
+        { label: '服务意向', value: settlementShortLabel },
+        { label: '线索状态', value: leadStatus },
+        { label: '跟进要求', value: needFollow },
+        { label: '选择时间', value: normalizeDateTimeText(context?.settlementCreateTime) },
+        { label: '下一步', value: settlementLeadApplyNextText(chain) }
       ]
     },
     {
       key: 'task',
       title: '履约',
-      code: chain.taskNo || chain.taskId,
-      desc: '',
+      code: chain.taskNo || (chain.taskId ? '已生成履约' : ''),
+      desc: chain.jobSeekerName || chain.jobName || '',
+      done: !!(chain.taskNo || chain.taskId),
       emptyText: '暂无履约',
       details: [
         { label: '履约编号', value: chain.taskNo },
-        { label: '履约ID', value: chain.taskId }
+        { label: '履约进度', value: settlementLeadTaskProgressText(chain) },
+        { label: '求职者', value: chain.jobSeekerName },
+        { label: '关联投递', value: chain.applyNo },
+        { label: '关联岗位', value: chain.jobName },
+        { label: '关联企业', value: chain.companyName },
+        { label: '服务意向', value: settlementLabel },
+        { label: '结算准备', value: settlementLeadTaskSettleText(chain) },
+        { label: '线索状态', value: leadStatus },
+        { label: '跟进备注', value: context?.settlementFollowRemark }
       ]
     },
     {
       key: 'ledger',
       title: '台账',
-      code: chain.orderNo || chain.ledgerId,
-      desc: chain.orderAmount != null ? `¥${chain.orderAmount}` : '',
+      code: chain.orderNo || (chain.ledgerId ? '已生成台账' : ''),
+      desc: settlementLeadMoneyText(chain.orderAmount),
+      done: !!(chain.orderNo || chain.ledgerId),
       emptyText: '暂无台账',
       details: [
         { label: '台账编号', value: chain.orderNo },
-        { label: '台账ID', value: chain.ledgerId },
-        { label: '结算金额', value: chain.orderAmount != null ? `¥${chain.orderAmount}` : '' }
+        { label: '台账进度', value: settlementLeadLedgerProgressText(chain) },
+        { label: '结算金额', value: settlementLeadMoneyText(chain.orderAmount) },
+        { label: '关联履约', value: chain.taskNo },
+        { label: '关联投递', value: chain.applyNo },
+        { label: '求职者', value: chain.jobSeekerName },
+        { label: '关联岗位', value: chain.jobName },
+        { label: '关联企业', value: chain.companyName },
+        { label: '服务意向', value: settlementLabel },
+        { label: '开票跟进', value: settlementLeadInvoiceSummary() }
+      ]
+    },
+    {
+      key: 'invoice',
+      title: '发票',
+      code: settlementLeadInvoices.value.length ? `${settlementLeadInvoices.value.length} 张` : '',
+      desc: settlementLeadInvoiceSummary(),
+      done: settlementLeadInvoices.value.length > 0,
+      emptyText: chain.orderNo || chain.ledgerId ? '暂无发票' : '待生成台账',
+      details: [
+        { label: '关联台账', value: chain.orderNo },
+        { label: '发票概览', value: settlementLeadInvoiceSummary() },
+        { label: '发票明细', value: settlementLeadInvoiceDetailText() }
       ]
     }
-  ].map((step) => ({ ...step, done: !!step.code || !!step.desc }));
+  ].map((step) => ({ ...step, done: step.done ?? !!step.code }));
 });
 
 const settlementLeadActiveStep = computed(() => {
@@ -1110,7 +1342,17 @@ const settlementLeadActiveStep = computed(() => {
 });
 
 const settlementLeadActiveDetails = computed(() => {
-  return settlementLeadActiveStep.value?.details || [];
+  const details = [...(settlementLeadActiveStep.value?.details || [])];
+  if (settlementLeadActiveStep.value?.key === 'company') {
+    details.push(
+      { label: '联系人', value: settlementLeadContext.value?.contactPerson || settlementLeadContext.value?.operatorName },
+      { label: '联系电话', value: settlementLeadContext.value?.contactPhone || settlementLeadContext.value?.operatorPhone }
+    );
+  }
+  if (settlementLeadActiveStep.value?.key === 'job') {
+    details.push({ label: '岗位备注', value: settlementLeadContext.value?.remark });
+  }
+  return details;
 });
 
 function selectSettlementLeadStep(key: string) {
@@ -1171,6 +1413,7 @@ const editForm = reactive({
   categoryId: '' as number | string | '',
   category: '',
   regionPath: [] as string[],
+  regionScope: '',
   province: '',
   city: '',
   district: '',
@@ -1383,18 +1626,22 @@ function appendBenefit(b: string) {
 }
 
 // 运营后台编辑岗位同样使用三级联动数据源，地区字段只由 cascader 拆分生成。
-const regionOptions = REGIONS.map((province: any) => ({
-  label: province.name,
-  value: province.name,
-  children: (province.cities || []).map((city: any) => ({
-    label: city.name,
-    value: city.name,
-    children: (city.areas || []).map((area: string) => ({
-      label: area,
-      value: area
+const NATIONAL_REGION_VALUE = '__nationwide__';
+const regionOptions = [
+  { label: '全国', value: NATIONAL_REGION_VALUE },
+  ...REGIONS.map((province: any) => ({
+    label: province.name,
+    value: province.name,
+    children: (province.cities || []).map((city: any) => ({
+      label: city.name,
+      value: city.name,
+      children: (city.areas || []).map((area: string) => ({
+        label: area,
+        value: area
+      }))
     }))
   }))
-}));
+];
 
 interface StandardPositionPick {
   positionId?: number | string;
@@ -1508,7 +1755,11 @@ async function handleEdit(row: any) {
     editForm.province = d.province ?? '';
     editForm.city = d.city ?? '';
     editForm.district = d.district ?? '';
-    editForm.regionPath = [d.province, d.city, d.district].filter(Boolean);
+    editForm.regionScope = d.regionScope || '';
+    editForm.regionPath =
+      d.regionScope === 'nationwide' || (!d.province && !d.city && !d.district && d.workAddress === '全国')
+        ? [NATIONAL_REGION_VALUE]
+        : [d.province, d.city, d.district].filter(Boolean);
     editForm.salaryMin = d.salaryMin ?? undefined;
     editForm.salaryMax = d.salaryMax ?? undefined;
     editForm.salaryUnit = normalizeSalaryUnit(d.salaryUnit);
@@ -1551,6 +1802,7 @@ function buildEditPayload() {
     province: editForm.province,
     city: editForm.city,
     district: editForm.district,
+    regionScope: editForm.regionScope,
     salaryMin: editForm.salaryMin,
     salaryMax: editForm.salaryMax,
     salaryUnit: editForm.salaryUnit,
@@ -1616,9 +1868,19 @@ async function submitEditAndAudit() {
 
 function syncEditRegionFromPath() {
   const [province = '', city = '', district = ''] = editForm.regionPath || [];
+  if (province === NATIONAL_REGION_VALUE) {
+    editForm.province = '';
+    editForm.city = '';
+    editForm.district = '';
+    editForm.regionScope = 'nationwide';
+    editForm.workAddress = '全国';
+    editFormRef.value?.validateField?.('workAddress');
+    return;
+  }
   editForm.province = province;
   editForm.city = city;
   editForm.district = district;
+  editForm.regionScope = district ? 'district' : city ? 'city' : province ? 'province' : '';
   // 工作地点为空时，用「省+市」预填地址前缀，HR 只需补街道门牌；已填则不覆盖，避免破坏运营已修正的地址
   if (!String(editForm.workAddress || '').trim() && (province || city)) {
     editForm.workAddress = `${province}${city}`;
@@ -1758,10 +2020,10 @@ async function handleHotChange(row: any) {
 async function handleDetail(row: any) {
   detailVisible.value = true;
   detailLoading.value = true;
-  currentJob.value = null;
+  currentJob.value = mergeJobDetail(row);
   try {
     const res = await getJobFullDetail(row.jobId);
-    currentJob.value = res.data;
+    currentJob.value = mergeJobDetail(row, res.data || {});
   } catch (error) {
     ElMessage.error('获取岗位详情失败');
   } finally {
@@ -1848,6 +2110,8 @@ async function handleSettlementLead(row: any) {
   settlementLeadVisible.value = true;
   settlementLeadLoading.value = true;
   settlementLead.value = null;
+  settlementLeadInvoices.value = [];
+  settlementLeadContext.value = { ...leadRow };
   settlementLeadActiveKey.value = 'company';
   try {
     if (!leadRow.companyId) {
@@ -1855,12 +2119,39 @@ async function handleSettlementLead(row: any) {
     }
     const res = await getBizNoChainByCompanyId(leadRow.companyId, leadRow.settlementIntentId);
     settlementLead.value = res.data || null;
-    settlementLeadActiveKey.value = settlementLeadSteps.value.find((step) => step.done)?.key || 'company';
+    await loadSettlementLeadInvoices(settlementLead.value);
+    settlementLeadActiveKey.value = [...settlementLeadSteps.value].reverse().find((step) => step.done)?.key || 'company';
   } catch {
+    settlementLeadContext.value = null;
+    settlementLeadInvoices.value = [];
     ElMessage.error('线索链路加载失败');
   } finally {
     settlementLeadLoading.value = false;
   }
+}
+
+function openSettlementLeadJob() {
+  if (!settlementLead.value?.jobId) return;
+  settlementLeadVisible.value = false;
+  router.push({ name: 'RecruitmentJob', query: { jobId: String(settlementLead.value.jobId) } });
+}
+
+function openSettlementLeadLedger() {
+  if (!settlementLead.value?.orderNo) return;
+  settlementLeadVisible.value = false;
+  router.push({ name: 'RecruitmentLedger', query: { orderNo: settlementLead.value.orderNo } });
+}
+
+function openSettlementLeadInvoice() {
+  if (!settlementLead.value?.orderNo && !settlementLead.value?.ledgerId) return;
+  settlementLeadVisible.value = false;
+  router.push({
+    name: 'RecruitmentInvoice',
+    query: {
+      ...(settlementLead.value.orderNo ? { ledgerOrderNo: settlementLead.value.orderNo } : {}),
+      ...(settlementLead.value.ledgerId ? { ledgerId: String(settlementLead.value.ledgerId) } : {})
+    }
+  });
 }
 
 function handleAudit(row: any, status: string) {
@@ -1879,6 +2170,16 @@ function handleSelectApplyUsers(row: any) {
 
 function displayPhone(row: any): string {
   return row?.phone || '-';
+}
+
+function imageUrl(value?: string | number): string {
+  const url = String(value || '').trim();
+  return /^(https?:\/\/|\/)/.test(url) ? url : '';
+}
+
+// 投递人员头像使用后端可访问 URL；旧头像 ID 不是图片地址，必须保留文字兜底。
+function candidateAvatarSrc(row: any): string {
+  return imageUrl(row?.resumeAvatarUrl || row?.avatarUrl || row?.avatar);
 }
 
 async function submitAudit() {
@@ -1949,6 +2250,10 @@ async function applyRouteFocus() {
   const qStatus = route.query.status;
   if (typeof qStatus === 'string' && qStatus) {
     queryParams.status = qStatus;
+  }
+  const qCompanyName = route.query.companyName;
+  if (typeof qCompanyName === 'string' && qCompanyName) {
+    queryParams.companyName = qCompanyName;
   }
   const qJobNo = route.query.jobNo;
   if (typeof qJobNo === 'string' && qJobNo) {
@@ -2156,14 +2461,59 @@ function formatStartDate(val?: string | number): string {
   gap: 4px;
 }
 
-/* 编辑弹窗：分组标题(el-divider)上下间距收紧，使三段更紧凑 */
+/* 编辑弹窗：分组标题独占稳定行距，避免上一行表单的计数/提示区域压住下一段标题。 */
 .job-edit-form :deep(.el-divider) {
-  margin: 4px 0 18px;
+  clear: both;
+  margin: 22px 0 22px;
 }
 
 .job-edit-form :deep(.el-divider__text) {
+  display: inline-flex;
+  align-items: center;
+  max-width: calc(100% - 32px);
+  padding: 0 12px;
+  line-height: 20px;
   font-weight: 600;
   color: #303133;
+  white-space: nowrap;
+}
+
+.job-edit-form .edit-work-time-row {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.job-edit-form .edit-work-time-row :deep(.el-col) {
+  min-width: 0;
+}
+
+.job-edit-form .edit-work-time-row :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.job-edit-form .edit-work-time-row :deep(.el-form-item__label) {
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.job-edit-form .edit-work-time-row :deep(.el-input__wrapper),
+.job-edit-form .edit-work-time-row :deep(.el-select__wrapper) {
+  min-height: 32px;
+}
+
+.job-edit-form .edit-work-time-row :deep(.el-input__count) {
+  position: static;
+  flex: none;
+  margin-left: 8px;
+  white-space: nowrap;
+  background: transparent;
+  transform: none;
+}
+
+.job-edit-form .job-detail-divider {
+  margin-top: 26px;
 }
 
 /* 模块标题：浅蓝文字 + 前置图标，区分不同分组 */

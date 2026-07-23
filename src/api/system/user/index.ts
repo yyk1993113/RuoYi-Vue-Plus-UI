@@ -2,7 +2,7 @@ import { DeptTreeVO } from './../dept/types';
 import { RoleVO } from '@/api/system/role/types';
 import request from '@/utils/request';
 import { AxiosPromise } from 'axios';
-import { UserForm, UserQuery, UserVO, UserInfoVO } from './types';
+import { BusinessUserQuery, JobSeekerUserQuery, UserForm, UserQuery, UserVO, UserInfoVO } from './types';
 import { parseStrEmpty } from '@/utils/ruoyi';
 
 /**
@@ -12,6 +12,39 @@ import { parseStrEmpty } from '@/utils/ruoyi';
 export const listUser = (query: UserQuery): AxiosPromise<UserVO[]> => {
   return request({
     url: '/system/user/list',
+    method: 'get',
+    params: query
+  });
+};
+
+/**
+ * 查询B端企业用户列表（用户管理页专用）
+ */
+export const listBusinessUsers = (query: BusinessUserQuery) => {
+  return request({
+    url: '/admin/recruitment/company/user-list',
+    method: 'get',
+    params: query
+  });
+};
+
+/**
+ * 查询B端企业树列表（用户管理页左侧企业树专用，保留企业维度）
+ */
+export const listBusinessCompanies = (query: BusinessUserQuery) => {
+  return request({
+    url: '/admin/recruitment/company/list',
+    method: 'get',
+    params: query
+  });
+};
+
+/**
+ * 查询C端求职者列表（用户管理页专用）
+ */
+export const listJobSeekerUsers = (query: JobSeekerUserQuery) => {
+  return request({
+    url: '/admin/recruitment/user/listWithStats',
     method: 'get',
     params: query
   });
@@ -211,6 +244,9 @@ export const deptTreeSelect = (): AxiosPromise<DeptTreeVO[]> => {
 
 export default {
   listUser,
+  listBusinessUsers,
+  listBusinessCompanies,
+  listJobSeekerUsers,
   getUser,
   optionSelect,
   addUser,
