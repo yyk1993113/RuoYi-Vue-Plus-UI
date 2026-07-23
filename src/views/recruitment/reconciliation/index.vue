@@ -1,28 +1,28 @@
-<!-- 归集资金流水读取本地 NTDMATRX 持久化记录；对账文件任务继续独立展示，避免把银行文件任务与资金状态混为一类。 -->
+<!-- 银行收支流水通过只读银行接口定时查询；对账文件任务继续独立展示，避免把银行文件任务与资金流水混为一类。 -->
 <template>
   <div class="p-4">
     <el-card shadow="hover" class="mb-4 filter-card">
       <el-tabs v-model="activeTab" @tab-change="loadActiveTab">
-        <el-tab-pane label="归集资金流水" name="funding">
+        <el-tab-pane label="银行收支流水" name="funding">
           <el-form :model="fundingQuery" inline>
             <el-form-item label="流水检索">
               <el-input
                 v-model="fundingQuery.keyword"
                 clearable
-                placeholder="平台请求号 / 银行流水号"
+                placeholder="银行流水号 / 企业 / 摘要"
                 style="width: 260px"
-                @keyup.enter="handleFundingSearch"
+                @input="applyFundingFilters"
+                @keyup.enter="applyFundingFilters"
               />
             </el-form-item>
-            <el-form-item label="归集状态">
-              <el-select v-model="fundingQuery.status" clearable placeholder="全部" style="width: 150px">
-                <el-option label="处理中" value="PROCESSING" />
-                <el-option label="成功" value="SUCCESS" />
-                <el-option label="失败" value="FAILED" />
-                <el-option label="待确认" value="UNKNOWN" />
+            <el-form-item label="收支类型">
+              <el-select v-model="fundingQuery.direction" clearable placeholder="全部" style="width: 150px" @change="applyFundingFilters">
+                <el-option label="收入" value="INCOME" />
+                <el-option label="支出" value="EXPENSE" />
+                <el-option label="待识别" value="UNKNOWN" />
               </el-select>
             </el-form-item>
-            <el-form-item label="归集日期">
+            <el-form-item label="交易日期">
               <el-date-picker
                 v-model="fundingDateRange"
                 type="daterange"
@@ -30,11 +30,19 @@
                 range-separator="至"
                 start-placeholder="开始日期"
                 end-placeholder="结束日期"
+                :disabled-date="disableFutureFundingDate"
                 style="width: 260px"
               />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" icon="Search" @click="handleFundingSearch">查询</el-button>
+              <el-button
+                v-hasPermi="['settlement:reconciliation:list']"
+                type="primary"
+                icon="Search"
+                :loading="syncing"
+                :disabled="manualCooldown > 0"
+                @click="queryBankFlows(true)"
+              >{{ queryButtonText }}</el-button>
               <el-button icon="Refresh" @click="resetFunding">重置</el-button>
             </el-form-item>
           </el-form>
@@ -72,77 +80,87 @@
       <template #header>
         <div class="toolbar">
           <div>
-            <strong>归集资金流水</strong>
-            <div class="hint">展示企业子单元通过 NTDMATRX 归集至主账号的本地资金记录</div>
+            <strong>银行收支流水</strong>
+            <div class="hint">数据来自银行子单元交易接口；页面停留期间每 5 分钟自动更新</div>
           </div>
-          <div>
-            <el-button
-              v-hasPermi="['settlement:reconciliation:list']"
-              type="success"
-              plain
-              icon="Refresh"
-              :loading="syncing"
-              @click="syncFunding"
-            >同步银行流水</el-button>
-            <el-button icon="Refresh" @click="loadFunding">刷新</el-button>
+          <div class="refresh-meta">
+            <el-tag type="success" effect="plain">自动查询：5 分钟</el-tag>
+            <span>最近查询：{{ formatDateTime(lastQueriedAt) }}</span>
           </div>
         </div>
       </template>
 
-      <el-table v-loading="fundingLoading" :data="fundingRows" stripe>
-        <el-table-column prop="createTime" label="归集时间" width="170">
-          <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
+      <div class="flow-summary">
+        <div class="summary-item income-summary">
+          <span>收入合计</span>
+          <strong>+ ¥{{ formatMoney(incomeTotal) }}</strong>
+        </div>
+        <div class="summary-item expense-summary">
+          <span>支出合计</span>
+          <strong>- ¥{{ formatMoney(expenseTotal) }}</strong>
+        </div>
+        <div class="summary-item">
+          <span>收支净额</span>
+          <strong :class="netAmount >= 0 ? 'amount-income' : 'amount-expense'">{{ netAmount >= 0 ? '+' : '-' }} ¥{{ formatMoney(Math.abs(netAmount)) }}</strong>
+        </div>
+        <div class="summary-item">
+          <span>当前结果</span>
+          <strong>{{ filteredFundingRows.length }} 笔</strong>
+        </div>
+      </div>
+
+      <el-table v-loading="syncing" :data="pagedFundingRows" stripe :row-key="bankFlowRowKey">
+        <el-table-column prop="bankTime" label="交易时间" width="175">
+          <template #default="{ row }">{{ formatDateTime(row.bankTime) }}</template>
+        </el-table-column>
+        <el-table-column label="收支" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="bankDirectionType[row.direction]" effect="light">{{ bankDirectionText[row.direction] }}</el-tag>
+          </template>
         </el-table-column>
         <el-table-column label="企业" min-width="190" show-overflow-tooltip>
           <template #default="{ row }">
             <div>{{ row.companyName || '-' }}</div>
-            <div class="cell-subtext">{{ row.companyNo || row.companyId }}</div>
+            <div class="cell-subtext">{{ row.companyNo || row.companyId || '-' }}</div>
           </template>
         </el-table-column>
         <el-table-column prop="subAccountNoMasked" label="子单元账号" min-width="150">
           <template #default="{ row }">{{ row.subAccountNoMasked || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="requestNo" label="平台请求号" min-width="190" show-overflow-tooltip />
         <el-table-column prop="bankSerialNo" label="银行流水号" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">{{ row.bankSerialNo || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="orderNo" label="台账号" min-width="180" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.orderNo || '-' }}</template>
+        <el-table-column prop="counterpartyAccountMasked" label="对方账号" min-width="150" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.counterpartyAccountMasked || '-' }}</template>
         </el-table-column>
-        <el-table-column label="台账金额" width="130" align="right">
-          <template #default="{ row }">¥{{ formatMoney(row.ledgerAmount) }}</template>
+        <el-table-column prop="purposeMasked" label="交易摘要" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.purposeMasked || '-' }}</template>
         </el-table-column>
-        <el-table-column label="抽佣" width="145" align="right">
+        <el-table-column label="收入" width="135" align="right">
           <template #default="{ row }">
-            <div>¥{{ formatMoney(row.commissionAmount) }}</div>
-            <div class="cell-subtext">{{ formatPercent(row.commissionRate) }}</div>
+            <strong v-if="row.direction === 'INCOME' && row.amount != null" class="amount-income">+ ¥{{ formatMoney(row.amount) }}</strong>
+            <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column label="归集金额" width="135" align="right">
-          <template #default="{ row }"><strong>¥{{ formatMoney(row.transferAmount) }}</strong></template>
-        </el-table-column>
-        <el-table-column label="状态" width="100" align="center">
+        <el-table-column label="支出" width="135" align="right">
           <template #default="{ row }">
-            <el-tag :type="fundingStatusType[row.status]">{{ fundingStatusText[row.status] }}</el-tag>
+            <strong v-if="row.direction === 'EXPENSE' && row.amount != null" class="amount-expense">- ¥{{ formatMoney(row.amount) }}</strong>
+            <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column label="银行结果" min-width="165" show-overflow-tooltip>
-          <template #default="{ row }">
-            <div>{{ row.bankResponseCode || row.failureCode || '-' }}</div>
-            <div v-if="row.failureMessage" class="cell-error">{{ row.failureMessage }}</div>
-          </template>
+        <el-table-column label="余额" width="135" align="right">
+          <template #default="{ row }">{{ row.balance == null ? '-' : `¥${formatMoney(row.balance)}` }}</template>
         </el-table-column>
-        <el-table-column prop="operatorName" label="操作人" width="120">
-          <template #default="{ row }">{{ row.operatorName || '-' }}</template>
-        </el-table-column>
+        <template #empty>
+          <el-empty description="当前查询范围暂无银行收支流水" />
+        </template>
       </el-table>
 
       <pagination
-        v-show="fundingTotal > 0"
+        v-show="filteredFundingRows.length > 0"
         v-model:page="fundingQuery.pageNum"
         v-model:limit="fundingQuery.pageSize"
-        :total="fundingTotal"
-        @pagination="loadFunding"
+        :total="filteredFundingRows.length"
       />
     </el-card>
 
@@ -197,29 +215,36 @@
 <script setup lang="ts">
 import {
   downloadReceipt,
-  listFundingFlows,
   listReceiptTasks,
   queryReceiptResult,
   submitPayrollReceipt,
   submitSubAccountStatement,
   syncFundingFlows,
-  type FundingFlow,
-  type FundingFlowQuery,
-  type FundingFlowStatus,
+  type BankFlowDirection,
+  type BankFundingFlow,
   type ReceiptTask,
   type ReceiptTaskStatus,
   type SyncFundingResult
 } from '@/api/recruitment/settlementReconciliation';
 
 type ActiveTab = 'funding' | 'receipt';
+type FundingQueryState = { keyword: string; direction: BankFlowDirection | ''; pageNum: number; pageSize: number };
+
+const AUTO_QUERY_INTERVAL = 5 * 60 * 1000;
+const MANUAL_QUERY_INTERVAL = 60 * 1000;
+const COOLDOWN_STORAGE_KEY = 'settlement-bank-flow-query-available-at';
 
 const activeTab = ref<ActiveTab>('funding');
-const fundingLoading = ref(false);
-const fundingRows = ref<FundingFlow[]>([]);
-const fundingTotal = ref(0);
-const fundingDateRange = ref<string[]>([]);
-const fundingQuery = reactive<FundingFlowQuery>({ keyword: '', status: '', pageNum: 1, pageSize: 10 });
+const fundingRows = ref<BankFundingFlow[]>([]);
+const fundingDateRange = ref<string[]>([todayText(), todayText()]);
+const fundingQuery = reactive<FundingQueryState>({ keyword: '', direction: '', pageNum: 1, pageSize: 10 });
 const syncing = ref(false);
+const manualCooldown = ref(0);
+const lastQueriedAt = ref('');
+let lastSuccessfulQueryAt = 0;
+let autoQueryTimer: number | undefined;
+let cooldownTimer: number | undefined;
+let delayedInitialQueryTimer: number | undefined;
 
 const receiptLoading = ref(false);
 const receiptRows = ref<ReceiptTask[]>([]);
@@ -230,16 +255,14 @@ const statementVisible = ref(false);
 const paymentNo = ref('');
 const statement = reactive<{ applicationId: string; range: string[] }>({ applicationId: '', range: [] });
 
-const fundingStatusText: Record<FundingFlowStatus, string> = {
-  PROCESSING: '处理中',
-  SUCCESS: '成功',
-  FAILED: '失败',
-  UNKNOWN: '待确认'
+const bankDirectionText: Record<BankFlowDirection, string> = {
+  INCOME: '收入',
+  EXPENSE: '支出',
+  UNKNOWN: '待识别'
 };
-const fundingStatusType: Record<FundingFlowStatus, '' | 'success' | 'warning' | 'danger'> = {
-  PROCESSING: '',
-  SUCCESS: 'success',
-  FAILED: 'danger',
+const bankDirectionType: Record<BankFlowDirection, 'success' | 'warning' | 'danger'> = {
+  INCOME: 'success',
+  EXPENSE: 'danger',
   UNKNOWN: 'warning'
 };
 const receiptStatusText: Record<ReceiptTaskStatus, string> = {
@@ -255,50 +278,111 @@ const receiptStatusType: Record<ReceiptTaskStatus, '' | 'success' | 'warning' | 
   FAILED: 'danger'
 };
 
-async function loadFunding() {
-  fundingLoading.value = true;
-  try {
-    // 日期只按自然日传给后端，分页与固定倒序由服务端统一控制。
-    const response = await listFundingFlows({
-      ...fundingQuery,
-      keyword: fundingQuery.keyword?.trim() || undefined,
-      status: fundingQuery.status || undefined,
-      startDate: fundingDateRange.value[0] || undefined,
-      endDate: fundingDateRange.value[1] || undefined
-    });
-    fundingRows.value = Array.isArray(response?.rows) ? response.rows : [];
-    fundingTotal.value = Number(response?.total || 0);
-  } finally {
-    fundingLoading.value = false;
-  }
-}
+const filteredFundingRows = computed(() => {
+  const keyword = fundingQuery.keyword.trim().toLowerCase();
+  return fundingRows.value.filter((row) => {
+    if (fundingQuery.direction && row.direction !== fundingQuery.direction) return false;
+    if (!keyword) return true;
+    return [row.bankSerialNo, row.companyName, row.companyNo, row.subAccountNoMasked, row.counterpartyAccountMasked, row.purposeMasked]
+      .some((value) => String(value || '').toLowerCase().includes(keyword));
+  });
+});
+const pagedFundingRows = computed(() => {
+  const start = (fundingQuery.pageNum - 1) * fundingQuery.pageSize;
+  return filteredFundingRows.value.slice(start, start + fundingQuery.pageSize);
+});
+const incomeTotal = computed(() => sumByDirection('INCOME'));
+const expenseTotal = computed(() => sumByDirection('EXPENSE'));
+const netAmount = computed(() => incomeTotal.value - expenseTotal.value);
+const queryButtonText = computed(() => manualCooldown.value > 0 ? `查询（${manualCooldown.value}秒）` : '查询银行流水');
 
-function handleFundingSearch() {
+function applyFundingFilters() {
   fundingQuery.pageNum = 1;
-  loadFunding();
 }
 
 function resetFunding() {
   fundingQuery.keyword = '';
-  fundingQuery.status = '';
+  fundingQuery.direction = '';
   fundingQuery.pageNum = 1;
   fundingQuery.pageSize = 10;
-  fundingDateRange.value = [];
-  loadFunding();
+  fundingDateRange.value = [todayText(), todayText()];
+  fundingRows.value = [];
+  lastQueriedAt.value = '';
+  if (manualCooldown.value === 0) queryBankFlows(true);
+  else scheduleDelayedBankQuery();
 }
 
-async function syncFunding() {
+async function queryBankFlows(manual = false) {
+  if (syncing.value || manualCooldown.value > 0) return;
+  if (!isFundingDateRangeValid()) return;
   syncing.value = true;
+  // 与后端的租户级限流保持一致，避免刷新页面或连点按钮重复消耗银行查询额度。
+  startManualCooldown();
   try {
     const result: SyncFundingResult = await syncFundingFlows({
       startDate: fundingDateRange.value[0] || undefined,
       endDate: fundingDateRange.value[1] || undefined
     });
-    ElMessage.success(`同步完成：拉取 ${result.fetched} 条，更新 ${result.updated} 条`);
-    await loadFunding();
+    fundingRows.value = Array.isArray(result?.flows) ? result.flows : [];
+    lastQueriedAt.value = result?.queriedAt || new Date().toISOString();
+    lastSuccessfulQueryAt = Date.now();
+    fundingQuery.pageNum = 1;
+    if (manual) ElMessage.success(`查询完成，共获取 ${result.fetched || 0} 笔银行流水`);
   } finally {
     syncing.value = false;
   }
+}
+
+function sumByDirection(direction: BankFlowDirection) {
+  return filteredFundingRows.value.reduce((total, row) => {
+    if (row.direction !== direction) return total;
+    const amount = Number(row.amount);
+    return Number.isFinite(amount) ? total + amount : total;
+  }, 0);
+}
+
+function startManualCooldown() {
+  localStorage.setItem(COOLDOWN_STORAGE_KEY, String(Date.now() + MANUAL_QUERY_INTERVAL));
+  updateManualCooldown();
+}
+
+function updateManualCooldown() {
+  const availableAt = Number(localStorage.getItem(COOLDOWN_STORAGE_KEY) || 0);
+  manualCooldown.value = Math.max(0, Math.ceil((availableAt - Date.now()) / 1000));
+  if (manualCooldown.value === 0 && availableAt) localStorage.removeItem(COOLDOWN_STORAGE_KEY);
+}
+
+function scheduleInitialBankQuery() {
+  updateManualCooldown();
+  if (manualCooldown.value === 0) {
+    queryBankFlows(false);
+    return;
+  }
+  scheduleDelayedBankQuery();
+}
+
+function scheduleDelayedBankQuery() {
+  if (delayedInitialQueryTimer) window.clearTimeout(delayedInitialQueryTimer);
+  delayedInitialQueryTimer = window.setTimeout(() => queryBankFlows(false), manualCooldown.value * 1000 + 300);
+}
+
+function isFundingDateRangeValid() {
+  if (fundingDateRange.value.length !== 2) {
+    ElMessage.warning('请选择完整的交易日期范围');
+    return false;
+  }
+  const start = new Date(`${fundingDateRange.value[0]}T00:00:00`);
+  const end = new Date(`${fundingDateRange.value[1]}T00:00:00`);
+  const days = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  if (!Number.isFinite(days) || days < 0 || days > 30) {
+    ElMessage.warning('单次最多查询 31 天银行流水');
+    return false;
+  }
+  return true;
+}
+
+function bankFlowRowKey(row: BankFundingFlow) {
+  return [row.applicationId, row.bankSerialNo, row.bankTime, row.direction, row.counterpartyAccountMasked, row.amount].join('-');
 }
 
 async function loadReceipts() {
@@ -318,8 +402,11 @@ function resetReceipts() {
 }
 
 function loadActiveTab() {
-  if (activeTab.value === 'funding') loadFunding();
-  else loadReceipts();
+  if (activeTab.value === 'receipt') {
+    loadReceipts();
+  } else if (!fundingRows.value.length && manualCooldown.value === 0) {
+    queryBankFlows(false);
+  }
 }
 
 async function submitPayroll() {
@@ -374,17 +461,38 @@ function formatMoney(value?: string | number) {
   return amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function formatPercent(value?: string | number) {
-  const rate = Number(value);
-  return Number.isFinite(rate) ? `${rate.toFixed(1)}%` : '-';
+function formatDateTime(value?: string) {
+  return value ? value.replace('T', ' ').replace(/\.\d+$/, '') : '-';
 }
 
-function formatDateTime(value?: string) {
-  return value || '-';
+function todayText() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60 * 1000);
+  return local.toISOString().slice(0, 10);
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible' && Date.now() - lastSuccessfulQueryAt >= AUTO_QUERY_INTERVAL) {
+    queryBankFlows(false);
+  }
 }
 
 const disableToday = (date: Date) => date.getTime() >= new Date(new Date().setHours(0, 0, 0, 0)).getTime();
-onMounted(loadFunding);
+const disableFutureFundingDate = (date: Date) => date.getTime() > new Date(new Date().setHours(23, 59, 59, 999)).getTime();
+onMounted(() => {
+  scheduleInitialBankQuery();
+  cooldownTimer = window.setInterval(updateManualCooldown, 1000);
+  autoQueryTimer = window.setInterval(() => {
+    if (activeTab.value === 'funding' && document.visibilityState === 'visible') queryBankFlows(false);
+  }, AUTO_QUERY_INTERVAL);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+});
+onBeforeUnmount(() => {
+  if (autoQueryTimer) window.clearInterval(autoQueryTimer);
+  if (cooldownTimer) window.clearInterval(cooldownTimer);
+  if (delayedInitialQueryTimer) window.clearTimeout(delayedInitialQueryTimer);
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+});
 </script>
 
 <style scoped>
@@ -392,10 +500,20 @@ onMounted(loadFunding);
 .filter-card :deep(.el-tabs__header) { margin-bottom: 18px; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .hint { margin-top: 6px; color: var(--el-text-color-secondary); font-size: 13px; font-weight: normal; }
+.refresh-meta { display: flex; align-items: center; gap: 12px; color: var(--el-text-color-secondary); font-size: 13px; }
+.flow-summary { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.summary-item { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border: 1px solid var(--el-border-color-lighter); border-radius: 10px; background: var(--el-fill-color-lighter); }
+.summary-item span { color: var(--el-text-color-secondary); font-size: 13px; }
+.summary-item strong { color: var(--el-text-color-primary); font-size: 20px; }
+.income-summary { background: var(--el-color-success-light-9); }
+.expense-summary { background: var(--el-color-danger-light-9); }
+.amount-income { color: var(--el-color-success) !important; }
+.amount-expense { color: var(--el-color-danger) !important; }
 .cell-subtext { margin-top: 3px; color: var(--el-text-color-secondary); font-size: 12px; }
-.cell-error { margin-top: 3px; color: var(--el-color-danger); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @media (max-width: 768px) {
   .toolbar { align-items: flex-start; flex-direction: column; }
+  .refresh-meta { align-items: flex-start; flex-direction: column; }
+  .flow-summary { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
 }
 </style>

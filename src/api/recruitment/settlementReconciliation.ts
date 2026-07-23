@@ -4,6 +4,7 @@ const baseUrl = '/admin/settlement/reconciliation';
 
 export type ReceiptTaskStatus = 'PENDING' | 'PROCESSING' | 'FETCHED' | 'FAILED';
 export type FundingFlowStatus = 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'UNKNOWN';
+export type BankFlowDirection = 'INCOME' | 'EXPENSE' | 'UNKNOWN';
 
 export interface FundingFlowQuery {
   keyword?: string;
@@ -43,6 +44,22 @@ export interface FundingFlowPage {
   total: number;
 }
 
+// 银行流水只接收后端已脱敏的子单元、对方账号和摘要，不在浏览器保留完整金融账号。
+export interface BankFundingFlow {
+  bankSerialNo?: string;
+  bankTime?: string;
+  direction: BankFlowDirection;
+  amount?: string | number;
+  balance?: string | number;
+  applicationId?: string | number;
+  subAccountNoMasked?: string;
+  companyId?: string | number;
+  companyNo?: string;
+  companyName?: string;
+  counterpartyAccountMasked?: string;
+  purposeMasked?: string;
+}
+
 export interface ReceiptTask {
   receiptNo: string;
   type: 'PAYROLL_RECEIPT' | 'SUB_ACCOUNT_STATEMENT' | string;
@@ -56,6 +73,8 @@ export interface SyncFundingResult {
   fetched: number;
   updated: number;
   skipped: number;
+  queriedAt?: string;
+  flows: BankFundingFlow[];
 }
 
 export function listReceiptTasks(params: { receiptNo?: string; type?: string; status?: string }) {
