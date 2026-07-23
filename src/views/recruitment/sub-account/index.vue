@@ -1019,19 +1019,27 @@
         <el-divider content-position="left">主账号资料</el-divider>
         <el-form class="payment-account-add-form" label-width="96px" @submit.prevent>
           <el-form-item label="选择主账号" class="payment-account-profile-account">
-            <el-select
-              v-model="paymentAccountProfileAccountId"
-              placeholder="请选择已有主账号或新增主账号"
-              @change="selectPaymentAccountProfile"
-            >
-              <el-option
-                v-for="item in paymentAccountRows"
-                :key="String(item.accountId)"
-                :label="`${item.accountName || '未命名主账号'}（${item.subjectCompanyName || '企业待补充'}）`"
-                :value="String(item.accountId)"
-              />
-              <el-option label="＋ 新增主账号" :value="NEW_PAYMENT_ACCOUNT_ID" />
-            </el-select>
+            <div class="payment-account-selector-row">
+              <el-select
+                v-model="paymentAccountProfileAccountId"
+                placeholder="请选择已有主账号"
+                @change="selectPaymentAccountProfile"
+              >
+                <el-option
+                  v-for="item in paymentAccountRows"
+                  :key="String(item.accountId)"
+                  :label="`${item.accountName || '未命名主账号'}（${item.subjectCompanyName || '企业待补充'}）`"
+                  :value="String(item.accountId)"
+                />
+                <el-option label="新增主账号" :value="NEW_PAYMENT_ACCOUNT_ID" />
+              </el-select>
+              <el-button
+                type="primary"
+                plain
+                :disabled="isCreatingPaymentAccount"
+                @click="selectPaymentAccountProfile(NEW_PAYMENT_ACCOUNT_ID)"
+              >＋ 添加主账号</el-button>
+            </div>
           </el-form-item>
           <el-form-item label="主账号企业">
             <el-input v-model="paymentAccountEditor.subjectCompanyName" maxlength="100" placeholder="请输入该主账号实际开户企业名称" />
@@ -2325,17 +2333,6 @@ function handleMultipleMainAccountChange(enabled: boolean | string | number) {
   ElMessage.info('已保留当前默认主账号，其余账号将在保存后解除分配');
 }
 
-function selectPaymentAccountForSave(accountId: string | number) {
-  const id = String(accountId);
-  if (!paymentAccountAllowMultiple.value) {
-    paymentAccountSelectedIds.value = [id];
-    paymentAccountDefaultId.value = id;
-    return;
-  }
-  if (!paymentAccountSelectedIds.value.includes(id)) paymentAccountSelectedIds.value.push(id);
-  if (!paymentAccountDefaultId.value) paymentAccountDefaultId.value = id;
-}
-
 async function persistPaymentAccount(
   accountName: string,
   accountNo: string,
@@ -2461,9 +2458,8 @@ async function addPaymentAccount() {
       draft.contactPhone
     );
     await loadPaymentAccounts();
-    selectPaymentAccountForSave(savedAccount.accountId);
     selectPaymentAccountProfile(savedAccount.accountId);
-    ElMessage.success(existing ? '该银行卡号已存在，已自动选中' : '主账号已添加并选中');
+    ElMessage.success(existing ? '该银行卡号已存在，当前保持原关联状态' : '主账号已添加，当前未关联子账号');
     return true;
   } finally {
     paymentAccountAdding.value = false;
@@ -3203,6 +3199,17 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
 
 .payment-account-profile-account {
   grid-column: 1 / -1;
+}
+
+.payment-account-selector-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+}
+
+.payment-account-selector-row :deep(.el-select) {
+  flex: 1;
 }
 
 .payment-account-add-action {
