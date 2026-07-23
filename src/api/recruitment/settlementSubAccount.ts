@@ -167,6 +167,7 @@ export interface SettlementPaymentAccountCreateRequest {
 }
 
 export interface SettlementPaymentAccountProfileRequest {
+  accountName: string;
   subjectCompanyName: string;
   contactName: string;
   /** 留空表示保留该主账号已经加密保存的联系方式。 */
@@ -352,6 +353,13 @@ export function updateSettlementPaymentAccountProfile(
     method: 'put',
     headers: { isEncrypt: true },
     data
+  });
+}
+
+export function deleteSettlementPaymentAccount(applicationId: string | number, accountId: string | number) {
+  return request({
+    url: `${baseUrl}/${applicationId}/payment-accounts/${accountId}`,
+    method: 'delete'
   });
 }
 

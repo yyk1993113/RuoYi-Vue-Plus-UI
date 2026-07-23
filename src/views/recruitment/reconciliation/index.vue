@@ -75,7 +75,17 @@
             <strong>归集资金流水</strong>
             <div class="hint">展示企业子单元通过 NTDMATRX 归集至主账号的本地资金记录</div>
           </div>
-          <el-button icon="Refresh" @click="loadFunding">刷新</el-button>
+          <div>
+            <el-button
+              v-hasPermi="['settlement:reconciliation:list']"
+              type="success"
+              plain
+              icon="Refresh"
+              :loading="syncing"
+              @click="syncFunding"
+            >同步银行流水</el-button>
+            <el-button icon="Refresh" @click="loadFunding">刷新</el-button>
+          </div>
         </div>
       </template>
 
@@ -192,11 +202,13 @@ import {
   queryReceiptResult,
   submitPayrollReceipt,
   submitSubAccountStatement,
+  syncFundingFlows,
   type FundingFlow,
   type FundingFlowQuery,
   type FundingFlowStatus,
   type ReceiptTask,
-  type ReceiptTaskStatus
+  type ReceiptTaskStatus,
+  type SyncFundingResult
 } from '@/api/recruitment/settlementReconciliation';
 
 type ActiveTab = 'funding' | 'receipt';
@@ -207,6 +219,7 @@ const fundingRows = ref<FundingFlow[]>([]);
 const fundingTotal = ref(0);
 const fundingDateRange = ref<string[]>([]);
 const fundingQuery = reactive<FundingFlowQuery>({ keyword: '', status: '', pageNum: 1, pageSize: 10 });
+const syncing = ref(false);
 
 const receiptLoading = ref(false);
 const receiptRows = ref<ReceiptTask[]>([]);
@@ -272,6 +285,20 @@ function resetFunding() {
   fundingQuery.pageSize = 10;
   fundingDateRange.value = [];
   loadFunding();
+}
+
+async function syncFunding() {
+  syncing.value = true;
+  try {
+    const result: SyncFundingResult = await syncFundingFlows({
+      startDate: fundingDateRange.value[0] || undefined,
+      endDate: fundingDateRange.value[1] || undefined
+    });
+    ElMessage.success(`同步完成：拉取 ${result.fetched} 条，更新 ${result.updated} 条`);
+    await loadFunding();
+  } finally {
+    syncing.value = false;
+  }
 }
 
 async function loadReceipts() {

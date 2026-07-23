@@ -52,6 +52,12 @@ export interface ReceiptTask {
   endDate?: string;
 }
 
+export interface SyncFundingResult {
+  fetched: number;
+  updated: number;
+  skipped: number;
+}
+
 export function listReceiptTasks(params: { receiptNo?: string; type?: string; status?: string }) {
   return request.get<ReceiptTask[]>(baseUrl, { params });
 }
@@ -59,6 +65,10 @@ export function listReceiptTasks(params: { receiptNo?: string; type?: string; st
 // 标准分页接口直接返回 TableDataInfo，rows/total 位于响应根节点。
 export function listFundingFlows(params: FundingFlowQuery) {
   return request.get<any, FundingFlowPage>(`${baseUrl}/funding-flows`, { params });
+}
+
+export function syncFundingFlows(data: { startDate?: string; endDate?: string }) {
+  return request.post<any, SyncFundingResult>(`${baseUrl}/funding-flows/sync`, data);
 }
 
 export function submitPayrollReceipt(paymentNo: string) {

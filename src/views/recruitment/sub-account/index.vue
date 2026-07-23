@@ -1015,6 +1015,17 @@
               </div>
             </template>
           </el-table-column>
+          <el-table-column label="操作" width="76" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                link
+                type="danger"
+                icon="Delete"
+                :loading="paymentAccountDeletingIds.includes(String(row.accountId))"
+                @click.stop="confirmDeletePaymentAccount(row)"
+              >删除</el-button>
+            </template>
+          </el-table-column>
         </el-table>
         <el-divider content-position="left">主账号资料</el-divider>
         <el-form class="payment-account-add-form" label-width="96px" @submit.prevent>
@@ -1040,6 +1051,9 @@
                 @click="selectPaymentAccountProfile(NEW_PAYMENT_ACCOUNT_ID)"
               >＋ 添加主账号</el-button>
             </div>
+          </el-form-item>
+          <el-form-item label="主账号名称">
+            <el-input v-model="paymentAccountEditor.accountName" maxlength="64" placeholder="请输入主账号名称" />
           </el-form-item>
           <el-form-item label="主账号企业">
             <el-input v-model="paymentAccountEditor.subjectCompanyName" maxlength="100" placeholder="请输入该主账号实际开户企业名称" />
@@ -1098,6 +1112,7 @@ import {
   addSettlementPaymentAccount,
   assignSettlementPaymentAccounts,
   blacklistSettlementSubAccount,
+  deleteSettlementPaymentAccount,
   getSettlementGlobalSettings,
   getSettlementMainAccountSettings,
   getSettlementPaymentAccountNo,
@@ -1337,6 +1352,7 @@ const paymentAccountLoading = ref(false);
 const paymentAccountSubmitting = ref(false);
 const paymentAccountAdding = ref(false);
 const paymentAccountProfileSubmitting = ref(false);
+const paymentAccountDeletingIds = ref<string[]>([]);
 const paymentAccountTarget = ref<SettlementSubAccountVO>();
 const paymentAccountRows = ref<SettlementPaymentAccount[]>([]);
 const revealedPaymentAccountNos = reactive<Record<string, string>>({});
@@ -1351,6 +1367,7 @@ const paymentAccountProfileAccountId = ref('');
 const paymentAccountStoredContactPhoneMasked = ref('');
 // 已有账号编辑和新增账号共用一条资料模型，仅银行卡号在新增时允许录入。
 const paymentAccountEditor = reactive({
+  accountName: '',
   subjectCompanyName: '',
   contactName: '',
   accountNo: '',
@@ -2237,6 +2254,7 @@ function clearPaymentAccountSensitiveValues() {
   paymentAccountRevealVersion.value += 1;
   Object.keys(revealedPaymentAccountNos).forEach((key) => delete revealedPaymentAccountNos[key]);
   paymentAccountNoLoadingIds.value = [];
+  paymentAccountDeletingIds.value = [];
   selectPaymentAccountProfile('');
   paymentAccountTarget.value = undefined;
 }
@@ -2246,6 +2264,7 @@ function selectPaymentAccountProfile(accountId: string | number) {
   if (id === NEW_PAYMENT_ACCOUNT_ID) {
     paymentAccountProfileAccountId.value = NEW_PAYMENT_ACCOUNT_ID;
     Object.assign(paymentAccountEditor, {
+      accountName: '',
       subjectCompanyName: '',
       contactName: '',
       contactPhone: '',
@@ -2256,6 +2275,7 @@ function selectPaymentAccountProfile(accountId: string | number) {
   }
   const account = paymentAccountRows.value.find((item) => String(item.accountId) === id);
   paymentAccountProfileAccountId.value = account ? id : '';
+  paymentAccountEditor.accountName = account?.accountName || '';
   paymentAccountEditor.subjectCompanyName = account?.subjectCompanyName || '';
   paymentAccountEditor.contactName = account?.contactName || '';
   paymentAccountEditor.contactPhone = '';
@@ -2357,12 +2377,10 @@ async function persistPaymentAccount(
 }
 
 function normalizedPaymentAccountDraft() {
-  const subjectCompanyName = paymentAccountEditor.subjectCompanyName.trim();
   return {
-    // 账户名称仅为内部展示字段，由主账号企业自动生成，页面不再重复录入。
-    accountName: `${subjectCompanyName}主账号`.slice(0, 64),
+    accountName: paymentAccountEditor.accountName.trim(),
     accountNo: paymentAccountEditor.accountNo.replace(/\s/g, ''),
-    subjectCompanyName,
+    subjectCompanyName: paymentAccountEditor.subjectCompanyName.trim(),
     contactName: paymentAccountEditor.contactName.trim(),
     contactPhone: paymentAccountEditor.contactPhone.trim()
   };
@@ -2375,6 +2393,7 @@ function validatePaymentAccountDraft(draft: ReturnType<typeof normalizedPaymentA
 
 function normalizedPaymentAccountProfileDraft() {
   return {
+    accountName: paymentAccountEditor.accountName.trim(),
     subjectCompanyName: paymentAccountEditor.subjectCompanyName.trim(),
     contactName: paymentAccountEditor.contactName.trim(),
     contactPhone: paymentAccountEditor.contactPhone.trim()
@@ -2382,9 +2401,10 @@ function normalizedPaymentAccountProfileDraft() {
 }
 
 function validatePaymentAccountProfile(
-  draft: { subjectCompanyName: string; contactName: string; contactPhone: string },
+  draft: { accountName: string; subjectCompanyName: string; contactName: string; contactPhone: string },
   requirePhone: boolean
 ) {
+  if (!draft.accountName) return '请输入主账号名称';
   if (!draft.subjectCompanyName) return '请输入主账号企业名称';
   if (!draft.contactName) return '请输入联系人';
   if (requirePhone && !draft.contactPhone) return '请输入联系人联系方式';
@@ -2395,7 +2415,7 @@ function validatePaymentAccountProfile(
 function selectedPaymentAccountMissingProfile() {
   const selected = new Set(paymentAccountSelectedIds.value.map(String));
   return paymentAccountRows.value.find((item) => selected.has(String(item.accountId))
-    && (!item.subjectCompanyName || !item.contactName || !item.contactPhoneMasked));
+    && (!item.accountName || !item.subjectCompanyName || !item.contactName || !item.contactPhoneMasked));
 }
 
 async function persistPaymentAccountProfile() {
@@ -2414,6 +2434,7 @@ async function persistPaymentAccountProfile() {
     paymentAccountTarget.value.applicationId,
     current.accountId,
     {
+      accountName: draft.accountName,
       subjectCompanyName: draft.subjectCompanyName,
       contactName: draft.contactName,
       contactPhone: draft.contactPhone || undefined
@@ -2466,12 +2487,41 @@ async function addPaymentAccount() {
   }
 }
 
+async function confirmDeletePaymentAccount(row: SettlementPaymentAccount) {
+  if (!paymentAccountTarget.value) return;
+  const accountId = String(row.accountId);
+  const confirmed = await ElMessageBox.confirm(
+    `确认删除主账号“${row.accountName || '未命名主账号'}”吗？删除后该账号将不再显示，且不可直接恢复。`,
+    '删除主账号',
+    {
+      type: 'warning',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消'
+    }
+  ).then(() => true).catch(() => false);
+  if (!confirmed) return;
+  if (row.assigned) {
+    ElMessage.warning('该主账号仍关联当前子账号，请先关闭关联并保存配置后再删除');
+    return;
+  }
+  paymentAccountDeletingIds.value.push(accountId);
+  try {
+    await deleteSettlementPaymentAccount(paymentAccountTarget.value.applicationId, row.accountId);
+    if (paymentAccountProfileAccountId.value === accountId) paymentAccountProfileAccountId.value = '';
+    await loadPaymentAccounts();
+    ElMessage.success('主账号已删除');
+  } finally {
+    paymentAccountDeletingIds.value = paymentAccountDeletingIds.value.filter((item) => item !== accountId);
+  }
+}
+
 async function submitPaymentAccounts() {
   if (!paymentAccountTarget.value) return;
   paymentAccountSubmitting.value = true;
   try {
     // 新增模式下填写了任一资料时，底部“保存配置”会先创建并选中该主账号。
     const hasNewAccountDraft = [
+      paymentAccountEditor.accountName,
       paymentAccountEditor.subjectCompanyName,
       paymentAccountEditor.contactName,
       paymentAccountEditor.contactPhone,
