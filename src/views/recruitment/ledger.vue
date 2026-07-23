@@ -243,8 +243,7 @@
         <el-table-column label="操作" width="190" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" icon="View" @click="handleDetail(row)">详情</el-button>
-            <!-- 标记已结算：仅「待结算」可操作 -->
-            <el-button v-if="row.status === '0'" link type="success" icon="Money" @click="openSettle([row])">结算</el-button>
+            <!-- 待结算行仅保留详情入口，避免在列表操作区重复展示单条结算动作。 -->
             <!-- 发放是运营管理员独立流程，仅对已结算台账开放，不复用或修改原结算动作。 -->
             <el-button
               v-if="row.status === '1'"
