@@ -166,6 +166,13 @@ export interface SettlementPaymentAccountCreateRequest {
   contactPhone: string;
 }
 
+export interface SettlementPaymentAccountProfileRequest {
+  subjectCompanyName: string;
+  contactName: string;
+  /** 留空表示保留该主账号已经加密保存的联系方式。 */
+  contactPhone?: string;
+}
+
 export function listSettlementSubAccount(params: SettlementSubAccountQuery) {
   return request.get<any>(`${baseUrl}/list`, { params }).then((response: any) => {
     if (!Array.isArray(response?.rows)) return response;
@@ -335,16 +342,25 @@ export function addSettlementPaymentAccount(applicationId: string | number, data
   });
 }
 
+export function updateSettlementPaymentAccountProfile(
+  applicationId: string | number,
+  accountId: string | number,
+  data: SettlementPaymentAccountProfileRequest
+) {
+  return request<SettlementPaymentAccount>({
+    url: `${baseUrl}/${applicationId}/payment-accounts/${accountId}/profile`,
+    method: 'put',
+    headers: { isEncrypt: true },
+    data
+  });
+}
+
 export function assignSettlementPaymentAccounts(
   applicationId: string | number,
   data: {
     accountIds: Array<string | number>;
     defaultAccountId: string | number;
     allowMultipleMainAccounts: boolean;
-    subjectCompanyName: string;
-    contactName: string;
-    /** 留空表示保留已加密保存的联系方式，首次配置必须填写。 */
-    contactPhone?: string;
   }
 ) {
   return request({
