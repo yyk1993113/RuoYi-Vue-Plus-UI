@@ -147,12 +147,23 @@ export interface SettlementPaymentAccount {
   accountId: string | number;
   accountName: string;
   accountNoMasked: string;
+  subjectCompanyName?: string;
+  contactName?: string;
+  contactPhoneMasked?: string;
   assigned: boolean;
   defaultAccount: boolean;
   /** 开户成功子账号记录确认的所属主账号状态：SUCCESS/UNASSIGNED/ERROR。 */
   syncStatus: 'SUCCESS' | 'UNASSIGNED' | 'ERROR' | string;
   syncCode?: string;
   syncMessage?: string;
+}
+
+export interface SettlementPaymentAccountCreateRequest {
+  accountName: string;
+  accountNo: string;
+  subjectCompanyName: string;
+  contactName: string;
+  contactPhone: string;
 }
 
 export function listSettlementSubAccount(params: SettlementSubAccountQuery) {
@@ -315,7 +326,7 @@ export function getSettlementMainAccountSettings(applicationId: string | number)
   });
 }
 
-export function addSettlementPaymentAccount(applicationId: string | number, data: { accountName: string; accountNo: string }) {
+export function addSettlementPaymentAccount(applicationId: string | number, data: SettlementPaymentAccountCreateRequest) {
   return request<SettlementPaymentAccount>({
     url: `${baseUrl}/${applicationId}/payment-accounts`,
     method: 'post',
@@ -330,7 +341,16 @@ export function assignSettlementPaymentAccounts(
     accountIds: Array<string | number>;
     defaultAccountId: string | number;
     allowMultipleMainAccounts: boolean;
+    subjectCompanyName: string;
+    contactName: string;
+    /** 留空表示保留已加密保存的联系方式，首次配置必须填写。 */
+    contactPhone?: string;
   }
 ) {
-  return request.put(`${baseUrl}/${applicationId}/payment-account-bindings`, data);
+  return request({
+    url: `${baseUrl}/${applicationId}/payment-account-bindings`,
+    method: 'put',
+    headers: { isEncrypt: true },
+    data
+  });
 }
