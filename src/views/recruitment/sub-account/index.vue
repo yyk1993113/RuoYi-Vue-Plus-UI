@@ -1016,12 +1016,12 @@
             </template>
           </el-table-column>
         </el-table>
-        <el-divider content-position="left">主账号企业与联系人资料</el-divider>
+        <el-divider content-position="left">主账号资料</el-divider>
         <el-form class="payment-account-add-form" label-width="96px" @submit.prevent>
-          <el-form-item label="对应主账号" class="payment-account-profile-account">
+          <el-form-item label="选择主账号" class="payment-account-profile-account">
             <el-select
               v-model="paymentAccountProfileAccountId"
-              placeholder="请选择要维护资料的主账号"
+              placeholder="请选择已有主账号或新增主账号"
               @change="selectPaymentAccountProfile"
             >
               <el-option
@@ -1030,50 +1030,39 @@
                 :label="`${item.accountName || '未命名主账号'}（${item.subjectCompanyName || '企业待补充'}）`"
                 :value="String(item.accountId)"
               />
+              <el-option label="＋ 新增主账号" :value="NEW_PAYMENT_ACCOUNT_ID" />
             </el-select>
           </el-form-item>
           <el-form-item label="主账号企业">
-            <el-input v-model="paymentAccountProfile.subjectCompanyName" maxlength="100" placeholder="请输入该主账号实际开户企业名称" />
+            <el-input v-model="paymentAccountEditor.subjectCompanyName" maxlength="100" placeholder="请输入该主账号实际开户企业名称" />
           </el-form-item>
           <el-form-item label="联系人">
-            <el-input v-model="paymentAccountProfile.contactName" maxlength="50" placeholder="请输入该主账号联系人姓名" />
+            <el-input v-model="paymentAccountEditor.contactName" maxlength="50" placeholder="请输入该主账号联系人姓名" />
           </el-form-item>
           <el-form-item label="联系方式">
             <el-input
-              v-model="paymentAccountProfile.contactPhone"
+              v-model="paymentAccountEditor.contactPhone"
               maxlength="32"
               :placeholder="paymentAccountStoredContactPhoneMasked ? `已保存 ${paymentAccountStoredContactPhoneMasked}，留空不修改` : '请输入手机号或固定电话'"
             />
+          </el-form-item>
+          <el-form-item label="银行卡号">
+            <el-input
+              v-if="isCreatingPaymentAccount"
+              v-model="paymentAccountEditor.accountNo"
+              maxlength="35"
+              placeholder="请输入完整银行卡号"
+            />
+            <el-input v-else :model-value="currentPaymentAccount?.accountNoMasked || '-'" disabled />
           </el-form-item>
           <el-form-item class="payment-account-add-action">
             <el-button
               type="primary"
               plain
               :disabled="!paymentAccountProfileAccountId"
-              :loading="paymentAccountProfileSubmitting"
-              @click="savePaymentAccountProfile"
-            >保存该主账号资料</el-button>
-          </el-form-item>
-        </el-form>
-        <el-divider content-position="left">新增主账号</el-divider>
-        <el-form class="payment-account-add-form" label-width="96px" @submit.prevent>
-          <el-form-item label="账户名称">
-            <el-input v-model="paymentAccountCreate.accountName" maxlength="64" placeholder="如：工资主账号" />
-          </el-form-item>
-          <el-form-item label="银行卡号">
-            <el-input v-model="paymentAccountCreate.accountNo" maxlength="35" placeholder="请输入完整银行卡号" />
-          </el-form-item>
-          <el-form-item label="主账号企业">
-            <el-input v-model="paymentAccountCreate.subjectCompanyName" maxlength="100" placeholder="请输入该主账号实际开户企业名称" />
-          </el-form-item>
-          <el-form-item label="联系人">
-            <el-input v-model="paymentAccountCreate.contactName" maxlength="50" placeholder="请输入该主账号联系人姓名" />
-          </el-form-item>
-          <el-form-item label="联系方式">
-            <el-input v-model="paymentAccountCreate.contactPhone" maxlength="32" placeholder="请输入手机号或固定电话" />
-          </el-form-item>
-          <el-form-item class="payment-account-add-action">
-            <el-button type="primary" plain :loading="paymentAccountAdding" @click="addPaymentAccount">添加主账号</el-button>
+              :loading="paymentAccountAdding || paymentAccountProfileSubmitting"
+              @click="savePaymentAccountEditor"
+            >{{ isCreatingPaymentAccount ? '添加主账号' : '保存主账号资料' }}</el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -1349,21 +1338,20 @@ const paymentAccountSelectedIds = ref<string[]>([]);
 const paymentAccountDefaultId = ref('');
 const paymentAccountAllowMultiple = ref(false);
 const paymentAccountSettingSource = ref<'GLOBAL' | 'INDIVIDUAL'>('GLOBAL');
+const NEW_PAYMENT_ACCOUNT_ID = '__NEW_PAYMENT_ACCOUNT__';
 const paymentAccountProfileAccountId = ref('');
 const paymentAccountStoredContactPhoneMasked = ref('');
-// 现有主账号资料与新增主账号草稿分离，避免把 B 端企业或另一张主账号的资料批量覆盖。
-const paymentAccountProfile = reactive({
+// 已有账号编辑和新增账号共用一条资料模型，仅银行卡号在新增时允许录入。
+const paymentAccountEditor = reactive({
   subjectCompanyName: '',
   contactName: '',
-  contactPhone: ''
-});
-const paymentAccountCreate = reactive({
-  accountName: '',
   accountNo: '',
-  subjectCompanyName: '',
-  contactName: '',
   contactPhone: ''
 });
+const isCreatingPaymentAccount = computed(() => paymentAccountProfileAccountId.value === NEW_PAYMENT_ACCOUNT_ID);
+const currentPaymentAccount = computed(() => paymentAccountRows.value.find(
+  (item) => String(item.accountId) === paymentAccountProfileAccountId.value
+));
 
 const globalCommissionRate = ref(5);
 const globalSettingsVisible = ref(false);
@@ -2243,22 +2231,27 @@ function clearPaymentAccountSensitiveValues() {
   paymentAccountNoLoadingIds.value = [];
   selectPaymentAccountProfile('');
   paymentAccountTarget.value = undefined;
-  Object.assign(paymentAccountCreate, {
-    accountName: '',
-    accountNo: '',
-    subjectCompanyName: '',
-    contactName: '',
-    contactPhone: ''
-  });
 }
 
 function selectPaymentAccountProfile(accountId: string | number) {
   const id = String(accountId || '');
+  if (id === NEW_PAYMENT_ACCOUNT_ID) {
+    paymentAccountProfileAccountId.value = NEW_PAYMENT_ACCOUNT_ID;
+    Object.assign(paymentAccountEditor, {
+      subjectCompanyName: '',
+      contactName: '',
+      contactPhone: '',
+      accountNo: ''
+    });
+    paymentAccountStoredContactPhoneMasked.value = '';
+    return;
+  }
   const account = paymentAccountRows.value.find((item) => String(item.accountId) === id);
   paymentAccountProfileAccountId.value = account ? id : '';
-  paymentAccountProfile.subjectCompanyName = account?.subjectCompanyName || '';
-  paymentAccountProfile.contactName = account?.contactName || '';
-  paymentAccountProfile.contactPhone = '';
+  paymentAccountEditor.subjectCompanyName = account?.subjectCompanyName || '';
+  paymentAccountEditor.contactName = account?.contactName || '';
+  paymentAccountEditor.contactPhone = '';
+  paymentAccountEditor.accountNo = '';
   paymentAccountStoredContactPhoneMasked.value = account?.contactPhoneMasked || '';
 }
 
@@ -2288,7 +2281,7 @@ async function loadPaymentAccounts() {
       ?? paymentAccountRows.value.find((item) => String(item.accountId) === paymentAccountDefaultId.value)
       ?? paymentAccountRows.value.find((item) => item.assigned)
       ?? paymentAccountRows.value[0];
-    selectPaymentAccountProfile(profileAccount?.accountId || '');
+    selectPaymentAccountProfile(profileAccount?.accountId || NEW_PAYMENT_ACCOUNT_ID);
     if (!paymentAccountAllowMultiple.value && paymentAccountSelectedIds.value.length > 1) {
       const retainedId = paymentAccountDefaultId.value || paymentAccountSelectedIds.value[0];
       paymentAccountSelectedIds.value = retainedId ? [retainedId] : [];
@@ -2363,37 +2356,31 @@ async function persistPaymentAccount(
   // 新增接口按银行卡号幂等返回实际记录，弹窗始终以服务端账户 ID 作为后续分配依据。
   if (existingIndex >= 0) paymentAccountRows.value.splice(existingIndex, 1, savedAccount);
   else paymentAccountRows.value.push(savedAccount);
-  Object.assign(paymentAccountCreate, {
-    accountName: '',
-    accountNo: '',
-    subjectCompanyName: '',
-    contactName: '',
-    contactPhone: ''
-  });
   return { savedAccount, existing: existingIndex >= 0 };
 }
 
 function normalizedPaymentAccountDraft() {
+  const subjectCompanyName = paymentAccountEditor.subjectCompanyName.trim();
   return {
-    accountName: paymentAccountCreate.accountName.trim(),
-    accountNo: paymentAccountCreate.accountNo.replace(/\s/g, ''),
-    subjectCompanyName: paymentAccountCreate.subjectCompanyName.trim(),
-    contactName: paymentAccountCreate.contactName.trim(),
-    contactPhone: paymentAccountCreate.contactPhone.trim()
+    // 账户名称仅为内部展示字段，由主账号企业自动生成，页面不再重复录入。
+    accountName: `${subjectCompanyName}主账号`.slice(0, 64),
+    accountNo: paymentAccountEditor.accountNo.replace(/\s/g, ''),
+    subjectCompanyName,
+    contactName: paymentAccountEditor.contactName.trim(),
+    contactPhone: paymentAccountEditor.contactPhone.trim()
   };
 }
 
 function validatePaymentAccountDraft(draft: ReturnType<typeof normalizedPaymentAccountDraft>) {
-  if (!draft.accountName) return '请输入账户名称';
   if (!/^\d{6,35}$/.test(draft.accountNo)) return '请输入6至35位银行卡号';
   return validatePaymentAccountProfile(draft, true);
 }
 
 function normalizedPaymentAccountProfileDraft() {
   return {
-    subjectCompanyName: paymentAccountProfile.subjectCompanyName.trim(),
-    contactName: paymentAccountProfile.contactName.trim(),
-    contactPhone: paymentAccountProfile.contactPhone.trim()
+    subjectCompanyName: paymentAccountEditor.subjectCompanyName.trim(),
+    contactName: paymentAccountEditor.contactName.trim(),
+    contactPhone: paymentAccountEditor.contactPhone.trim()
   };
 }
 
@@ -2415,7 +2402,7 @@ function selectedPaymentAccountMissingProfile() {
 }
 
 async function persistPaymentAccountProfile() {
-  if (!paymentAccountTarget.value || !paymentAccountProfileAccountId.value) return false;
+  if (!paymentAccountTarget.value || !paymentAccountProfileAccountId.value || isCreatingPaymentAccount.value) return false;
   const current = paymentAccountRows.value.find(
     (item) => String(item.accountId) === paymentAccountProfileAccountId.value
   );
@@ -2443,7 +2430,11 @@ async function persistPaymentAccountProfile() {
   return true;
 }
 
-async function savePaymentAccountProfile() {
+async function savePaymentAccountEditor() {
+  if (isCreatingPaymentAccount.value) {
+    await addPaymentAccount();
+    return;
+  }
   paymentAccountProfileSubmitting.value = true;
   try {
     if (await persistPaymentAccountProfile()) ElMessage.success('主账号企业与联系人资料已保存');
@@ -2453,10 +2444,13 @@ async function savePaymentAccountProfile() {
 }
 
 async function addPaymentAccount() {
-  if (!paymentAccountTarget.value) return;
+  if (!paymentAccountTarget.value) return false;
   const draft = normalizedPaymentAccountDraft();
   const validationMessage = validatePaymentAccountDraft(draft);
-  if (validationMessage) return ElMessage.warning(validationMessage);
+  if (validationMessage) {
+    ElMessage.warning(validationMessage);
+    return false;
+  }
   paymentAccountAdding.value = true;
   try {
     const { savedAccount, existing } = await persistPaymentAccount(
@@ -2469,7 +2463,8 @@ async function addPaymentAccount() {
     await loadPaymentAccounts();
     selectPaymentAccountForSave(savedAccount.accountId);
     selectPaymentAccountProfile(savedAccount.accountId);
-    ElMessage.success(existing ? '该银行卡号已存在，已自动选中' : '主账号已添加并选中，请保存配置');
+    ElMessage.success(existing ? '该银行卡号已存在，已自动选中' : '主账号已添加并选中');
+    return true;
   } finally {
     paymentAccountAdding.value = false;
   }
@@ -2479,25 +2474,21 @@ async function submitPaymentAccounts() {
   if (!paymentAccountTarget.value) return;
   paymentAccountSubmitting.value = true;
   try {
-    const draft = normalizedPaymentAccountDraft();
-    // 用户直接点击“保存配置”时，先把尚未点击“添加”的输入内容落库并自动加入本次分配。
-    if (draft.accountName || draft.accountNo) {
-      const validationMessage = validatePaymentAccountDraft(draft);
-      if (validationMessage) return ElMessage.warning(validationMessage);
-      const { savedAccount } = await persistPaymentAccount(
-        draft.accountName,
-        draft.accountNo,
-        draft.subjectCompanyName,
-        draft.contactName,
-        draft.contactPhone
-      );
-      await loadPaymentAccounts();
-      selectPaymentAccountForSave(savedAccount.accountId);
+    // 新增模式下填写了任一资料时，底部“保存配置”会先创建并选中该主账号。
+    const hasNewAccountDraft = [
+      paymentAccountEditor.subjectCompanyName,
+      paymentAccountEditor.contactName,
+      paymentAccountEditor.contactPhone,
+      paymentAccountEditor.accountNo
+    ].some((value) => value.trim());
+    if (isCreatingPaymentAccount.value && hasNewAccountDraft) {
+      if (!(await addPaymentAccount())) return;
     }
     if (!paymentAccountSelectedIds.value.length || !paymentAccountDefaultId.value) {
       return ElMessage.warning('请至少选择一个主账号并指定默认账号');
     }
-    if (paymentAccountProfileAccountId.value && !(await persistPaymentAccountProfile())) return;
+    if (paymentAccountProfileAccountId.value && !isCreatingPaymentAccount.value
+      && !(await persistPaymentAccountProfile())) return;
     const incompleteAccount = selectedPaymentAccountMissingProfile();
     if (incompleteAccount) {
       return ElMessage.warning(`请先完善主账号“${incompleteAccount.accountName || '未命名主账号'}”的企业与联系人资料`);
