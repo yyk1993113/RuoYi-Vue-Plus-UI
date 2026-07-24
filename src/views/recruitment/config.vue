@@ -201,6 +201,52 @@
             <div class="template-tip">上传后立即作为企业端下载模板生效；企业需选择身份后下载对应 PDF。</div>
           </div>
         </el-card>
+
+        <!-- 7) 微信分享海报 -->
+        <el-card v-loading="posterLoading" shadow="hover" class="mb-4 cfg-card">
+          <template #header>
+            <div class="cfg-card-header">
+              <span class="cfg-title">微信分享海报</span>
+              <el-button
+                v-if="wechatPoster.url"
+                link
+                type="danger"
+                :loading="posterRemoving"
+                @click="removeWechatPoster"
+              >
+                清除海报
+              </el-button>
+            </div>
+          </template>
+          <div class="poster-upload">
+            <div v-if="wechatPoster.url" class="poster-preview-box">
+              <el-image
+                :src="wechatPoster.url"
+                fit="contain"
+                class="poster-preview-img"
+                :preview-src-list="[wechatPoster.url]"
+              />
+              <div class="poster-meta">已上传：{{ wechatPoster.originalName || '未命名' }}</div>
+            </div>
+            <div v-else class="poster-empty">尚未上传自定义海报，小程序将使用默认 Canvas 海报</div>
+            <el-upload
+              :action="posterUploadAction"
+              :headers="uploadHeaders"
+              :show-file-list="false"
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+              :before-upload="beforePosterUpload"
+              :on-success="handlePosterUploadSuccess"
+              :on-error="handlePosterUploadError"
+            >
+              <el-button type="primary" :loading="posterUploading">
+                {{ wechatPoster.url ? '重新上传' : '上传海报' }}
+              </el-button>
+            </el-upload>
+            <div class="poster-tip">
+              建议尺寸 750×1185（约 9:14 竖版），JPG/PNG/WebP，不超过 5MB；上传后小程序端优先展示此图。
+            </div>
+          </div>
+        </el-card>
       </el-col>
 
       <!-- 右侧：字典（只读，透传 sys_dict） -->
@@ -254,6 +300,9 @@ import {
   getRecConfig,
   updateRecConfig,
   getAuthLetterTemplate,
+  getWechatPoster,
+  wechatPosterUploadUrl,
+  type WechatPosterFile,
   downloadAuthLetterTemplateFile,
   authLetterTemplateUploadUrl,
   listConfigDictData,
@@ -425,6 +474,15 @@ const templateDownloading = reactive<Record<AuthLetterTemplateType, boolean>>({
 });
 const uploadHeaders = ref(globalHeaders());
 
+// 微信分享海报上传地址（拼基址后供 el-upload 使用）
+const posterUploadAction = ${import.meta.env.VITE_APP_BASE_API};
+
+// 当前自定义微信分享海报（未配置时 url 为空，小程序走默认 Canvas 生成）
+const wechatPoster = ref<WechatPosterFile>({});
+const posterLoading = ref(false);
+const posterUploading = ref(false);
+const posterRemoving = ref(false);
+
 function templateUploadUrl(type: AuthLetterTemplateType) {
   return `${import.meta.env.VITE_APP_BASE_API}${authLetterTemplateUploadUrl(type)}`;
 }
@@ -521,6 +579,69 @@ async function loadAuthLetterTemplate() {
   } catch (e) {
     authLetterTemplate.value = {};
   }
+
+// 加载当前自定义微信分享海报
+async function loadWechatPoster() {
+  posterLoading.value = true;
+  try {
+    const res = await getWechatPoster();
+    wechatPoster.value = res.data || {};
+  } catch (e) {
+    wechatPoster.value = {};
+  } finally {
+    posterLoading.value = false;
+  }
+}
+
+function beforePosterUpload(file: File) {
+  const suffix = file.name.toLowerCase();
+  const isImage = ['.jpg', '.jpeg', '.png', '.webp'].some((s) => suffix.endsWith(s));
+  const isLt5M = file.size / 1024 / 1024 < 5;
+  if (!isImage) {
+    ElMessage.error('微信分享海报只支持 JPG/PNG/WebP 图片');
+    return false;
+  }
+  if (!isLt5M) {
+    ElMessage.error('微信分享海报图片大小不能超过 5MB');
+    return false;
+  }
+  posterUploading.value = true;
+  return true;
+}
+
+function handlePosterUploadSuccess(res: any) {
+  posterUploading.value = false;
+  if (res.code === 200) {
+    wechatPoster.value = res.data || {};
+    ElMessage.success('微信分享海报已上传并生效');
+  } else {
+    ElMessage.error(res.msg || '海报上传失败');
+  }
+}
+
+function handlePosterUploadError() {
+  posterUploading.value = false;
+  ElMessage.error('海报上传失败');
+}
+
+async function removeWechatPoster() {
+  posterRemoving.value = true;
+  try {
+    await updateRecConfig({
+      configKey: 'poster.wechat.share',
+      configValue: '',
+      configGroup: 'poster',
+      valueType: 'json',
+      remark: 'C 端微信分享海报自定义图片'
+    });
+    wechatPoster.value = {};
+    ElMessage.success('已清除自定义海报，小程序将恢复默认 Canvas 海报');
+  } catch (e) {
+    ElMessage.error('清除失败，请重试');
+  } finally {
+    posterRemoving.value = false;
+  }
+}
 }
 
 function beforeTemplateUpload(file: File, type: AuthLetterTemplateType) {
@@ -595,6 +716,7 @@ onMounted(() => {
   loadAllConfigs();
   loadJobTemplateTree();
   loadAuthLetterTemplate();
+  loadWechatPoster();
   loadAllDicts();
 });
 </script>
@@ -698,5 +820,44 @@ onMounted(() => {
 .text-secondary {
   font-size: 12px;
   color: #909399;
+}
+
+.poster-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.poster-preview-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.poster-preview-img {
+  width: 100%;
+  max-height: 360px;
+  border-radius: 8px;
+  background: #f5f7fa;
+}
+
+.poster-meta {
+  color: #606266;
+  font-size: 13px;
+}
+
+.poster-empty {
+  padding: 24px 0;
+  color: #909399;
+  font-size: 13px;
+  text-align: center;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.poster-tip {
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.6;
 }
 </style>
