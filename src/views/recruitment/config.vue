@@ -116,12 +116,7 @@
           <template #header>
             <div class="cfg-card-header">
               <span class="cfg-title">具体职位岗位描述模板</span>
-              <el-button
-                type="primary"
-                :loading="jobTemplateSaving"
-                :disabled="!selectedJobPositionKey"
-                @click="saveJobDescriptionTemplate"
-              >
+              <el-button type="primary" :loading="jobTemplateSaving" :disabled="!selectedJobPositionKey" @click="saveJobDescriptionTemplate">
                 保存模板
               </el-button>
             </div>
@@ -201,52 +196,6 @@
             <div class="template-tip">上传后立即作为企业端下载模板生效；企业需选择身份后下载对应 PDF。</div>
           </div>
         </el-card>
-
-        <!-- 7) 微信分享海报 -->
-        <el-card v-loading="posterLoading" shadow="hover" class="mb-4 cfg-card">
-          <template #header>
-            <div class="cfg-card-header">
-              <span class="cfg-title">微信分享海报</span>
-              <el-button
-                v-if="wechatPoster.url"
-                link
-                type="danger"
-                :loading="posterRemoving"
-                @click="removeWechatPoster"
-              >
-                清除海报
-              </el-button>
-            </div>
-          </template>
-          <div class="poster-upload">
-            <div v-if="wechatPoster.url" class="poster-preview-box">
-              <el-image
-                :src="wechatPoster.url"
-                fit="contain"
-                class="poster-preview-img"
-                :preview-src-list="[wechatPoster.url]"
-              />
-              <div class="poster-meta">已上传：{{ wechatPoster.originalName || '未命名' }}</div>
-            </div>
-            <div v-else class="poster-empty">尚未上传自定义海报，小程序将使用默认 Canvas 海报</div>
-            <el-upload
-              :action="posterUploadAction"
-              :headers="uploadHeaders"
-              :show-file-list="false"
-              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-              :before-upload="beforePosterUpload"
-              :on-success="handlePosterUploadSuccess"
-              :on-error="handlePosterUploadError"
-            >
-              <el-button type="primary" :loading="posterUploading">
-                {{ wechatPoster.url ? '重新上传' : '上传海报' }}
-              </el-button>
-            </el-upload>
-            <div class="poster-tip">
-              建议尺寸 750×1185（约 9:14 竖版），JPG/PNG/WebP，不超过 5MB；上传后小程序端优先展示此图。
-            </div>
-          </div>
-        </el-card>
       </el-col>
 
       <!-- 右侧：字典（只读，透传 sys_dict） -->
@@ -284,6 +233,37 @@
               </el-table>
             </el-collapse-item>
           </el-collapse>
+        </el-card>
+
+        <!-- 微信分享海报放在右侧行业字典区域下方，便于运营集中维护行业相关展示素材。 -->
+        <el-card v-loading="posterLoading" shadow="hover" class="mb-4 cfg-card">
+          <template #header>
+            <div class="cfg-card-header">
+              <span class="cfg-title">微信分享海报</span>
+              <el-button v-if="wechatPoster.url" link type="danger" :loading="posterRemoving" @click="removeWechatPoster"> 清除海报 </el-button>
+            </div>
+          </template>
+          <div class="poster-upload">
+            <div v-if="wechatPoster.url" class="poster-preview-box">
+              <el-image :src="wechatPoster.url" fit="contain" class="poster-preview-img" :preview-src-list="[wechatPoster.url]" />
+              <div class="poster-meta">已上传：{{ wechatPoster.originalName || '未命名' }}</div>
+            </div>
+            <div v-else class="poster-empty">尚未上传自定义海报，小程序将使用默认 Canvas 海报</div>
+            <el-upload
+              :action="posterUploadAction"
+              :headers="uploadHeaders"
+              :show-file-list="false"
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+              :before-upload="beforePosterUpload"
+              :on-success="handlePosterUploadSuccess"
+              :on-error="handlePosterUploadError"
+            >
+              <el-button type="primary" :loading="posterUploading">
+                {{ wechatPoster.url ? '重新上传' : '上传海报' }}
+              </el-button>
+            </el-upload>
+            <div class="poster-tip">建议尺寸 750×1185（约 9:14 竖版），JPG/PNG/WebP，不超过 5MB；上传后小程序端优先展示此图。</div>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -475,7 +455,7 @@ const templateDownloading = reactive<Record<AuthLetterTemplateType, boolean>>({
 const uploadHeaders = ref(globalHeaders());
 
 // 微信分享海报上传地址（拼基址后供 el-upload 使用）
-const posterUploadAction = ${import.meta.env.VITE_APP_BASE_API};
+const posterUploadAction = `${import.meta.env.VITE_APP_BASE_API}${wechatPosterUploadUrl}`;
 
 // 当前自定义微信分享海报（未配置时 url 为空，小程序走默认 Canvas 生成）
 const wechatPoster = ref<WechatPosterFile>({});
@@ -579,6 +559,7 @@ async function loadAuthLetterTemplate() {
   } catch (e) {
     authLetterTemplate.value = {};
   }
+}
 
 // 加载当前自定义微信分享海报
 async function loadWechatPoster() {
@@ -641,7 +622,6 @@ async function removeWechatPoster() {
   } finally {
     posterRemoving.value = false;
   }
-}
 }
 
 function beforeTemplateUpload(file: File, type: AuthLetterTemplateType) {

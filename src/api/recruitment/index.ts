@@ -1848,11 +1848,11 @@ export interface WechatPosterFile {
 
 // 获取当前 C 端微信分享海报配置
 export function getWechatPoster() {
-  return request.get<WechatPosterFile>(${configBaseUrl}/wechat-poster);
+  return request.get<WechatPosterFile>(`${configBaseUrl}/wechat-poster`);
 }
 
 // 上传微信分享海报图片接口地址（供 el-upload 使用）
-export const wechatPosterUploadUrl = ${configBaseUrl}/wechat-poster/upload;
+export const wechatPosterUploadUrl = `${configBaseUrl}/wechat-poster/upload`;
 
 // 配置列表（分页，支持 configKey 模糊 / configGroup 过滤）：GET /admin/config/list，返回 TableDataInfo（rows/total）
 export function listRecConfig(query: { pageNum?: number; pageSize?: number; configKey?: string; configGroup?: string }) {
