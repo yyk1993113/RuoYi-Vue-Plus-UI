@@ -71,6 +71,8 @@ export interface RecommendationSearchTestRequest {
 
 export interface RecommendationSearchHit {
   entityId: number;
+  entityCode?: string;
+  entityName?: string;
   score: number;
 }
 

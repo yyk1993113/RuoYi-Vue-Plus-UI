@@ -116,6 +116,12 @@
         </el-descriptions>
         <el-table v-if="testResult.hits.length" :data="testResult.hits" border stripe class="mt-3">
           <el-table-column type="index" label="排名" width="80" align="center" />
+          <el-table-column :label="targetCodeLabel" prop="entityCode" min-width="190" align="center">
+            <template #default="{ row }">{{ row.entityCode || '-' }}</template>
+          </el-table-column>
+          <el-table-column v-if="testResult.direction === 'CANDIDATE_TO_JOB'" label="岗位名称" prop="entityName" min-width="180">
+            <template #default="{ row }">{{ row.entityName || '-' }}</template>
+          </el-table-column>
           <el-table-column :label="targetIdLabel" prop="entityId" min-width="160" align="center" />
           <el-table-column label="相似度分数" min-width="160" align="center">
             <template #default="{ row }">{{ Number(row.score).toFixed(6) }}</template>
@@ -469,7 +475,10 @@ const refreshRules: FormRules = {
 
 const sourceCodeLabel = computed(() => (testForm.direction === 'CANDIDATE_TO_JOB' ? '求职者编号' : '岗位编号'));
 const sourceCodePlaceholder = computed(() => (testForm.direction === 'CANDIDATE_TO_JOB' ? '如 SKR-...' : '如 JOB-...'));
-const targetIdLabel = computed(() => (testForm.direction === 'CANDIDATE_TO_JOB' ? '岗位 ID' : '求职者用户 ID'));
+// 结果列以实际返回方向为准，避免检索完成后切换单选项导致旧结果标题错位。
+const resultDirection = computed(() => testResult.value?.direction || testForm.direction);
+const targetCodeLabel = computed(() => (resultDirection.value === 'CANDIDATE_TO_JOB' ? '岗位编号' : '求职者编号'));
+const targetIdLabel = computed(() => (resultDirection.value === 'CANDIDATE_TO_JOB' ? '岗位 ID' : '求职者用户 ID'));
 const memoryCodeLabel = computed(() => (memoryForm.direction === 'CANDIDATE_TO_JOB' ? '求职者编号' : '岗位编号'));
 const memoryCodePlaceholder = computed(() => (memoryForm.direction === 'CANDIDATE_TO_JOB' ? '如 SKR-...' : '如 JOB-...'));
 const canRunTest = computed(
