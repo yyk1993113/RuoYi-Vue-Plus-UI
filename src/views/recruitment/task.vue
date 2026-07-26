@@ -318,7 +318,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, type FormRules } from 'element-plus';
 import { Refresh, Clock, Warning, Money } from '@element-plus/icons-vue';
@@ -762,9 +762,20 @@ async function applyRouteFocus() {
   }
 }
 
+function handleBusinessEvent(event: Event) {
+  const detail = (event as CustomEvent).detail;
+  if (detail?.type !== 'fulfillment_task_verified') return;
+  refresh();
+}
+
 onMounted(() => {
+  window.addEventListener('business-event', handleBusinessEvent);
   applyRouteFocus();
   refresh();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('business-event', handleBusinessEvent);
 });
 </script>
 
