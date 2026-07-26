@@ -320,7 +320,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage, type FormRules } from 'element-plus';
+import { ElMessage, ElMessageBox, type FormRules } from 'element-plus';
 import { Refresh, Clock, Warning, Money } from '@element-plus/icons-vue';
 import { listTask, getTaskStatistics, getTaskAbnormalStatistics, getTask, verifyTask, taskExportUrl, listLedger } from '@/api/recruitment';
 import { listByIds } from '@/api/system/oss';
@@ -337,6 +337,8 @@ const total = ref(0);
 const tableData = ref<any[]>([]);
 const detailVisible = ref(false);
 const currentTask = ref<any>(null);
+let taskListRequestSeq = 0;
+let taskDetailRequestSeq = 0;
 const photoUrlMap = ref<Record<string, string>>({});
 const queryFormRef = ref();
 // 平台代核验
@@ -584,19 +586,24 @@ function rowAbnormal(row: any): string {
 }
 
 async function loadData() {
+  const requestSeq = ++taskListRequestSeq;
   loading.value = true;
   try {
     // 时间区间拆分注入查询参数
     queryParams.beginTime = dateRange.value?.[0] || '';
     queryParams.endTime = dateRange.value?.[1] || '';
     const res = await listTask(queryParams);
+    if (requestSeq !== taskListRequestSeq) return;
     const list = unwrapList(res);
     tableData.value = list.rows;
     total.value = list.total;
   } catch (error) {
+    if (requestSeq !== taskListRequestSeq) return;
     console.error('加载履约任务失败:', error);
   } finally {
-    loading.value = false;
+    if (requestSeq === taskListRequestSeq) {
+      loading.value = false;
+    }
   }
 }
 
@@ -645,10 +652,20 @@ function resetVerifyForm() {
 }
 
 async function submitVerify() {
+  if (submitting.value) return;
   // 仅在「通过」时校验工时/金额；「驳回」时校验原因（rules 已按 status 区分）
   const fieldsToCheck = verifyForm.status === 'completed' ? ['workHours', 'settleAmount'] : ['remark'];
   try {
     await verifyFormRef.value?.validateField(fieldsToCheck);
+  } catch {
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(
+      verifyForm.status === 'completed' ? '确认将该履约任务代核验通过？' : '确认驳回该履约任务？',
+      '操作确认',
+      { type: 'warning' }
+    );
   } catch {
     return;
   }
@@ -728,18 +745,24 @@ function handleExport() {
 }
 
 async function handleDetail(row: any) {
+  const requestSeq = ++taskDetailRequestSeq;
   detailVisible.value = true;
   detailLoading.value = true;
   currentTask.value = null;
   try {
     const res = await getTask(row.taskId);
+    if (requestSeq !== taskDetailRequestSeq) return;
     currentTask.value = res.data;
     await loadTaskPhotoUrls(currentTask.value);
+    if (requestSeq !== taskDetailRequestSeq) return;
   } catch (error) {
+    if (requestSeq !== taskDetailRequestSeq) return;
     ElMessage.error('获取任务详情失败');
     detailVisible.value = false;
   } finally {
-    detailLoading.value = false;
+    if (requestSeq === taskDetailRequestSeq) {
+      detailLoading.value = false;
+    }
   }
 }
 

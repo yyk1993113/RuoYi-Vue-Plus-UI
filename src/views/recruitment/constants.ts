@@ -22,6 +22,7 @@ function resolve(map: Record<string, StatusMeta>, status: string | undefined | n
 const TASK_STATUS: Record<string, StatusMeta> = {
   pending_confirm: { label: '待确认', type: 'warning' },
   in_progress: { label: '进行中', type: 'primary' },
+  terms_pending: { label: '变更待确认', type: 'warning' },
   submitted: { label: '待核验', type: 'warning' },
   rejected: { label: '已退回', type: 'danger' },
   completed: { label: '已完成', type: 'success' },
@@ -34,10 +35,9 @@ export const taskStatusMeta = (status?: string | null): StatusMeta => resolve(TA
 const INVOICE_STATUS: Record<string, StatusMeta> = {
   '0': { label: '未开票', type: 'warning' },
   '1': { label: '已开票', type: 'success' },
-  '2': { label: '已作废', type: 'danger' },
-  '3': { label: '红冲', type: 'danger' }
+  '2': { label: '已作废', type: 'danger' }
 };
-export const invoiceStatusMeta = (status?: string | null): StatusMeta => resolve(INVOICE_STATUS, status, INVOICE_STATUS['2']);
+export const invoiceStatusMeta = (status?: string | null): StatusMeta => resolve(INVOICE_STATUS, status, { label: '未知', type: 'info' });
 
 // ========== 台账结算状态 ledger.status：0待结算 / 1已结算 / 2已取消 ==========
 // 来源：后端 Ledger.status。运营端「履约监控台」详情的资金主线展示该任务最新台账的结算状态。
@@ -47,7 +47,7 @@ const LEDGER_STATUS: Record<string, StatusMeta> = {
   '1': { label: '已结算', type: 'success' },
   '2': { label: '已取消', type: 'info' }
 };
-export const ledgerStatusMeta = (status?: string | null): StatusMeta => resolve(LEDGER_STATUS, status, LEDGER_STATUS['0']);
+export const ledgerStatusMeta = (status?: string | null): StatusMeta => resolve(LEDGER_STATUS, status, { label: '未知', type: 'info' });
 
 // ========== 履约异常类型 abnormalType（运营端只读预警，无对应数据库字段，为服务端按阈值计算的派生维度）==========
 // pending_timeout 待确认超时 / verify_timeout 待核验超时(催企业核验) / settlement_pending 待结算 / completed_unsettled 完成未结算。
@@ -68,7 +68,7 @@ const LEDGER_INVOICE_STATUS: Record<string, StatusMeta> = {
   '0': { label: '未绑定', type: 'info' },
   '1': { label: '已绑定', type: 'success' }
 };
-export const ledgerInvoiceStatusMeta = (status?: string | null): StatusMeta => resolve(LEDGER_INVOICE_STATUS, status, LEDGER_INVOICE_STATUS['0']);
+export const ledgerInvoiceStatusMeta = (status?: string | null): StatusMeta => resolve(LEDGER_INVOICE_STATUS, status, { label: '未知', type: 'info' });
 
 // ========== 企业认证状态 company：0待审核 / 1已认证 / 2已禁用 ==========
 // 来源：company.vue 表格列与详情弹窗的 el-tag 阶梯；原 v-else 兜底为「已禁用 / danger」。

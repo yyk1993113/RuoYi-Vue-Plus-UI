@@ -1645,7 +1645,7 @@ export function listInvoice(query: InvoiceQuery) {
 }
 
 export function getInvoice(invoiceId: number | string) {
-  return request.get<any>(`${baseUrl}/invoice/${invoiceId}`);
+  return request.get<any>(`/admin/invoice-manage/${invoiceId}`);
 }
 
 export function updateInvoiceStatus(data: { invoiceId: number | string; status: string }) {
@@ -1682,8 +1682,8 @@ export function bindInvoiceManage(data: { invoiceId: number | string; ledgerId: 
   return request.post<any>(`${invoiceManageBaseUrl}/bind`, data);
 }
 
-// 变更发票开票状态（0未开票/1已开票/2已作废/3红冲）
-export function markInvoiceManageStatus(data: { invoiceId: number | string; status: string }) {
+// 变更发票开票状态（0未开票/1已开票/2已作废）
+export function markInvoiceManageStatus(data: { invoiceId: number | string; status: string; remark?: string }) {
   return request.post<any>(`${invoiceManageBaseUrl}/markStatus`, data);
 }
 

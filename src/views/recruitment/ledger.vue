@@ -807,6 +807,8 @@ const total = ref(0);
 const tableData = ref<any[]>([]);
 const detailVisible = ref(false);
 const currentLedger = ref<any>(null);
+let ledgerListRequestSeq = 0;
+let ledgerDetailRequestSeq = 0;
 const queryFormRef = ref();
 
 // 多选：仅「待结算」可被选中（表格 selectable 已限制），这里再过滤一层兜底
@@ -1329,16 +1331,21 @@ async function loadChainDetails(chain: BizNoChainVO) {
 }
 
 async function loadData() {
+  const requestSeq = ++ledgerListRequestSeq;
   loading.value = true;
   try {
     const res = await listLedger(queryParams);
+    if (requestSeq !== ledgerListRequestSeq) return;
     const list = unwrapList(res);
     tableData.value = list.rows;
     total.value = list.total;
   } catch (error) {
+    if (requestSeq !== ledgerListRequestSeq) return;
     console.error('加载台账失败:', error);
   } finally {
-    loading.value = false;
+    if (requestSeq === ledgerListRequestSeq) {
+      loading.value = false;
+    }
   }
 }
 
@@ -1451,11 +1458,14 @@ function isSelectable(row: any) {
 }
 
 async function handleDetail(row: any) {
+  const requestSeq = ++ledgerDetailRequestSeq;
   try {
     const res = await getLedger(row.ledgerId);
+    if (requestSeq !== ledgerDetailRequestSeq) return;
     currentLedger.value = res.data;
     detailVisible.value = true;
   } catch (error) {
+    if (requestSeq !== ledgerDetailRequestSeq) return;
     ElMessage.error('获取台账详情失败');
   }
 }
@@ -1482,8 +1492,11 @@ async function submitSettle() {
   if (!ledgerIds.length) return;
   submitting.value = true;
   try {
-    await settleLedger({ ledgerIds, remark: settleRemark.value?.trim() || undefined });
-    ElMessage.success('已标记结算');
+    const res = await settleLedger({ ledgerIds, remark: settleRemark.value?.trim() || undefined });
+    const data = (res as any)?.data || {};
+    const settledCount = Number(data.settledCount ?? ledgerIds.length);
+    const skippedCount = Number(data.skippedCount ?? 0);
+    ElMessage.success(skippedCount > 0 ? `已标记 ${settledCount} 笔，跳过 ${skippedCount} 笔非待结算台账` : `已标记 ${settledCount} 笔结算`);
     settleVisible.value = false;
     detailVisible.value = false;
     loadData();

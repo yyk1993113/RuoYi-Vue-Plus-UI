@@ -67,7 +67,6 @@
             <el-option label="未开票" value="0" />
             <el-option label="已开票" value="1" />
             <el-option label="已作废" value="2" />
-            <el-option label="红冲" value="3" />
           </el-select>
         </el-form-item>
         <el-form-item label="台账编号" prop="ledgerOrderNo">
@@ -532,7 +531,6 @@
           <el-select v-model="uploadForm.status" placeholder="默认已开票" style="width: 100%">
             <el-option label="已开票" value="1" />
             <el-option label="作废" value="2" />
-            <el-option label="红冲" value="3" />
           </el-select>
         </el-form-item>
         <el-form-item label="备注" prop="remark">
@@ -676,6 +674,7 @@ const tableData = ref<InvoiceManageVO[]>([]);
 const detailVisible = ref(false);
 const currentInvoice = ref<any>(null);
 const sameLedgerInvoices = ref<InvoiceManageVO[]>([]);
+let invoiceDetailRequestSeq = 0;
 const filePreviewLoading = ref(false);
 const filePreviewFailed = ref(false);
 const filePreviewReloadKey = ref(0);
@@ -1116,10 +1115,11 @@ function resetQuery() {
 }
 
 async function handleDetail(row: InvoiceManageVO) {
+  const requestSeq = ++invoiceDetailRequestSeq;
   currentInvoice.value = { ...row };
   resetPreviewState();
   detailVisible.value = true;
-  await Promise.all([loadInvoiceDetail(row), loadSameLedgerInvoices(row)]);
+  await Promise.all([loadInvoiceDetail(row, requestSeq), loadSameLedgerInvoices(row, requestSeq)]);
 }
 
 function openRelatedLedger(row: InvoiceManageVO) {
@@ -1134,11 +1134,12 @@ function openRelatedCompany(row: InvoiceManageVO) {
   window.open(href, '_blank', 'noopener');
 }
 
-async function loadInvoiceDetail(row: InvoiceManageVO) {
+async function loadInvoiceDetail(row: InvoiceManageVO, requestSeq: number) {
   const invoiceId = idKey(row.invoiceId);
   if (!invoiceId) return;
   try {
     const res = await getInvoice(invoiceId);
+    if (requestSeq !== invoiceDetailRequestSeq) return;
     currentInvoice.value = { ...row, ...(res.data || {}) };
     resetPreviewState();
   } catch (error) {
@@ -1146,7 +1147,7 @@ async function loadInvoiceDetail(row: InvoiceManageVO) {
   }
 }
 
-async function loadSameLedgerInvoices(row: InvoiceManageVO) {
+async function loadSameLedgerInvoices(row: InvoiceManageVO, requestSeq: number) {
   sameLedgerInvoices.value = [];
   if (!row?.ledgerId && !row?.ledgerOrderNo) return;
   try {
@@ -1157,8 +1158,10 @@ async function loadSameLedgerInvoices(row: InvoiceManageVO) {
       ledgerOrderNo: row.ledgerOrderNo,
       orderNo: row.ledgerOrderNo
     });
+    if (requestSeq !== invoiceDetailRequestSeq) return;
     sameLedgerInvoices.value = unwrapList<InvoiceManageVO>(res).rows;
   } catch (error) {
+    if (requestSeq !== invoiceDetailRequestSeq) return;
     sameLedgerInvoices.value = [];
     console.warn('同台账发票加载失败', error);
   }
@@ -1422,7 +1425,7 @@ async function submitVoidWithReason() {
     localVoidReasonMap[invoiceId] = voidReasonDraft.value.trim();
   }
   voidDialogVisible.value = false;
-  await handleStatusChange(voidTarget.value, '2', { skipConfirm: true });
+  await handleStatusChange(voidTarget.value, '2', { skipConfirm: true, remark: voidReasonDraft.value.trim() });
   if (currentInvoice.value && invoiceId && idKey(currentInvoice.value.invoiceId) === invoiceId) {
     currentInvoice.value = { ...currentInvoice.value, status: '2', voidReason: voidReasonDraft.value.trim() };
   }
@@ -1747,7 +1750,7 @@ async function submitBind() {
 }
 
 // ===== 标记开票状态：走 markInvoiceManageStatus(/admin/invoice-manage/markStatus) =====
-async function handleStatusChange(row: InvoiceManageVO, status: string, options: { skipConfirm?: boolean } = {}) {
+async function handleStatusChange(row: InvoiceManageVO, status: string, options: { skipConfirm?: boolean; remark?: string } = {}) {
   const statusText = invoiceStatusMeta(status).label;
   const invoiceId = idKey(row.invoiceId);
   if (!invoiceId) return;
@@ -1759,7 +1762,7 @@ async function handleStatusChange(row: InvoiceManageVO, status: string, options:
         type: 'warning'
       });
     }
-    await markInvoiceManageStatus({ invoiceId, status });
+    await markInvoiceManageStatus({ invoiceId, status, remark: options.remark });
     ElMessage.success('更新成功');
     loadData();
     loadStatistics();
