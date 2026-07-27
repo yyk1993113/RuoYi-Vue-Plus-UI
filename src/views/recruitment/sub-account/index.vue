@@ -2646,7 +2646,7 @@ async function resolveMaterials(company: Record<string, any>, companyId: string 
   const fileMap: Record<string, any> = {};
   if (ossIds.length) {
     try {
-      // 通过企业范围接口解析文件，既覆盖本次待审 company_cert，也避免要求审核员拥有系统 OSS 管理权限。
+      // 只解析 qualification_snapshot 里声明的 OSS ID，不能从企业表补材料。
       const res: any = await listCompanyMaterials(companyId, Array.from(new Set(ossIds)).join(','));
       (res.data || []).forEach((file: any) => (fileMap[String(file.ossId)] = file));
     } catch {
