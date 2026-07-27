@@ -551,9 +551,105 @@
       <template #footer><el-button @click="detailVisible = false">关闭</el-button></template>
     </el-dialog>
 
-    <el-dialog v-model="auditVisible" :title="auditTargets.length > 1 ? `批量审核通过（${auditTargets.length} 家）` : '审核记账子单元申请'" width="680px" append-to-body>
-      <el-alert title="请逐项核验原件。当前后端为单级审核接口，主管双人复核需后续状态机升级后才能强制落地。" type="warning" :closable="false" show-icon />
-      <el-form ref="auditFormRef" :model="auditForm" :rules="auditRules" label-width="104px" class="dialog-form">
+    <el-dialog
+      v-model="auditVisible"
+      :title="auditTargets.length > 1 ? `批量审核通过（${auditTargets.length} 家）` : '审核记账子单元申请'"
+      width="min(1120px, 94vw)"
+      append-to-body
+      destroy-on-close
+      @closed="clearAuditApplicationDetail"
+    >
+      <div class="audit-dialog-content">
+        <el-alert title="请核对下方 B 端本次提交的开户申请和企业资质；审核通过后，本次待审资质将同步更新到企业管理。" type="warning" :closable="false" show-icon />
+
+        <div v-if="auditTargets.length === 1" v-loading="auditDetailLoading" class="audit-application-preview">
+          <el-divider content-position="left">本次 B 端申请</el-divider>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="企业名称" :span="2">{{ auditCurrentRow?.companyName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="统一社会信用代码">{{ auditQualificationInfo.creditCode }}</el-descriptions-item>
+            <el-descriptions-item label="申请提交时间">{{ formatMinute(auditCurrentRow?.createTime) }}</el-descriptions-item>
+            <el-descriptions-item label="记账子单元">{{ auditCurrentRow?.subAccountName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="账户类型">{{ accountTypeText(auditCurrentRow?.accountType) }}</el-descriptions-item>
+            <el-descriptions-item label="开户行">{{ auditCurrentRow?.bankBranch || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="银行账号">{{ auditCurrentRow?.bankAccountMasked || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="联系人">{{ auditCurrentRow?.contactName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="联系电话">{{ auditCurrentRow?.contactPhoneMasked || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="代发授权委托书" :span="2">
+              <el-button
+                v-if="auditCurrentRow?.authorizationLetterUploaded"
+                link
+                type="primary"
+                icon="Document"
+                :loading="authorizationLetterLoading"
+                @click="openAuthorizationLetter(auditCurrentRow)"
+              >查看本次提交的委托书</el-button>
+              <span v-else class="muted-text">本次申请未上传</span>
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <el-divider content-position="left">本次提交的企业资质</el-divider>
+          <el-alert
+            v-if="auditDetailError"
+            :title="auditDetailError"
+            type="error"
+            :closable="false"
+            show-icon
+            class="audit-detail-error"
+          />
+          <template v-else>
+            <el-descriptions :column="2" border class="qualification-descriptions">
+              <el-descriptions-item label="企业全称" :span="2">{{ auditQualificationInfo.companyName }}</el-descriptions-item>
+              <el-descriptions-item label="统一社会信用代码">{{ auditQualificationInfo.creditCode }}</el-descriptions-item>
+              <el-descriptions-item label="认证状态">
+                <el-tag :type="certStatusMeta(auditQualificationInfo.status).type">{{ certStatusMeta(auditQualificationInfo.status).label }}</el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="法定代表人">{{ auditQualificationInfo.legalPersonName }}</el-descriptions-item>
+              <el-descriptions-item label="法人联系电话">{{ maskPhone(auditQualificationInfo.legalPersonPhone) }}</el-descriptions-item>
+              <el-descriptions-item label="注册地址" :span="2">{{ auditQualificationInfo.registeredAddress }}</el-descriptions-item>
+              <el-descriptions-item label="实际办公地址" :span="2">{{ auditQualificationInfo.officeAddress }}</el-descriptions-item>
+              <el-descriptions-item label="资质提交时间">{{ auditQualificationInfo.createTime }}</el-descriptions-item>
+              <el-descriptions-item label="资质审核意见">{{ auditQualificationInfo.auditRemark }}</el-descriptions-item>
+            </el-descriptions>
+            <div class="qualification-section-title audit-material-title">本次提交的资质材料</div>
+            <div v-if="auditMaterialFiles.length" class="material-grid audit-material-grid">
+              <div v-for="file in auditMaterialFiles" :key="`audit-${file.label}-${file.url}`" class="material-card">
+                <div class="material-label">{{ file.label }}</div>
+                <el-image
+                  v-if="file.kind === 'image'"
+                  :src="file.url"
+                  :preview-src-list="auditImagePreviewList"
+                  :initial-index="auditImagePreviewIndex(file)"
+                  fit="cover"
+                  class="material-image"
+                  preview-teleported
+                >
+                  <template #error>
+                    <div class="material-image-error"><el-icon><Picture /></el-icon><span>图片加载失败</span></div>
+                  </template>
+                </el-image>
+                <div v-else class="material-document">
+                  <el-icon class="material-document-icon"><Document /></el-icon>
+                  <span>{{ file.name || file.label }}</span>
+                  <el-button link type="primary" @click="openExternal(file.url)">打开</el-button>
+                </div>
+              </div>
+            </div>
+            <el-empty v-else description="本次申请未获取到可预览的企业资质材料" :image-size="80" />
+          </template>
+        </div>
+
+        <el-table v-else :data="auditTargets" border class="audit-batch-table" max-height="280">
+          <el-table-column prop="companyName" label="企业名称" min-width="190" show-overflow-tooltip />
+          <el-table-column prop="subAccountName" label="记账子单元" min-width="160" show-overflow-tooltip />
+          <el-table-column prop="bankBranch" label="开户行" min-width="140" show-overflow-tooltip />
+          <el-table-column label="银行账号" min-width="150"><template #default="{ row }">{{ row.bankAccountMasked || '-' }}</template></el-table-column>
+          <el-table-column prop="contactName" label="联系人" width="100" />
+          <el-table-column label="申请内容" width="110" align="center">
+            <template #default="{ row }"><el-button link type="primary" icon="View" @click="openDetail(row, 'materials')">查看详情</el-button></template>
+          </el-table-column>
+        </el-table>
+
+        <el-form ref="auditFormRef" :model="auditForm" :rules="auditRules" label-width="104px" class="dialog-form">
         <el-form-item label="审核企业">
           <div class="target-list">
             <el-tag v-for="row in auditTargets" :key="String(row.applicationId)" effect="plain">{{ row.companyName }}</el-tag>
@@ -571,10 +667,16 @@
         <el-form-item label="风险确认" prop="riskConfirmed">
           <el-checkbox v-model="auditForm.riskConfirmed">已确认委托授权有效，企业不在风险黑名单且申请资料与主体一致</el-checkbox>
         </el-form-item>
-      </el-form>
+        </el-form>
+      </div>
       <template #footer>
         <el-button :disabled="auditSubmitting" @click="auditVisible = false">取消</el-button>
-        <el-button type="primary" :loading="auditSubmitting" @click="submitApprove">确认通过</el-button>
+        <el-button
+          type="primary"
+          :loading="auditSubmitting"
+          :disabled="auditTargets.length === 1 && (auditDetailLoading || Boolean(auditDetailError))"
+          @click="submitApprove"
+        >确认通过</el-button>
       </template>
     </el-dialog>
 
@@ -1101,8 +1203,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
-import { getAuditHistory, getCompany, getCompanyAuditHistory, type AuditLogVO } from '@/api/recruitment';
-import { listByIds } from '@/api/system/oss';
+import { getAuditHistory, getCompany, getCompanyAuditHistory, listCompanyMaterials, type AuditLogVO } from '@/api/recruitment';
 import { useUserStore } from '@/store/modules/user';
 import { encrypt } from '@/utils/jsencrypt';
 import hengfengBankLogo from '@/assets/bank-logos/hfb.png';
@@ -1212,27 +1313,23 @@ const currentCert = ref<Record<string, any>>();
 const materialFiles = ref<MaterialFile[]>([]);
 const auditLogs = ref<AuditLogVO[]>([]);
 
-// 资质详情以最新 company_cert 为主、企业主体表为兜底，避免只带出附件而缺少认证字段。
+// 待审核白名单优先展示最新待审 company_cert，避免资质历史按审核时间排序时误取旧的已通过资料。
 const qualificationInfo = computed(() => {
-  const company = currentCompany.value || {};
-  const cert = currentCert.value || {};
-  return {
-    companyName: cert.companyName || company.companyName || detailTarget.value?.companyName || '-',
-    creditCode: cert.creditCode || company.socialCreditCode || company.creditCode || detailTarget.value?.unifiedSocialCreditCode || '-',
-    status: cert.status || company.certStatus || '',
-    legalPersonName: cert.legalPersonName || company.legalPersonName || '-',
-    legalPersonPhone: cert.legalPersonPhone || company.legalPersonPhone || '',
-    registeredAddress: cert.registeredAddress || company.registeredAddress || '-',
-    officeAddress: cert.officeAddress || company.companyAddress || company.officeAddress || '-',
-    createTime: formatMinute(cert.createTime || company.createTime),
-    auditTime: formatMinute(cert.auditTime || company.auditTime),
-    auditRemark: cert.auditRemark || company.auditRemark || company.remark || '无'
-  };
+  return buildQualificationInfo(currentCompany.value, currentCert.value, detailTarget.value);
 });
 
 const auditVisible = ref(false);
 const auditSubmitting = ref(false);
 const auditTargets = ref<SettlementSubAccountVO[]>([]);
+const auditDetailLoading = ref(false);
+const auditDetailError = ref('');
+const auditCurrentCompany = ref<Record<string, any>>();
+const auditCurrentCert = ref<Record<string, any>>();
+const auditMaterialFiles = ref<MaterialFile[]>([]);
+const auditCurrentRow = computed(() => auditTargets.value.length === 1 ? auditTargets.value[0] : undefined);
+const auditQualificationInfo = computed(() =>
+  buildQualificationInfo(auditCurrentCompany.value, auditCurrentCert.value, auditCurrentRow.value)
+);
 const auditFormRef = ref<FormInstance>();
 const auditForm = reactive({ checks: [] as string[], opinion: '', riskConfirmed: false });
 const auditCheckOptions = [
@@ -1494,6 +1591,7 @@ const sensitiveLoadingKeys = ref<string[]>([]);
 const pendingSelections = computed(() => selectedRows.value.filter((row) => row.status === 'PENDING'));
 const hasActiveFilter = computed(() => Boolean(query.keyword || query.status || query.subAccountName || query.bankBranch || timeRange.value.length));
 const imagePreviewList = computed(() => materialFiles.value.filter((file) => file.kind === 'image').map((file) => file.url));
+const auditImagePreviewList = computed(() => auditMaterialFiles.value.filter((file) => file.kind === 'image').map((file) => file.url));
 
 onMounted(async () => {
   restorePreferences();
@@ -1780,12 +1878,45 @@ function openAudit(targets: SettlementSubAccountVO[]) {
   if (!auditTargets.value.length) return ElMessage.warning('请选择待审核工单');
   if (targets.length > 20) ElMessage.warning('单次最多处理 20 条，已截取前 20 条');
   Object.assign(auditForm, { checks: [], opinion: '', riskConfirmed: false });
+  clearAuditApplicationDetail();
   auditVisible.value = true;
+  if (auditTargets.value.length === 1) void loadAuditApplicationDetail(auditTargets.value[0]);
   auditFormRef.value?.clearValidate();
+}
+
+async function loadAuditApplicationDetail(row: SettlementSubAccountVO) {
+  auditDetailLoading.value = true;
+  auditDetailError.value = '';
+  try {
+    // 审核弹窗只读取 B 端认证历史，不混入企业主表中的旧资质字段。
+    const historyResponse: any = await getCompanyAuditHistory(row.companyId);
+    const history = historyResponse.data || {};
+    const cert = selectApplicationCert(history.certHistory, row);
+    if (!Object.keys(cert).length) throw new Error('未找到该企业本次提交的资质申请，请确认 B 端已完成提交');
+    auditCurrentCompany.value = {};
+    auditCurrentCert.value = cert;
+    const materialSource = mergeQualificationMaterialSource({}, cert);
+    auditMaterialFiles.value = await resolveMaterials(materialSource, row.companyId);
+  } catch (error) {
+    console.error('加载白名单审核申请资料失败', error);
+    auditDetailError.value = error instanceof Error ? error.message : '本次提交的企业资质加载失败，请关闭后重试';
+  } finally {
+    auditDetailLoading.value = false;
+  }
+}
+
+function clearAuditApplicationDetail() {
+  auditDetailLoading.value = false;
+  auditDetailError.value = '';
+  auditCurrentCompany.value = undefined;
+  auditCurrentCert.value = undefined;
+  auditMaterialFiles.value = [];
 }
 
 async function submitApprove() {
   if (!auditFormRef.value) return;
+  if (auditTargets.value.length === 1 && auditDetailLoading.value) return ElMessage.warning('申请资料仍在加载，请稍候');
+  if (auditTargets.value.length === 1 && auditDetailError.value) return ElMessage.warning('请先重新打开审核弹窗并确认申请资料已完整加载');
   const valid = await auditFormRef.value.validate().catch(() => false);
   if (!valid) return;
   const confirmed = await ElMessageBox.confirm(`确认通过 ${auditTargets.value.length} 家企业的记账子单元申请？`, '审核确认', { type: 'warning', confirmButtonText: '确认通过' }).catch(() => false);
@@ -1981,20 +2112,59 @@ async function openDetail(row: SettlementSubAccountVO, tab: DetailTab = 'applica
   ]);
   const company = companyResult.status === 'fulfilled' ? (((companyResult.value as any).data || {}) as Record<string, any>) : {};
   const companyHistory = companyHistoryResult.status === 'fulfilled' ? (companyHistoryResult.value as any).data || {} : {};
-  const latestCert = Array.isArray(companyHistory.certHistory) ? companyHistory.certHistory[0] || {} : {};
+  const latestCert = selectApplicationCert(companyHistory.certHistory, row);
   currentCompany.value = company;
   currentCert.value = latestCert;
-  const materialSource = { ...company };
-  Object.entries(latestCert).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') materialSource[key] = value;
-  });
-  await hydrateMaterials(materialSource);
+  const materialSource = mergeQualificationMaterialSource(company, latestCert);
+  await hydrateMaterials(materialSource, row.companyId);
   const companyLogs = companyHistory.auditLogs || [];
   const subAccountPayload = subAccountHistoryResult.status === 'fulfilled' ? (subAccountHistoryResult.value as any).data : [];
   const subAccountLogs = Array.isArray(subAccountPayload) ? subAccountPayload : subAccountPayload?.rows || [];
   auditLogs.value = deduplicateAuditLogs([...subAccountLogs, ...companyLogs]);
   if (companyResult.status === 'rejected') ElMessage.warning('企业扩展资料加载失败，申请信息仍可查看');
   detailLoading.value = false;
+}
+
+function selectApplicationCert(certHistory: unknown, row?: SettlementSubAccountVO) {
+  const certs = Array.isArray(certHistory) ? certHistory.filter(Boolean) as Record<string, any>[] : [];
+  if (!certs.length) return {};
+  const pendingCerts = certs.filter((cert) => ['0', 'PENDING'].includes(String(cert.status || '').toUpperCase()));
+  const candidates = row?.status === 'PENDING' && pendingCerts.length ? pendingCerts : certs;
+  // company auditHistory 以审核时间优先排序，待审记录没有 auditTime；这里按提交时间重新选取本次申请资料。
+  return [...candidates].sort((left, right) => {
+    const timeDiff = Date.parse(String(right.createTime || '')) - Date.parse(String(left.createTime || ''));
+    if (Number.isFinite(timeDiff) && timeDiff !== 0) return timeDiff;
+    return String(right.certId || '').localeCompare(String(left.certId || ''));
+  })[0] || {};
+}
+
+function buildQualificationInfo(
+  companySource?: Record<string, any>,
+  certSource?: Record<string, any>,
+  row?: SettlementSubAccountVO
+) {
+  const company = companySource || {};
+  const cert = certSource || {};
+  const hasCertSnapshot = Object.keys(cert).length > 0;
+  return {
+    companyName: hasCertSnapshot ? cert.companyName || row?.companyName || '-' : company.companyName || row?.companyName || '-',
+    creditCode: hasCertSnapshot
+      ? cert.creditCode || row?.unifiedSocialCreditCode || '-'
+      : company.socialCreditCode || company.creditCode || row?.unifiedSocialCreditCode || '-',
+    status: hasCertSnapshot ? cert.status || '' : company.certStatus || '',
+    legalPersonName: hasCertSnapshot ? cert.legalPersonName || '-' : company.legalPersonName || '-',
+    legalPersonPhone: hasCertSnapshot ? cert.legalPersonPhone || '' : company.legalPersonPhone || '',
+    registeredAddress: hasCertSnapshot ? cert.registeredAddress || '-' : company.registeredAddress || '-',
+    officeAddress: hasCertSnapshot ? cert.officeAddress || '-' : company.companyAddress || company.officeAddress || '-',
+    createTime: formatMinute(hasCertSnapshot ? cert.createTime : company.createTime),
+    auditTime: formatMinute(hasCertSnapshot ? cert.auditTime : company.auditTime),
+    auditRemark: hasCertSnapshot ? cert.auditRemark || '无' : company.auditRemark || company.remark || '无'
+  };
+}
+
+function mergeQualificationMaterialSource(company: Record<string, any>, cert: Record<string, any>) {
+  // 一旦存在认证申请快照，材料必须完全来自该快照，不能用企业主表的旧附件补空而误导审核人。
+  return Object.keys(cert).length ? { ...cert } : { ...company };
 }
 
 async function openAuthorizationLetter(row?: SettlementSubAccountVO) {
@@ -2018,7 +2188,11 @@ async function openAuthorizationLetter(row?: SettlementSubAccountVO) {
   }
 }
 
-async function hydrateMaterials(company: Record<string, any>) {
+async function hydrateMaterials(company: Record<string, any>, companyId: string | number) {
+  materialFiles.value = await resolveMaterials(company, companyId);
+}
+
+async function resolveMaterials(company: Record<string, any>, companyId: string | number) {
   const fields = [
     { key: 'businessLicense', label: '营业执照', kind: 'image' as const },
     { key: 'legalPersonIdFront', label: '法人身份证正面', kind: 'image' as const },
@@ -2032,13 +2206,14 @@ async function hydrateMaterials(company: Record<string, any>) {
   const fileMap: Record<string, any> = {};
   if (ossIds.length) {
     try {
-      const res: any = await listByIds(Array.from(new Set(ossIds)).join(','));
+      // 通过企业范围接口解析文件，既覆盖本次待审 company_cert，也避免要求审核员拥有系统 OSS 管理权限。
+      const res: any = await listCompanyMaterials(companyId, Array.from(new Set(ossIds)).join(','));
       (res.data || []).forEach((file: any) => (fileMap[String(file.ossId)] = file));
     } catch {
       // 材料解析失败仅影响预览，不阻断申请详情与审核记录查看。
     }
   }
-  materialFiles.value = rawItems
+  return rawItems
     .map((item) => {
       const oss = fileMap[item.value];
       const url = oss?.url || (/^https?:\/\//i.test(item.value) || item.value.startsWith('/') ? item.value : '');
@@ -2058,6 +2233,10 @@ function fileExt(source?: string) {
 
 function imagePreviewIndex(file: MaterialFile) {
   return Math.max(0, imagePreviewList.value.findIndex((url) => url === file.url));
+}
+
+function auditImagePreviewIndex(file: MaterialFile) {
+  return Math.max(0, auditImagePreviewList.value.findIndex((url) => url === file.url));
 }
 
 function sensitiveRowKey(row: SettlementSubAccountVO) {
@@ -2994,6 +3173,29 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
 .detail-tip,
 .dialog-form {
   margin-top: 18px;
+}
+
+.audit-dialog-content {
+  max-height: 68vh;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.audit-application-preview,
+.audit-batch-table {
+  margin-top: 16px;
+}
+
+.audit-detail-error {
+  margin-bottom: 16px;
+}
+
+.audit-material-title {
+  margin-top: 18px;
+}
+
+.audit-material-grid {
+  margin-bottom: 8px;
 }
 
 .qualification-section-title {
