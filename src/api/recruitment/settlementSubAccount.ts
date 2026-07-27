@@ -11,9 +11,7 @@ const normalizeCommissionRate = (value: unknown) => {
 
 // 兼容前端先发布、后端尚未重启的短暂窗口；仅对明确的“路由不存在”执行旧接口降级。
 const isMissingEndpoint = (error: any) => {
-  const message = [error?.message, error?.response?.data?.msg, error?.response?.data?.message, String(error || '')]
-    .filter(Boolean)
-    .join(' ');
+  const message = [error?.message, error?.response?.data?.msg, error?.response?.data?.message, String(error || '')].filter(Boolean).join(' ');
   return error?.response?.status === 404 || /No endpoint|访问资源不存在/.test(message);
 };
 
@@ -177,6 +175,18 @@ export interface SettlementQualificationUpdateRequest {
   officePhotos: string;
 }
 
+/** 子单元申请独立保存的企业资料快照；status 仅用于展示企业原认证状态。 */
+export interface SettlementQualificationSnapshot extends SettlementQualificationUpdateRequest {
+  companyName?: string;
+  creditCode?: string;
+  legalPersonName?: string;
+  legalPersonPhone?: string;
+  registeredAddress?: string;
+  officeAddress?: string;
+  status?: string;
+  createTime?: string;
+}
+
 export interface SettlementPaymentAccountProfileRequest {
   accountName: string;
   subjectCompanyName: string;
@@ -245,10 +255,7 @@ export function getSettlementGlobalSettings() {
     }))
     .catch(async (error: any) => {
       if (!isMissingEndpoint(error)) throw error;
-      const [rateResponse, cmbResponse]: any[] = await Promise.all([
-        getSettlementCommissionRate(),
-        getSettlementCmbConfig()
-      ]);
+      const [rateResponse, cmbResponse]: any[] = await Promise.all([getSettlementCommissionRate(), getSettlementCmbConfig()]);
       return {
         data: {
           globalCommissionRate: normalizeCommissionRate(rateResponse?.data?.globalCommissionRate),
@@ -354,11 +361,13 @@ export function addSettlementPaymentAccount(applicationId: string | number, data
   });
 }
 
-/** 审核通过前保存管理端补充或更换的企业资质附件，字段值均为稳定 OSS ID。 */
-export function updateSettlementQualification(
-  applicationId: string | number,
-  data: SettlementQualificationUpdateRequest
-) {
+/** 读取本次子单元申请的独立附件快照，不读取或改变企业认证状态。 */
+export function getSettlementQualification(applicationId: string | number) {
+  return request.get<SettlementQualificationSnapshot>(`${baseUrl}/${applicationId}/qualification`);
+}
+
+/** 审核通过前只更新子单元申请的附件快照，字段值均为稳定 OSS ID。 */
+export function updateSettlementQualification(applicationId: string | number, data: SettlementQualificationUpdateRequest) {
   return request.put(`${baseUrl}/${applicationId}/qualification`, data);
 }
 
