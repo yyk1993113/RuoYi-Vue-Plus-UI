@@ -16,7 +16,12 @@
         </el-card>
       </el-col>
       <el-col :xs="12" :sm="12" :md="6">
-        <el-card shadow="hover" class="stat-mini-card warning clickable" :class="{ active: query.status === 'PENDING' }" @click="applyStatusFilter('PENDING')">
+        <el-card
+          shadow="hover"
+          class="stat-mini-card warning clickable"
+          :class="{ active: query.status === 'PENDING' }"
+          @click="applyStatusFilter('PENDING')"
+        >
           <div class="stat-mini">
             <span class="stat-label">待审核</span>
             <strong class="stat-value warning">{{ statistics.pendingCount }}</strong>
@@ -25,7 +30,12 @@
         </el-card>
       </el-col>
       <el-col :xs="12" :sm="12" :md="6">
-        <el-card shadow="hover" class="stat-mini-card success clickable" :class="{ active: query.status === 'APPROVED' }" @click="applyStatusFilter('APPROVED')">
+        <el-card
+          shadow="hover"
+          class="stat-mini-card success clickable"
+          :class="{ active: query.status === 'APPROVED' }"
+          @click="applyStatusFilter('APPROVED')"
+        >
           <div class="stat-mini">
             <span class="stat-label">白名单企业</span>
             <strong class="stat-value success">{{ statistics.approvedCount }}</strong>
@@ -34,7 +44,12 @@
         </el-card>
       </el-col>
       <el-col :xs="12" :sm="12" :md="6">
-        <el-card shadow="hover" class="stat-mini-card danger clickable" :class="{ active: query.status === 'BLACKLISTED' }" @click="applyStatusFilter('BLACKLISTED')">
+        <el-card
+          shadow="hover"
+          class="stat-mini-card danger clickable"
+          :class="{ active: query.status === 'BLACKLISTED' }"
+          @click="applyStatusFilter('BLACKLISTED')"
+        >
           <div class="stat-mini">
             <span class="stat-label">已拉黑</span>
             <strong class="stat-value danger">{{ statistics.blacklistedCount }}</strong>
@@ -90,10 +105,24 @@
           />
         </el-form-item>
         <el-form-item label="子单元名称">
-          <el-input v-model="query.subAccountName" clearable maxlength="100" placeholder="请输入子单元名称" style="width: 200px" @keyup.enter="handleQuery" />
+          <el-input
+            v-model="query.subAccountName"
+            clearable
+            maxlength="100"
+            placeholder="请输入子单元名称"
+            style="width: 200px"
+            @keyup.enter="handleQuery"
+          />
         </el-form-item>
         <el-form-item label="开户行">
-          <el-input v-model="query.bankBranch" clearable maxlength="120" placeholder="开户行 / 支行" style="width: 200px" @keyup.enter="handleQuery" />
+          <el-input
+            v-model="query.bankBranch"
+            clearable
+            maxlength="120"
+            placeholder="开户行 / 支行"
+            style="width: 200px"
+            @keyup.enter="handleQuery"
+          />
         </el-form-item>
         <el-form-item class="query-actions">
           <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
@@ -108,7 +137,9 @@
           <el-button :type="quickRange === '30d' ? 'primary' : 'default'" plain @click="applyQuickRange('30d')">近 30 天</el-button>
         </el-button-group>
         <el-button type="warning" plain icon="UserFilled" @click="applyStatusFilter('PENDING')">待审核工单</el-button>
-        <span class="memory-hint"><el-icon><InfoFilled /></el-icon> 筛选条件会自动记忆</span>
+        <span class="memory-hint"
+          ><el-icon><InfoFilled /></el-icon> 筛选条件会自动记忆</span
+        >
       </div>
     </el-card>
 
@@ -169,7 +200,9 @@
               <template #reference><el-button plain icon="Setting">列设置</el-button></template>
               <div class="column-setting-title">选择展示字段</div>
               <el-checkbox-group v-model="visibleColumns" class="column-setting-list" @change="saveColumnSettings">
-                <el-checkbox v-for="column in columnOptions" :key="column.key" :label="column.key" :disabled="column.required">{{ column.label }}</el-checkbox>
+                <el-checkbox v-for="column in columnOptions" :key="column.key" :label="column.key" :disabled="column.required">{{
+                  column.label
+                }}</el-checkbox>
               </el-checkbox-group>
             </el-popover>
             <el-button type="primary" plain icon="Refresh" @click="refreshAll">刷新</el-button>
@@ -201,7 +234,11 @@
               <span>{{ row.subAccountName || '-' }}</span>
               <div class="sensitive-value-row masked-account secondary-text">
                 <span>{{ subAccountNoText(row) }}</span>
-                <el-tooltip v-if="row.subAccountNoMasked" :content="isSubAccountNoRevealed(row) ? '隐藏完整子单元账户' : '查看完整子单元账户'" placement="top">
+                <el-tooltip
+                  v-if="row.subAccountNoMasked"
+                  :content="isSubAccountNoRevealed(row) ? '隐藏完整子单元账户' : '查看完整子单元账户'"
+                  placement="top"
+                >
                   <el-button
                     v-hasPermi="['settlement:subAccount:decrypt']"
                     class="sensitive-eye-button"
@@ -296,7 +333,14 @@
                   />
                 </el-tooltip>
                 <el-tooltip content="复制当前显示号码" placement="top">
-                  <el-button v-if="row.contactPhoneMasked" class="sensitive-eye-button" link type="primary" icon="CopyDocument" @click.stop="copyText(contactPhoneText(row))" />
+                  <el-button
+                    v-if="row.contactPhoneMasked"
+                    class="sensitive-eye-button"
+                    link
+                    type="primary"
+                    icon="CopyDocument"
+                    @click.stop="copyText(contactPhoneText(row))"
+                  />
                 </el-tooltip>
               </div>
             </div>
@@ -362,7 +406,9 @@
                 驳回
               </el-button>
               <el-dropdown trigger="click" @command="(command) => handleRowCommand(command, row)">
-                <el-button link type="primary">更多<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+                <el-button link type="primary"
+                  >更多<el-icon class="el-icon--right"><ArrowDown /></el-icon
+                ></el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item
@@ -380,7 +426,8 @@
                       v-hasPermi="['settlement:subAccount:config']"
                       command="paymentAccounts"
                       icon="CreditCard"
-                    >主账号设置</el-dropdown-item>
+                      >主账号设置</el-dropdown-item
+                    >
                     <el-dropdown-item v-hasPermi="['settlement:subAccount:decrypt']" command="account" icon="View">查看完整账号</el-dropdown-item>
                     <el-dropdown-item
                       v-if="row.status === 'APPROVED'"
@@ -411,7 +458,14 @@
         </template>
       </el-table>
 
-      <pagination v-show="total > 0" v-model:page="query.pageNum" v-model:limit="query.pageSize" :page-sizes="[10, 20, 50, 100]" :total="total" @pagination="loadData" />
+      <pagination
+        v-show="total > 0"
+        v-model:page="query.pageNum"
+        v-model:limit="query.pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        @pagination="loadData"
+      />
     </el-card>
 
     <el-dialog v-model="detailVisible" :title="`${detailTarget?.companyName || ''} · 白名单详情`" width="920px" append-to-body destroy-on-close>
@@ -420,7 +474,9 @@
           <el-tab-pane label="申请信息" name="application">
             <el-descriptions :column="2" border>
               <el-descriptions-item label="企业名称" :span="2">{{ detailTarget?.companyName || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="统一社会信用代码">{{ detailTarget?.unifiedSocialCreditCode || currentCompany?.socialCreditCode || currentCompany?.creditCode || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="统一社会信用代码">{{
+                detailTarget?.unifiedSocialCreditCode || currentCompany?.socialCreditCode || currentCompany?.creditCode || '-'
+              }}</el-descriptions-item>
               <el-descriptions-item label="审核状态">
                 <el-tag v-if="detailTarget" :type="statusMeta(detailTarget.status).type">{{ statusMeta(detailTarget.status).label }}</el-tag>
               </el-descriptions-item>
@@ -481,15 +537,24 @@
                   icon="Document"
                   :loading="authorizationLetterLoading"
                   @click="openAuthorizationLetter(detailTarget)"
-                >查看委托书</el-button>
+                  >查看委托书</el-button
+                >
                 <span v-else class="muted-text">历史申请未上传</span>
               </el-descriptions-item>
               <el-descriptions-item label="提交时间">{{ detailTarget?.createTime || '-' }}</el-descriptions-item>
               <el-descriptions-item label="审核时间">{{ detailTarget?.auditTime || '-' }}</el-descriptions-item>
               <el-descriptions-item label="审核人">{{ detailTarget?.auditUserName || '-' }}</el-descriptions-item>
-              <el-descriptions-item v-if="statusReason(detailTarget)" label="处理原因" :span="2">{{ statusReason(detailTarget) }}</el-descriptions-item>
+              <el-descriptions-item v-if="statusReason(detailTarget)" label="处理原因" :span="2">{{
+                statusReason(detailTarget)
+              }}</el-descriptions-item>
             </el-descriptions>
-            <el-alert class="detail-tip" type="info" :closable="false" show-icon title="主结算户、CMB UID、委托有效期与代发限额尚未进入当前接口契约，页面不展示推测数据。" />
+            <el-alert
+              class="detail-tip"
+              type="info"
+              :closable="false"
+              show-icon
+              title="主结算户、CMB UID、委托有效期与代发限额尚未进入当前接口契约，页面不展示推测数据。"
+            />
           </el-tab-pane>
           <el-tab-pane label="企业资质详情" name="materials">
             <div class="qualification-section-title">主体资质信息</div>
@@ -507,7 +572,28 @@
               <el-descriptions-item label="认证审核时间">{{ qualificationInfo.auditTime }}</el-descriptions-item>
               <el-descriptions-item label="认证审核意见" :span="2">{{ qualificationInfo.auditRemark }}</el-descriptions-item>
             </el-descriptions>
-            <div class="qualification-section-title material-section-title">资质材料</div>
+            <div class="qualification-section-title material-section-title material-title-row">
+              <span>资质材料</span>
+              <el-button
+                v-if="detailTarget?.status === 'APPROVED' && !detailMaterialEditing"
+                v-hasPermi="['settlement:subAccount:audit']"
+                type="primary"
+                plain
+                icon="Edit"
+                @click="detailMaterialEditing = true"
+                >修改材料</el-button
+              >
+              <el-button v-else-if="detailMaterialEditing" plain @click="cancelDetailQualificationEdit">取消修改</el-button>
+            </div>
+            <el-alert
+              v-if="detailMaterialEditing"
+              title="企业近三个月纳税记录 / 企业社保证明二选一必填"
+              description="请上传企业近三个月纳税记录或企业社保证明，二选一提交即可"
+              type="warning"
+              :closable="false"
+              show-icon
+              class="qualification-required-tip"
+            />
             <div v-if="materialFiles.length" class="material-grid">
               <div v-for="file in materialFiles" :key="`${file.label}-${file.url}`" class="material-card">
                 <div class="material-label">{{ file.label }}</div>
@@ -521,7 +607,9 @@
                   preview-teleported
                 >
                   <template #error>
-                    <div class="material-image-error"><el-icon><Picture /></el-icon><span>图片加载失败</span></div>
+                    <div class="material-image-error">
+                      <el-icon><Picture /></el-icon><span>图片加载失败</span>
+                    </div>
                   </template>
                 </el-image>
                 <div v-else class="material-document">
@@ -529,13 +617,44 @@
                   <span>{{ file.name || file.label }}</span>
                   <el-button link type="primary" @click="openExternal(file.url)">打开</el-button>
                 </div>
+                <div v-if="detailMaterialEditing" class="material-edit-actions">
+                  <el-button type="danger" plain size="small" icon="Delete" @click="removeDetailQualification(file)">移除</el-button>
+                </div>
               </div>
             </div>
             <el-empty v-else description="未获取到可预览的企业资质材料" />
+            <div v-if="detailMaterialEditing" class="qualification-upload-grid">
+              <div v-for="item in qualificationUploadFields" :key="`detail-${item.field}`" class="qualification-upload-item">
+                <div>
+                  <strong>{{ item.label }}</strong>
+                  <span>{{
+                    splitValues(detailQualificationIds[item.field]).length
+                      ? `已上传 ${splitValues(detailQualificationIds[item.field]).length} 份`
+                      : '尚未上传'
+                  }}</span>
+                </div>
+                <el-upload
+                  :show-file-list="false"
+                  :disabled="Boolean(detailMaterialUploadingField) || detailMaterialSaving"
+                  accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                  :before-upload="(file: File) => beforeAuditQualificationUpload(file, item.field)"
+                  :http-request="(options: UploadRequestOptions) => uploadDetailQualification(options, item.field)"
+                >
+                  <el-button type="primary" plain size="small" icon="Upload" :loading="detailMaterialUploadingField === item.field">{{
+                    singleQualificationFields.has(item.field) && detailQualificationIds[item.field] ? '更换' : '上传'
+                  }}</el-button>
+                </el-upload>
+              </div>
+            </div>
           </el-tab-pane>
           <el-tab-pane label="审计记录" name="logs">
             <el-timeline v-if="auditLogs.length">
-              <el-timeline-item v-for="log in auditLogs" :key="String(log.logId || `${log.operTime}-${log.action}`)" :timestamp="log.operTime || log.createTime" placement="top">
+              <el-timeline-item
+                v-for="log in auditLogs"
+                :key="String(log.logId || `${log.operTime}-${log.action}`)"
+                :timestamp="log.operTime || log.createTime"
+                placement="top"
+              >
                 <div class="audit-log-card">
                   <strong>{{ log.action || '操作记录' }}</strong>
                   <span class="audit-operator">{{ auditOperatorName(log) }}</span>
@@ -548,7 +667,13 @@
           </el-tab-pane>
         </el-tabs>
       </div>
-      <template #footer><el-button @click="detailVisible = false">关闭</el-button></template>
+      <template #footer>
+        <template v-if="detailMaterialEditing">
+          <el-button @click="cancelDetailQualificationEdit">取消</el-button>
+          <el-button type="primary" :loading="detailMaterialSaving" @click="saveDetailQualification">保存修改</el-button>
+        </template>
+        <el-button v-else @click="detailVisible = false">关闭</el-button>
+      </template>
     </el-dialog>
 
     <el-dialog
@@ -560,7 +685,12 @@
       @closed="clearAuditApplicationDetail"
     >
       <div class="audit-dialog-content">
-        <el-alert title="请核对下方 B 端本次提交的开户申请和企业资质；审核通过后，本次待审资质将同步更新到企业管理。" type="warning" :closable="false" show-icon />
+        <el-alert
+          title="请核对下方 B 端本次提交的开户申请和企业资质；审核通过后，本次待审资质将同步更新到企业管理。"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
 
         <div v-if="auditTargets.length === 1" v-loading="auditDetailLoading" class="audit-application-preview">
           <el-divider content-position="left">本次 B 端申请</el-divider>
@@ -582,20 +712,14 @@
                 icon="Document"
                 :loading="authorizationLetterLoading"
                 @click="openAuthorizationLetter(auditCurrentRow)"
-              >查看本次提交的委托书</el-button>
+                >查看本次提交的委托书</el-button
+              >
               <span v-else class="muted-text">本次申请未上传</span>
             </el-descriptions-item>
           </el-descriptions>
 
           <el-divider content-position="left">本次提交的企业资质</el-divider>
-          <el-alert
-            v-if="auditDetailError"
-            :title="auditDetailError"
-            type="error"
-            :closable="false"
-            show-icon
-            class="audit-detail-error"
-          />
+          <el-alert v-if="auditDetailError" :title="auditDetailError" type="error" :closable="false" show-icon class="audit-detail-error" />
           <template v-else>
             <el-descriptions :column="2" border class="qualification-descriptions">
               <el-descriptions-item label="企业全称" :span="2">{{ auditQualificationInfo.companyName }}</el-descriptions-item>
@@ -612,13 +736,7 @@
             </el-descriptions>
             <div class="qualification-section-title audit-material-title material-title-row">
               <span>本次提交的资质材料</span>
-              <el-button
-                v-if="!auditMaterialEditing"
-                type="primary"
-                plain
-                icon="Edit"
-                @click="auditMaterialEditing = true"
-              >修改材料</el-button>
+              <el-button v-if="!auditMaterialEditing" type="primary" plain icon="Edit" @click="auditMaterialEditing = true">修改材料</el-button>
               <el-button v-else plain @click="cancelAuditQualificationEdit">取消修改</el-button>
             </div>
             <el-alert
@@ -642,7 +760,9 @@
                   preview-teleported
                 >
                   <template #error>
-                    <div class="material-image-error"><el-icon><Picture /></el-icon><span>图片加载失败</span></div>
+                    <div class="material-image-error">
+                      <el-icon><Picture /></el-icon><span>图片加载失败</span>
+                    </div>
                   </template>
                 </el-image>
                 <div v-else class="material-document">
@@ -660,7 +780,11 @@
               <div v-for="item in qualificationUploadFields" :key="item.field" class="qualification-upload-item">
                 <div>
                   <strong>{{ item.label }}</strong>
-                  <span>{{ splitValues(auditQualificationIds[item.field]).length ? `已上传 ${splitValues(auditQualificationIds[item.field]).length} 份` : '尚未上传' }}</span>
+                  <span>{{
+                    splitValues(auditQualificationIds[item.field]).length
+                      ? `已上传 ${splitValues(auditQualificationIds[item.field]).length} 份`
+                      : '尚未上传'
+                  }}</span>
                 </div>
                 <el-upload
                   :show-file-list="false"
@@ -669,13 +793,9 @@
                   :before-upload="(file: File) => beforeAuditQualificationUpload(file, item.field)"
                   :http-request="(options: UploadRequestOptions) => uploadAuditQualification(options, item.field)"
                 >
-                  <el-button
-                    type="primary"
-                    plain
-                    size="small"
-                    icon="Upload"
-                    :loading="auditMaterialUploadingField === item.field"
-                  >{{ singleQualificationFields.has(item.field) && auditQualificationIds[item.field] ? '更换' : '上传' }}</el-button>
+                  <el-button type="primary" plain size="small" icon="Upload" :loading="auditMaterialUploadingField === item.field">{{
+                    singleQualificationFields.has(item.field) && auditQualificationIds[item.field] ? '更换' : '上传'
+                  }}</el-button>
                 </el-upload>
               </div>
             </div>
@@ -686,31 +806,44 @@
           <el-table-column prop="companyName" label="企业名称" min-width="190" show-overflow-tooltip />
           <el-table-column prop="subAccountName" label="记账子单元" min-width="160" show-overflow-tooltip />
           <el-table-column prop="bankBranch" label="开户行" min-width="140" show-overflow-tooltip />
-          <el-table-column label="银行账号" min-width="150"><template #default="{ row }">{{ row.bankAccountMasked || '-' }}</template></el-table-column>
+          <el-table-column label="银行账号" min-width="150"
+            ><template #default="{ row }">{{ row.bankAccountMasked || '-' }}</template></el-table-column
+          >
           <el-table-column prop="contactName" label="联系人" width="100" />
           <el-table-column label="申请内容" width="110" align="center">
-            <template #default="{ row }"><el-button link type="primary" icon="View" @click="openDetail(row, 'materials')">查看详情</el-button></template>
+            <template #default="{ row }"
+              ><el-button link type="primary" icon="View" @click="openDetail(row, 'materials')">查看详情</el-button></template
+            >
           </el-table-column>
         </el-table>
 
         <el-form ref="auditFormRef" :model="auditForm" :rules="auditRules" label-width="104px" class="dialog-form">
-        <el-form-item label="审核企业">
-          <div class="target-list">
-            <el-tag v-for="row in auditTargets" :key="String(row.applicationId)" effect="plain">{{ row.companyName }}</el-tag>
-            <el-button v-if="auditTargets.length === 1" link type="primary" icon="View" @click="openDetail(auditTargets[0], 'materials')">查看企业资质详情</el-button>
-          </div>
-        </el-form-item>
-        <el-form-item label="材料清单" prop="checks">
-          <el-checkbox-group v-model="auditForm.checks" class="audit-checklist">
-            <el-checkbox v-for="item in auditCheckOptions" :key="item.value" :label="item.value">{{ item.label }}</el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-        <el-form-item label="审核意见" prop="opinion">
-          <el-input v-model="auditForm.opinion" type="textarea" :rows="3" maxlength="300" show-word-limit placeholder="记录材料核验、委托范围与风险判断" />
-        </el-form-item>
-        <el-form-item label="风险确认" prop="riskConfirmed">
-          <el-checkbox v-model="auditForm.riskConfirmed">已确认委托授权有效，企业不在风险黑名单且申请资料与主体一致</el-checkbox>
-        </el-form-item>
+          <el-form-item label="审核企业">
+            <div class="target-list">
+              <el-tag v-for="row in auditTargets" :key="String(row.applicationId)" effect="plain">{{ row.companyName }}</el-tag>
+              <el-button v-if="auditTargets.length === 1" link type="primary" icon="View" @click="openDetail(auditTargets[0], 'materials')"
+                >查看企业资质详情</el-button
+              >
+            </div>
+          </el-form-item>
+          <el-form-item label="材料清单" prop="checks">
+            <el-checkbox-group v-model="auditForm.checks" class="audit-checklist">
+              <el-checkbox v-for="item in auditCheckOptions" :key="item.value" :label="item.value">{{ item.label }}</el-checkbox>
+            </el-checkbox-group>
+          </el-form-item>
+          <el-form-item label="审核意见" prop="opinion">
+            <el-input
+              v-model="auditForm.opinion"
+              type="textarea"
+              :rows="3"
+              maxlength="300"
+              show-word-limit
+              placeholder="记录材料核验、委托范围与风险判断"
+            />
+          </el-form-item>
+          <el-form-item label="风险确认" prop="riskConfirmed">
+            <el-checkbox v-model="auditForm.riskConfirmed">已确认委托授权有效，企业不在风险黑名单且申请资料与主体一致</el-checkbox>
+          </el-form-item>
         </el-form>
       </div>
       <template #footer>
@@ -721,20 +854,32 @@
           :loading="auditMaterialSaving"
           :disabled="Boolean(auditMaterialUploadingField)"
           @click="saveAuditQualification"
-        >保存材料修改</el-button>
+          >保存材料修改</el-button
+        >
         <el-button
           type="primary"
           :loading="auditSubmitting"
-          :disabled="auditTargets.length === 1 && (auditDetailLoading || Boolean(auditDetailError) || auditMaterialEditing || auditMaterialSaving || Boolean(auditMaterialUploadingField))"
+          :disabled="
+            auditTargets.length === 1 &&
+            (auditDetailLoading || Boolean(auditDetailError) || auditMaterialEditing || auditMaterialSaving || Boolean(auditMaterialUploadingField))
+          "
           @click="submitApprove"
-        >确认通过</el-button>
+          >确认通过</el-button
+        >
       </template>
     </el-dialog>
 
-    <el-dialog v-model="rejectVisible" :title="rejectTargets.length > 1 ? `批量驳回（${rejectTargets.length} 家）` : '驳回记账子单元申请'" width="620px" append-to-body>
+    <el-dialog
+      v-model="rejectVisible"
+      :title="rejectTargets.length > 1 ? `批量驳回（${rejectTargets.length} 家）` : '驳回记账子单元申请'"
+      width="620px"
+      append-to-body
+    >
       <el-form ref="rejectFormRef" :model="rejectForm" :rules="reasonRules" label-width="92px">
         <el-form-item label="驳回企业">
-          <div class="target-list"><el-tag v-for="row in rejectTargets" :key="String(row.applicationId)" type="danger" effect="plain">{{ row.companyName }}</el-tag></div>
+          <div class="target-list">
+            <el-tag v-for="row in rejectTargets" :key="String(row.applicationId)" type="danger" effect="plain">{{ row.companyName }}</el-tag>
+          </div>
         </el-form-item>
         <el-form-item label="常用模板">
           <el-select v-model="rejectTemplate" clearable placeholder="选择模板自动填充" style="width: 100%" @change="applyRejectTemplate">
@@ -742,7 +887,15 @@
           </el-select>
         </el-form-item>
         <el-form-item label="驳回原因" prop="reason">
-          <el-input v-model="rejectForm.reason" type="textarea" :rows="4" minlength="5" maxlength="500" show-word-limit placeholder="请明确指出需补充或整改的材料" />
+          <el-input
+            v-model="rejectForm.reason"
+            type="textarea"
+            :rows="4"
+            minlength="5"
+            maxlength="500"
+            show-word-limit
+            placeholder="请明确指出需补充或整改的材料"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -751,14 +904,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog
-      v-model="editVisible"
-      title="编辑白名单数据"
-      width="680px"
-      append-to-body
-      destroy-on-close
-      @closed="clearEditSensitiveFields"
-    >
+    <el-dialog v-model="editVisible" title="编辑白名单数据" width="680px" append-to-body destroy-on-close @closed="clearEditSensitiveFields">
       <el-alert
         v-if="editTarget?.status === 'APPROVED'"
         title="修改已开户数据的子单元名称后，系统会同步提交招行 NTDMAMNT 修改任务。"
@@ -784,7 +930,15 @@
           <el-input :model-value="editTarget?.bankAccountMasked || '-'" disabled />
         </el-form-item>
         <el-form-item label="新银行账号" prop="bankAccount">
-          <el-input v-model="editForm.bankAccount" type="password" show-password clearable maxlength="32" autocomplete="new-password" placeholder="不填写则保留当前账号" />
+          <el-input
+            v-model="editForm.bankAccount"
+            type="password"
+            show-password
+            clearable
+            maxlength="32"
+            autocomplete="new-password"
+            placeholder="不填写则保留当前账号"
+          />
         </el-form-item>
         <el-form-item label="联系人" prop="contactName">
           <el-input v-model="editForm.contactName" maxlength="50" show-word-limit />
@@ -793,7 +947,15 @@
           <el-input :model-value="editTarget?.contactPhoneMasked || '-'" disabled />
         </el-form-item>
         <el-form-item label="新联系电话" prop="contactPhone">
-          <el-input v-model="editForm.contactPhone" type="password" show-password clearable maxlength="11" autocomplete="new-password" placeholder="不填写则保留当前电话" />
+          <el-input
+            v-model="editForm.contactPhone"
+            type="password"
+            show-password
+            clearable
+            maxlength="11"
+            autocomplete="new-password"
+            placeholder="不填写则保留当前电话"
+          />
         </el-form-item>
         <template v-if="editTarget?.status === 'APPROVED' && canManageCommissionRate">
           <el-divider content-position="left">抽佣比例</el-divider>
@@ -820,7 +982,12 @@
     </el-dialog>
 
     <el-dialog v-model="blacklistVisible" title="企业移出结算白名单" width="620px" append-to-body>
-      <el-alert title="拉黑后企业立即失去白名单资格，系统同时提交子单元关户任务；余额未清零或存在未完成支付时会等待，满足条件后关闭。" type="error" :closable="false" show-icon />
+      <el-alert
+        title="拉黑后企业立即失去白名单资格，系统同时提交子单元关户任务；余额未清零或存在未完成支付时会等待，满足条件后关闭。"
+        type="error"
+        :closable="false"
+        show-icon
+      />
       <el-form ref="blacklistFormRef" :model="blacklistForm" :rules="blacklistRules" label-width="112px" class="dialog-form">
         <el-form-item label="企业名称">{{ blacklistTarget?.companyName || '-' }}</el-form-item>
         <el-form-item label="风险原因" prop="reasonCode">
@@ -833,7 +1000,15 @@
           </el-select>
         </el-form-item>
         <el-form-item label="详细说明" prop="reason">
-          <el-input v-model="blacklistForm.reason" type="textarea" :rows="4" minlength="5" maxlength="400" show-word-limit placeholder="请填写风险事实、依据和后续处置建议" />
+          <el-input
+            v-model="blacklistForm.reason"
+            type="textarea"
+            :rows="4"
+            minlength="5"
+            maxlength="400"
+            show-word-limit
+            placeholder="请填写风险事实、依据和后续处置建议"
+          />
         </el-form-item>
         <el-form-item label="确认企业名称" prop="confirmation">
           <el-input v-model="blacklistForm.confirmation" autocomplete="off" placeholder="输入完整企业名称确认高风险操作" />
@@ -873,11 +1048,7 @@
           />
         </el-form-item>
         <el-form-item label="允许多个主账号">
-          <el-switch
-            v-model="globalSettingsForm.allowMultipleMainAccounts"
-            active-text="允许"
-            inactive-text="仅单个"
-          />
+          <el-switch v-model="globalSettingsForm.allowMultipleMainAccounts" active-text="允许" inactive-text="仅单个" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -886,7 +1057,12 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="commissionRateEditorVisible" :title="`${commissionRateEditorTarget?.companyName || ''} · 抽佣比例`" width="500px" append-to-body>
+    <el-dialog
+      v-model="commissionRateEditorVisible"
+      :title="`${commissionRateEditorTarget?.companyName || ''} · 抽佣比例`"
+      width="500px"
+      append-to-body
+    >
       <el-form ref="commissionRateEditorFormRef" :model="commissionRateEditorForm" :rules="commissionRateRules" label-width="110px">
         <el-form-item label="设置方式">
           <el-radio-group v-model="commissionRateEditorForm.mode">
@@ -895,7 +1071,14 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item v-if="commissionRateEditorForm.mode === 'INDIVIDUAL'" label="抽佣比例" prop="commissionRate">
-          <el-input-number v-model="commissionRateEditorForm.commissionRate" :min="3" :max="100" :precision="1" :step="0.1" controls-position="right" />
+          <el-input-number
+            v-model="commissionRateEditorForm.commissionRate"
+            :min="3"
+            :max="100"
+            :precision="1"
+            :step="0.1"
+            controls-position="right"
+          />
           <span class="rate-unit">%</span>
         </el-form-item>
       </el-form>
@@ -1059,12 +1242,7 @@
             <span class="policy-label">允许多个主账号</span>
             <el-tag v-if="paymentAccountSettingSource === 'GLOBAL'" type="info" size="small" effect="plain">当前继承全局</el-tag>
           </div>
-          <el-switch
-            v-model="paymentAccountAllowMultiple"
-            active-text="开启"
-            inactive-text="关闭"
-            @change="handleMultipleMainAccountChange"
-          />
+          <el-switch v-model="paymentAccountAllowMultiple" active-text="开启" inactive-text="关闭" @change="handleMultipleMainAccountChange" />
         </div>
         <el-table :data="paymentAccountRows" row-key="accountId" class="payment-account-table">
           <el-table-column label="关联子账号" width="118" align="center">
@@ -1140,18 +1318,14 @@
                 v-model="paymentAccountDefaultId"
                 :label="String(row.accountId)"
                 :disabled="!paymentAccountSelectedIds.includes(String(row.accountId))"
-              ><span /></el-radio>
+                ><span
+              /></el-radio>
             </template>
           </el-table-column>
           <el-table-column label="默认主账号关系" min-width="210">
             <template #default="{ row }">
               <div class="payment-account-status-cell">
-                <el-tooltip
-                  v-if="paymentAccountStatusDetail(row)"
-                  :content="paymentAccountStatusDetail(row)"
-                  placement="top"
-                  :show-after="200"
-                >
+                <el-tooltip v-if="paymentAccountStatusDetail(row)" :content="paymentAccountStatusDetail(row)" placement="top" :show-after="200">
                   <el-tag :type="paymentAccountStatusType(paymentAccountDisplayStatus(row))" size="small">
                     {{ paymentAccountStatusText(paymentAccountDisplayStatus(row)) }}
                   </el-tag>
@@ -1176,7 +1350,8 @@
                 icon="Delete"
                 :loading="paymentAccountDeletingIds.includes(String(row.accountId))"
                 @click.stop="confirmDeletePaymentAccount(row)"
-              >删除</el-button>
+                >删除</el-button
+              >
             </template>
           </el-table-column>
         </el-table>
@@ -1184,11 +1359,7 @@
         <el-form class="payment-account-add-form" label-width="96px" @submit.prevent>
           <el-form-item label="选择主账号" class="payment-account-profile-account">
             <div class="payment-account-selector-row">
-              <el-select
-                v-model="paymentAccountProfileAccountId"
-                placeholder="请选择已有主账号"
-                @change="selectPaymentAccountProfile"
-              >
+              <el-select v-model="paymentAccountProfileAccountId" placeholder="请选择已有主账号" @change="selectPaymentAccountProfile">
                 <el-option
                   v-for="item in paymentAccountRows"
                   :key="String(item.accountId)"
@@ -1197,12 +1368,9 @@
                 />
                 <el-option label="新增主账号" :value="NEW_PAYMENT_ACCOUNT_ID" />
               </el-select>
-              <el-button
-                type="primary"
-                plain
-                :disabled="isCreatingPaymentAccount"
-                @click="selectPaymentAccountProfile(NEW_PAYMENT_ACCOUNT_ID)"
-              >＋ 添加主账号</el-button>
+              <el-button type="primary" plain :disabled="isCreatingPaymentAccount" @click="selectPaymentAccountProfile(NEW_PAYMENT_ACCOUNT_ID)"
+                >＋ 添加主账号</el-button
+              >
             </div>
           </el-form-item>
           <el-form-item label="主账号名称">
@@ -1218,16 +1386,13 @@
             <el-input
               v-model="paymentAccountEditor.contactPhone"
               maxlength="32"
-              :placeholder="paymentAccountStoredContactPhoneMasked ? `已保存 ${paymentAccountStoredContactPhoneMasked}，留空不修改` : '请输入手机号或固定电话'"
+              :placeholder="
+                paymentAccountStoredContactPhoneMasked ? `已保存 ${paymentAccountStoredContactPhoneMasked}，留空不修改` : '请输入手机号或固定电话'
+              "
             />
           </el-form-item>
           <el-form-item label="银行卡号">
-            <el-input
-              v-if="isCreatingPaymentAccount"
-              v-model="paymentAccountEditor.accountNo"
-              maxlength="35"
-              placeholder="请输入完整银行卡号"
-            />
+            <el-input v-if="isCreatingPaymentAccount" v-model="paymentAccountEditor.accountNo" maxlength="35" placeholder="请输入完整银行卡号" />
             <el-input v-else :model-value="currentPaymentAccount?.accountNoMasked || '-'" disabled />
           </el-form-item>
           <el-form-item class="payment-account-add-action">
@@ -1237,7 +1402,8 @@
               :disabled="!paymentAccountProfileAccountId"
               :loading="paymentAccountAdding || paymentAccountProfileSubmitting"
               @click="savePaymentAccountEditor"
-            >{{ isCreatingPaymentAccount ? '添加主账号' : '保存主账号资料' }}</el-button>
+              >{{ isCreatingPaymentAccount ? '添加主账号' : '保存主账号资料' }}</el-button
+            >
           </el-form-item>
         </el-form>
       </div>
@@ -1246,7 +1412,6 @@
         <el-button type="primary" :loading="paymentAccountSubmitting" @click="submitPaymentAccounts">保存配置</el-button>
       </template>
     </el-dialog>
-
   </div>
 </template>
 
@@ -1316,10 +1481,11 @@ const COLUMN_STORAGE_KEY = 'admin:sub-account:columns:v2';
 const router = useRouter();
 const userStore = useUserStore();
 // 编辑权限与抽佣权限分开判断，只有具备抽佣权限时才在编辑弹窗展示比例设置。
-const canManageCommissionRate = computed(() =>
-  userStore.permissions.includes('*:*:*')
-  || userStore.permissions.includes('settlement:subAccount:commissionRate')
-  || userStore.permissions.includes('settlement:subAccount:interestRate')
+const canManageCommissionRate = computed(
+  () =>
+    userStore.permissions.includes('*:*:*') ||
+    userStore.permissions.includes('settlement:subAccount:commissionRate') ||
+    userStore.permissions.includes('settlement:subAccount:interestRate')
 );
 // 生产参数仍由后端保留，本页面按运营要求隐藏配置入口，后续可通过开关恢复。
 const showCmbConfigEntry = false;
@@ -1370,6 +1536,20 @@ const currentCompany = ref<Record<string, any>>();
 const currentCert = ref<Record<string, any>>();
 const materialFiles = ref<MaterialFile[]>([]);
 const auditLogs = ref<AuditLogVO[]>([]);
+// 白名单详情弹窗的资质材料编辑态：仅在申请状态为 APPROVED 时提供修改入口，避免误改待审或已驳回资料。
+const detailMaterialEditing = ref(false);
+const detailMaterialSaving = ref(false);
+const detailMaterialUploadingField = ref<QualificationMaterialField | ''>('');
+const detailQualificationIds = reactive<SettlementQualificationUpdateRequest>({
+  businessLicense: '',
+  legalPersonIdFront: '',
+  legalPersonIdBack: '',
+  bankAccountProof: '',
+  authLetter: '',
+  taxRecords: '',
+  socialSecurityProofs: '',
+  officePhotos: ''
+});
 
 // 待审核白名单优先展示最新待审 company_cert，避免资质历史按审核时间排序时误取旧的已通过资料。
 const qualificationInfo = computed(() => {
@@ -1397,9 +1577,7 @@ const auditQualificationIds = reactive<SettlementQualificationUpdateRequest>({
   socialSecurityProofs: '',
   officePhotos: ''
 });
-const singleQualificationFields = new Set<QualificationMaterialField>([
-  'businessLicense', 'legalPersonIdFront', 'legalPersonIdBack', 'authLetter'
-]);
+const singleQualificationFields = new Set<QualificationMaterialField>(['businessLicense', 'legalPersonIdFront', 'legalPersonIdBack', 'authLetter']);
 const qualificationFieldLabels: Record<QualificationMaterialField, string> = {
   businessLicense: '营业执照',
   legalPersonIdFront: '法人身份证正面',
@@ -1410,12 +1588,12 @@ const qualificationFieldLabels: Record<QualificationMaterialField, string> = {
   socialSecurityProofs: '企业社保证明',
   officePhotos: '经营场地照片'
 };
-const qualificationUploadFields = (Object.keys(qualificationFieldLabels) as QualificationMaterialField[])
-  .map((field) => ({ field, label: qualificationFieldLabels[field] }));
-const auditCurrentRow = computed(() => auditTargets.value.length === 1 ? auditTargets.value[0] : undefined);
-const auditQualificationInfo = computed(() =>
-  buildQualificationInfo(auditCurrentCompany.value, auditCurrentCert.value, auditCurrentRow.value)
-);
+const qualificationUploadFields = (Object.keys(qualificationFieldLabels) as QualificationMaterialField[]).map((field) => ({
+  field,
+  label: qualificationFieldLabels[field]
+}));
+const auditCurrentRow = computed(() => (auditTargets.value.length === 1 ? auditTargets.value[0] : undefined));
+const auditQualificationInfo = computed(() => buildQualificationInfo(auditCurrentCompany.value, auditCurrentCert.value, auditCurrentRow.value));
 const auditFormRef = ref<FormInstance>();
 const auditForm = reactive({ checks: [] as string[], opinion: '', riskConfirmed: false });
 const auditCheckOptions = [
@@ -1428,7 +1606,10 @@ const auditCheckOptions = [
 ];
 const auditRules: FormRules = {
   checks: [{ type: 'array', required: true, min: auditCheckOptions.length, message: '请完成全部材料校验项', trigger: 'change' }],
-  opinion: [{ required: true, message: '请输入审核意见', trigger: 'blur' }, { min: 5, max: 300, message: '审核意见需为5到300个字符', trigger: 'blur' }],
+  opinion: [
+    { required: true, message: '请输入审核意见', trigger: 'blur' },
+    { min: 5, max: 300, message: '审核意见需为5到300个字符', trigger: 'blur' }
+  ],
   riskConfirmed: [{ validator: (_rule, value, callback) => (value ? callback() : callback(new Error('请确认风险校验结果'))), trigger: 'change' }]
 };
 
@@ -1439,7 +1620,10 @@ const rejectFormRef = ref<FormInstance>();
 const rejectTemplate = ref('');
 const rejectForm = reactive({ reason: '' });
 const reasonRules: FormRules = {
-  reason: [{ required: true, message: '请输入驳回原因', trigger: 'blur' }, { min: 5, max: 500, message: '原因需为5到500个字符', trigger: 'blur' }]
+  reason: [
+    { required: true, message: '请输入驳回原因', trigger: 'blur' },
+    { min: 5, max: 500, message: '原因需为5到500个字符', trigger: 'blur' }
+  ]
 };
 const rejectTemplates = [
   '缺少加盖公章的资金代发授权委托书，请补充后重新提交',
@@ -1486,17 +1670,13 @@ const editRules: FormRules = {
     { max: 120, message: '开户支行不能超过120个字符', trigger: 'blur' },
     { pattern: /^[\p{L}\p{N}\s（）()·&._-]+$/u, message: '开户支行包含不允许的特殊符号', trigger: 'blur' }
   ],
-  bankAccount: [
-    { pattern: /^$|^\d{8,32}$/, message: '新银行账号应为8到32位数字', trigger: 'blur' }
-  ],
+  bankAccount: [{ pattern: /^$|^\d{8,32}$/, message: '新银行账号应为8到32位数字', trigger: 'blur' }],
   contactName: [
     { required: true, message: '请输入联系人', trigger: 'blur' },
     { max: 50, message: '联系人不能超过50个字符', trigger: 'blur' },
     { pattern: /^[\p{L}\p{N}\s·._-]+$/u, message: '联系人包含不允许的特殊符号', trigger: 'blur' }
   ],
-  contactPhone: [
-    { pattern: /^$|^1[3-9]\d{9}$/, message: '新联系电话格式不正确', trigger: 'blur' }
-  ],
+  contactPhone: [{ pattern: /^$|^1[3-9]\d{9}$/, message: '新联系电话格式不正确', trigger: 'blur' }],
   commissionRateMode: [{ required: true, message: '请选择抽佣方式', trigger: 'change' }],
   commissionRate: [
     { required: true, message: '请输入抽佣比例', trigger: 'change' },
@@ -1523,10 +1703,16 @@ const blacklistFormRef = ref<FormInstance>();
 const blacklistForm = reactive({ reasonCode: '', reason: '', confirmation: '' });
 const blacklistRules: FormRules = {
   reasonCode: [{ required: true, message: '请选择风险原因', trigger: 'change' }],
-  reason: [{ required: true, message: '请填写详细说明', trigger: 'blur' }, { min: 5, max: 400, message: '详细说明需为5到400个字符', trigger: 'blur' }],
+  reason: [
+    { required: true, message: '请填写详细说明', trigger: 'blur' },
+    { min: 5, max: 400, message: '详细说明需为5到400个字符', trigger: 'blur' }
+  ],
   confirmation: [
     { required: true, message: '请输入完整企业名称', trigger: 'blur' },
-    { validator: (_rule, value, callback) => (value === blacklistTarget.value?.companyName ? callback() : callback(new Error('企业名称不一致'))), trigger: 'blur' }
+    {
+      validator: (_rule, value, callback) => (value === blacklistTarget.value?.companyName ? callback() : callback(new Error('企业名称不一致'))),
+      trigger: 'blur'
+    }
   ]
 };
 
@@ -1558,9 +1744,9 @@ const paymentAccountEditor = reactive({
   contactPhone: ''
 });
 const isCreatingPaymentAccount = computed(() => paymentAccountProfileAccountId.value === NEW_PAYMENT_ACCOUNT_ID);
-const currentPaymentAccount = computed(() => paymentAccountRows.value.find(
-  (item) => String(item.accountId) === paymentAccountProfileAccountId.value
-));
+const currentPaymentAccount = computed(() =>
+  paymentAccountRows.value.find((item) => String(item.accountId) === paymentAccountProfileAccountId.value)
+);
 
 const globalCommissionRate = ref(5);
 const globalSettingsVisible = ref(false);
@@ -1583,9 +1769,7 @@ const commissionRateRules: FormRules = {
       trigger: 'change'
     }
   ],
-  mainAccountNo: [
-    { pattern: /^$|^\d{6,35}$/, message: '全局主账号必须为6至35位数字', trigger: 'blur' }
-  ]
+  mainAccountNo: [{ pattern: /^$|^\d{6,35}$/, message: '全局主账号必须为6至35位数字', trigger: 'blur' }]
 };
 
 // 列表比例采用独立轻量弹窗，避免为只改抽佣比例打开完整企业编辑表单。
@@ -1912,7 +2096,14 @@ function applyQuickRange(range: Exclude<QuickRange, ''>) {
 function saveFilters() {
   localStorage.setItem(
     FILTER_STORAGE_KEY,
-    JSON.stringify({ keyword: query.keyword, status: query.status, subAccountName: query.subAccountName, bankBranch: query.bankBranch, pageSize: query.pageSize, timeRange: timeRange.value })
+    JSON.stringify({
+      keyword: query.keyword,
+      status: query.status,
+      subAccountName: query.subAccountName,
+      bankBranch: query.bankBranch,
+      pageSize: query.pageSize,
+      timeRange: timeRange.value
+    })
   );
 }
 
@@ -2074,9 +2265,7 @@ function removeAuditQualification(file: MaterialFile) {
 async function cancelAuditQualificationEdit() {
   const cert = auditCurrentCert.value || {};
   seedAuditQualificationIds(cert);
-  auditMaterialFiles.value = auditCurrentRow.value
-    ? await resolveMaterials(cert, auditCurrentRow.value.companyId)
-    : [];
+  auditMaterialFiles.value = auditCurrentRow.value ? await resolveMaterials(cert, auditCurrentRow.value.companyId) : [];
   auditMaterialEditing.value = false;
 }
 
@@ -2097,13 +2286,92 @@ async function saveAuditQualification() {
   }
 }
 
+function seedDetailQualificationIds(cert: Record<string, any>) {
+  (Object.keys(detailQualificationIds) as QualificationMaterialField[]).forEach((field) => {
+    detailQualificationIds[field] = splitValues(cert?.[field])
+      .filter((value) => /^\d+$/.test(value))
+      .join(',');
+  });
+}
+
+async function uploadDetailQualification(options: UploadRequestOptions, field: QualificationMaterialField) {
+  detailMaterialUploadingField.value = field;
+  try {
+    const file = options.file as File;
+    const response: any = await uploadSettlementQualification(file);
+    const data = response?.data || {};
+    const ossId = String(data.ossId || '');
+    const url = String(data.url || '');
+    if (!ossId || !url) throw new Error('上传成功但未返回有效文件信息');
+    const ids = splitValues(detailQualificationIds[field]);
+    if (singleQualificationFields.has(field)) {
+      ids.splice(0, ids.length, ossId);
+      materialFiles.value = materialFiles.value.filter((item) => item.field !== field);
+    } else {
+      const limit = field === 'officePhotos' ? 3 : 5;
+      if (ids.length >= limit) throw new Error(`${qualificationFieldLabels[field]}最多上传${limit}个文件`);
+      ids.push(ossId);
+    }
+    detailQualificationIds[field] = Array.from(new Set(ids)).join(',');
+    materialFiles.value.push({
+      field,
+      label: qualificationFieldLabels[field],
+      url,
+      name: String(data.originalName || data.fileName || file.name),
+      ossId,
+      kind: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(fileExt(data.fileSuffix || file.name)) ? 'image' : 'document'
+    });
+    options.onSuccess?.(response);
+    ElMessage.success(`${qualificationFieldLabels[field]}已上传，请点击保存修改`);
+  } catch (error: any) {
+    options.onError?.(error);
+    ElMessage.error(error?.message || '资质附件上传失败');
+  } finally {
+    detailMaterialUploadingField.value = '';
+  }
+}
+
+function removeDetailQualification(file: MaterialFile) {
+  const ids = splitValues(detailQualificationIds[file.field]).filter((id) => id !== file.ossId);
+  detailQualificationIds[file.field] = ids.join(',');
+  materialFiles.value = materialFiles.value.filter((item) => item !== file);
+}
+
+async function cancelDetailQualificationEdit() {
+  const cert = currentCert.value || {};
+  seedDetailQualificationIds(cert);
+  const row = detailTarget.value;
+  materialFiles.value = row ? await resolveMaterials(cert, row.companyId) : [];
+  detailMaterialEditing.value = false;
+}
+
+async function saveDetailQualification() {
+  const row = detailTarget.value;
+  if (!row) return;
+  if (!detailQualificationIds.taxRecords && !detailQualificationIds.socialSecurityProofs) {
+    return ElMessage.error('请上传企业近三个月纳税记录或企业社保证明，二选一提交即可');
+  }
+  detailMaterialSaving.value = true;
+  try {
+    await updateSettlementQualification(row.applicationId, { ...detailQualificationIds });
+    currentCert.value = { ...(currentCert.value || {}), ...detailQualificationIds };
+    detailMaterialEditing.value = false;
+    ElMessage.success('企业资质材料已保存');
+  } finally {
+    detailMaterialSaving.value = false;
+  }
+}
+
 async function submitApprove() {
   if (!auditFormRef.value) return;
   if (auditTargets.value.length === 1 && auditDetailLoading.value) return ElMessage.warning('申请资料仍在加载，请稍候');
   if (auditTargets.value.length === 1 && auditDetailError.value) return ElMessage.warning('请先重新打开审核弹窗并确认申请资料已完整加载');
   const valid = await auditFormRef.value.validate().catch(() => false);
   if (!valid) return;
-  const confirmed = await ElMessageBox.confirm(`确认通过 ${auditTargets.value.length} 家企业的记账子单元申请？`, '审核确认', { type: 'warning', confirmButtonText: '确认通过' }).catch(() => false);
+  const confirmed = await ElMessageBox.confirm(`确认通过 ${auditTargets.value.length} 家企业的记账子单元申请？`, '审核确认', {
+    type: 'warning',
+    confirmButtonText: '确认通过'
+  }).catch(() => false);
   if (!confirmed) return;
   auditSubmitting.value = true;
   const opinion = auditForm.opinion.trim();
@@ -2285,10 +2553,14 @@ async function openDetail(row: SettlementSubAccountVO, tab: DetailTab = 'applica
   detailTab.value = tab;
   detailVisible.value = true;
   detailLoading.value = true;
+  detailMaterialEditing.value = false;
+  detailMaterialSaving.value = false;
+  detailMaterialUploadingField.value = '';
   currentCompany.value = undefined;
   currentCert.value = undefined;
   materialFiles.value = [];
   auditLogs.value = [];
+  seedDetailQualificationIds({});
   const [companyResult, companyHistoryResult, subAccountHistoryResult] = await Promise.allSettled([
     getCompany(row.companyId),
     getCompanyAuditHistory(row.companyId),
@@ -2299,6 +2571,7 @@ async function openDetail(row: SettlementSubAccountVO, tab: DetailTab = 'applica
   const latestCert = selectApplicationCert(companyHistory.certHistory, row);
   currentCompany.value = company;
   currentCert.value = latestCert;
+  seedDetailQualificationIds(latestCert);
   const materialSource = mergeQualificationMaterialSource(company, latestCert);
   await hydrateMaterials(materialSource, row.companyId);
   const companyLogs = companyHistory.auditLogs || [];
@@ -2310,23 +2583,21 @@ async function openDetail(row: SettlementSubAccountVO, tab: DetailTab = 'applica
 }
 
 function selectApplicationCert(certHistory: unknown, row?: SettlementSubAccountVO) {
-  const certs = Array.isArray(certHistory) ? certHistory.filter(Boolean) as Record<string, any>[] : [];
+  const certs = Array.isArray(certHistory) ? (certHistory.filter(Boolean) as Record<string, any>[]) : [];
   if (!certs.length) return {};
   const pendingCerts = certs.filter((cert) => ['0', 'PENDING'].includes(String(cert.status || '').toUpperCase()));
   const candidates = row?.status === 'PENDING' && pendingCerts.length ? pendingCerts : certs;
   // company auditHistory 以审核时间优先排序，待审记录没有 auditTime；这里按提交时间重新选取本次申请资料。
-  return [...candidates].sort((left, right) => {
-    const timeDiff = Date.parse(String(right.createTime || '')) - Date.parse(String(left.createTime || ''));
-    if (Number.isFinite(timeDiff) && timeDiff !== 0) return timeDiff;
-    return String(right.certId || '').localeCompare(String(left.certId || ''));
-  })[0] || {};
+  return (
+    [...candidates].sort((left, right) => {
+      const timeDiff = Date.parse(String(right.createTime || '')) - Date.parse(String(left.createTime || ''));
+      if (Number.isFinite(timeDiff) && timeDiff !== 0) return timeDiff;
+      return String(right.certId || '').localeCompare(String(left.certId || ''));
+    })[0] || {}
+  );
 }
 
-function buildQualificationInfo(
-  companySource?: Record<string, any>,
-  certSource?: Record<string, any>,
-  row?: SettlementSubAccountVO
-) {
+function buildQualificationInfo(companySource?: Record<string, any>, certSource?: Record<string, any>, row?: SettlementSubAccountVO) {
   const company = companySource || {};
   const cert = certSource || {};
   const hasCertSnapshot = Object.keys(cert).length > 0;
@@ -2419,17 +2690,29 @@ async function resolveMaterials(company: Record<string, any>, companyId: string 
 }
 
 function fileExt(source?: string) {
-  const raw = (String(source || '').split('?')[0].split('#')[0].split('/').pop() || '').replace(/^\./, '');
+  const raw = (
+    String(source || '')
+      .split('?')[0]
+      .split('#')[0]
+      .split('/')
+      .pop() || ''
+  ).replace(/^\./, '');
   const parts = raw.split('.');
   return (parts.length > 1 ? parts.pop() : raw).toLowerCase();
 }
 
 function imagePreviewIndex(file: MaterialFile) {
-  return Math.max(0, imagePreviewList.value.findIndex((url) => url === file.url));
+  return Math.max(
+    0,
+    imagePreviewList.value.findIndex((url) => url === file.url)
+  );
 }
 
 function auditImagePreviewIndex(file: MaterialFile) {
-  return Math.max(0, auditImagePreviewList.value.findIndex((url) => url === file.url));
+  return Math.max(
+    0,
+    auditImagePreviewList.value.findIndex((url) => url === file.url)
+  );
 }
 
 function sensitiveRowKey(row: SettlementSubAccountVO) {
@@ -2441,9 +2724,9 @@ function bankAccountText(row: SettlementSubAccountVO) {
 }
 
 function subAccountNoText(row: SettlementSubAccountVO) {
-  return revealedSubAccountNumbers[sensitiveRowKey(row)]
-    || row.subAccountNoMasked
-    || (row.openingStatus === 'SUCCESS' ? '编号暂不可用' : '开户成功后显示');
+  return (
+    revealedSubAccountNumbers[sensitiveRowKey(row)] || row.subAccountNoMasked || (row.openingStatus === 'SUCCESS' ? '编号暂不可用' : '开户成功后显示')
+  );
 }
 
 function commissionRateText(value?: number | null) {
@@ -2578,13 +2861,14 @@ const paymentBankBrands: readonly PaymentBankBrand[] = [
 function paymentAccountBankBrand(accountName?: string): PaymentBankBrand {
   const normalizedName = String(accountName || '').toUpperCase();
   const words = normalizedName.split(/[^A-Z0-9]+/).filter(Boolean);
-  return paymentBankBrands.find((brand) => brand.terms.some((term) => {
-    const normalizedTerm = term.toUpperCase();
-    return /^[A-Z]+$/.test(normalizedTerm)
-      ? words.includes(normalizedTerm)
-      : normalizedName.includes(normalizedTerm);
-  }))
-    || { terms: [], key: 'generic', glyph: '银', name: '银行账户' };
+  return (
+    paymentBankBrands.find((brand) =>
+      brand.terms.some((term) => {
+        const normalizedTerm = term.toUpperCase();
+        return /^[A-Z]+$/.test(normalizedTerm) ? words.includes(normalizedTerm) : normalizedName.includes(normalizedTerm);
+      })
+    ) || { terms: [], key: 'generic', glyph: '银', name: '银行账户' }
+  );
 }
 
 function paymentAccountNoText(row: SettlementPaymentAccount) {
@@ -2609,10 +2893,7 @@ async function togglePaymentAccountNo(row: SettlementPaymentAccount) {
   const revealVersion = paymentAccountRevealVersion.value;
   paymentAccountNoLoadingIds.value.push(accountId);
   try {
-    const response: any = await getSettlementPaymentAccountNo(
-      paymentAccountTarget.value.applicationId,
-      row.accountId
-    );
+    const response: any = await getSettlementPaymentAccountNo(paymentAccountTarget.value.applicationId, row.accountId);
     const accountNo = response?.data?.accountNo;
     if (!accountNo) return ElMessage.warning('未获取到完整银行卡号');
     if (!paymentAccountVisible.value || revealVersion !== paymentAccountRevealVersion.value) return;
@@ -2668,19 +2949,18 @@ async function loadPaymentAccounts() {
     paymentAccountRows.value = Array.isArray(response?.data) ? response.data : [];
     paymentAccountAllowMultiple.value = settingsResponse?.data?.allowMultipleMainAccounts === true;
     paymentAccountSettingSource.value = settingsResponse?.data?.settingSource === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'GLOBAL';
-    paymentAccountSelectedIds.value = paymentAccountRows.value
-      .filter((item) => item.assigned)
-      .map((item) => String(item.accountId));
+    paymentAccountSelectedIds.value = paymentAccountRows.value.filter((item) => item.assigned).map((item) => String(item.accountId));
     paymentAccountDefaultId.value = String(
-      paymentAccountRows.value.find((item) => item.assigned && item.defaultAccount)?.accountId
-        ?? paymentAccountRows.value.find((item) => item.assigned)?.accountId
-        ?? ''
+      paymentAccountRows.value.find((item) => item.assigned && item.defaultAccount)?.accountId ??
+        paymentAccountRows.value.find((item) => item.assigned)?.accountId ??
+        ''
     );
     // 编辑区只读取主账号自身资料，不使用当前 B 端申请企业兜底，防止错误归属被保存。
-    const profileAccount = paymentAccountRows.value.find((item) => String(item.accountId) === paymentAccountProfileAccountId.value)
-      ?? paymentAccountRows.value.find((item) => String(item.accountId) === paymentAccountDefaultId.value)
-      ?? paymentAccountRows.value.find((item) => item.assigned)
-      ?? paymentAccountRows.value[0];
+    const profileAccount =
+      paymentAccountRows.value.find((item) => String(item.accountId) === paymentAccountProfileAccountId.value) ??
+      paymentAccountRows.value.find((item) => String(item.accountId) === paymentAccountDefaultId.value) ??
+      paymentAccountRows.value.find((item) => item.assigned) ??
+      paymentAccountRows.value[0];
     selectPaymentAccountProfile(profileAccount?.accountId || NEW_PAYMENT_ACCOUNT_ID);
     if (!paymentAccountAllowMultiple.value && paymentAccountSelectedIds.value.length > 1) {
       const retainedId = paymentAccountDefaultId.value || paymentAccountSelectedIds.value[0];
@@ -2725,13 +3005,7 @@ function handleMultipleMainAccountChange(enabled: boolean | string | number) {
   ElMessage.info('已保留当前默认主账号，其余账号将在保存后解除分配');
 }
 
-async function persistPaymentAccount(
-  accountName: string,
-  accountNo: string,
-  subjectCompanyName: string,
-  contactName: string,
-  contactPhone: string
-) {
+async function persistPaymentAccount(accountName: string, accountNo: string, subjectCompanyName: string, contactName: string, contactPhone: string) {
   const response = await addSettlementPaymentAccount(paymentAccountTarget.value!.applicationId, {
     accountName,
     accountNo,
@@ -2786,15 +3060,14 @@ function validatePaymentAccountProfile(
 
 function selectedPaymentAccountMissingProfile() {
   const selected = new Set(paymentAccountSelectedIds.value.map(String));
-  return paymentAccountRows.value.find((item) => selected.has(String(item.accountId))
-    && (!item.accountName || !item.subjectCompanyName || !item.contactName || !item.contactPhoneMasked));
+  return paymentAccountRows.value.find(
+    (item) => selected.has(String(item.accountId)) && (!item.accountName || !item.subjectCompanyName || !item.contactName || !item.contactPhoneMasked)
+  );
 }
 
 async function persistPaymentAccountProfile() {
   if (!paymentAccountTarget.value || !paymentAccountProfileAccountId.value || isCreatingPaymentAccount.value) return false;
-  const current = paymentAccountRows.value.find(
-    (item) => String(item.accountId) === paymentAccountProfileAccountId.value
-  );
+  const current = paymentAccountRows.value.find((item) => String(item.accountId) === paymentAccountProfileAccountId.value);
   if (!current) return false;
   const draft = normalizedPaymentAccountProfileDraft();
   const validationMessage = validatePaymentAccountProfile(draft, !current.contactPhoneMasked);
@@ -2802,16 +3075,12 @@ async function persistPaymentAccountProfile() {
     ElMessage.warning(validationMessage);
     return false;
   }
-  const response = await updateSettlementPaymentAccountProfile(
-    paymentAccountTarget.value.applicationId,
-    current.accountId,
-    {
-      accountName: draft.accountName,
-      subjectCompanyName: draft.subjectCompanyName,
-      contactName: draft.contactName,
-      contactPhone: draft.contactPhone || undefined
-    }
-  );
+  const response = await updateSettlementPaymentAccountProfile(paymentAccountTarget.value.applicationId, current.accountId, {
+    accountName: draft.accountName,
+    subjectCompanyName: draft.subjectCompanyName,
+    contactName: draft.contactName,
+    contactPhone: draft.contactPhone || undefined
+  });
   const savedAccount = response?.data;
   if (!savedAccount?.accountId) throw new Error('保存主账号企业资料后未返回账户信息，请刷新后重试');
   const index = paymentAccountRows.value.findIndex((item) => String(item.accountId) === String(savedAccount.accountId));
@@ -2870,7 +3139,9 @@ async function confirmDeletePaymentAccount(row: SettlementPaymentAccount) {
       confirmButtonText: '确认删除',
       cancelButtonText: '取消'
     }
-  ).then(() => true).catch(() => false);
+  )
+    .then(() => true)
+    .catch(() => false);
   if (!confirmed) return;
   if (row.assigned) {
     ElMessage.warning('该主账号仍关联当前子账号，请先关闭关联并保存配置后再删除');
@@ -2905,8 +3176,7 @@ async function submitPaymentAccounts() {
     if (!paymentAccountSelectedIds.value.length || !paymentAccountDefaultId.value) {
       return ElMessage.warning('请至少选择一个主账号并指定默认账号');
     }
-    if (paymentAccountProfileAccountId.value && !isCreatingPaymentAccount.value
-      && !(await persistPaymentAccountProfile())) return;
+    if (paymentAccountProfileAccountId.value && !isCreatingPaymentAccount.value && !(await persistPaymentAccountProfile())) return;
     const incompleteAccount = selectedPaymentAccountMissingProfile();
     if (incompleteAccount) {
       return ElMessage.warning(`请先完善主账号“${incompleteAccount.accountName || '未命名主账号'}”的企业与联系人资料`);
@@ -3076,9 +3346,7 @@ function auditOperatorRole(log: AuditLogVO) {
 function auditDetailText(log: AuditLogVO) {
   const rawDetail = log.detail || log.remark || '无补充说明';
   if (!/(?:^|[，,])企业ID=/.test(rawDetail)) return rawDetail;
-  const businessDetail = rawDetail
-    .replace(/(?:^|[，,])企业ID=[^，,]+/g, '')
-    .replace(/^[，,]+|[，,]+$/g, '');
+  const businessDetail = rawDetail.replace(/(?:^|[，,])企业ID=[^，,]+/g, '').replace(/^[，,]+|[，,]+$/g, '');
   const actorDetail = `操作人=${auditOperatorName(log)}，角色=${auditOperatorRole(log)}`;
   return businessDetail ? `${actorDetail}，${businessDetail}` : actorDetail;
 }
@@ -3112,7 +3380,9 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
 .stat-mini-card {
   height: 100%;
   border: 1px solid var(--el-border-color-lighter);
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .stat-mini-card.clickable {
@@ -3125,9 +3395,15 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
   border-color: var(--el-color-primary-light-5);
 }
 
-.stat-mini-card.warning { border-left: 3px solid var(--el-color-warning); }
-.stat-mini-card.success { border-left: 3px solid var(--el-color-success); }
-.stat-mini-card.danger { border-left: 3px solid var(--el-color-danger); }
+.stat-mini-card.warning {
+  border-left: 3px solid var(--el-color-warning);
+}
+.stat-mini-card.success {
+  border-left: 3px solid var(--el-color-success);
+}
+.stat-mini-card.danger {
+  border-left: 3px solid var(--el-color-danger);
+}
 
 .stat-mini {
   display: flex;
@@ -3135,12 +3411,28 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
   gap: 8px;
 }
 
-.stat-label { color: var(--el-text-color-regular); font-size: 14px; }
-.stat-value { color: var(--el-text-color-primary); font-size: 28px; line-height: 1; }
-.stat-value.warning { color: var(--el-color-warning); }
-.stat-value.success { color: var(--el-color-success); }
-.stat-value.danger { color: var(--el-color-danger); }
-.stat-caption { color: var(--el-text-color-secondary); font-size: 12px; }
+.stat-label {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+}
+.stat-value {
+  color: var(--el-text-color-primary);
+  font-size: 28px;
+  line-height: 1;
+}
+.stat-value.warning {
+  color: var(--el-color-warning);
+}
+.stat-value.success {
+  color: var(--el-color-success);
+}
+.stat-value.danger {
+  color: var(--el-color-danger);
+}
+.stat-caption {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
 
 .risk-alert {
   cursor: pointer;
@@ -3716,10 +4008,20 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
 }
 
 @media (max-width: 1200px) {
-  .material-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .qualification-upload-grid { grid-template-columns: 1fr; }
-  .memory-hint { margin-left: 0; }
-  .payment-account-add-form { grid-template-columns: 1fr; }
-  .payment-account-add-action { justify-self: stretch; }
+  .material-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .qualification-upload-grid {
+    grid-template-columns: 1fr;
+  }
+  .memory-hint {
+    margin-left: 0;
+  }
+  .payment-account-add-form {
+    grid-template-columns: 1fr;
+  }
+  .payment-account-add-action {
+    justify-self: stretch;
+  }
 }
 </style>
