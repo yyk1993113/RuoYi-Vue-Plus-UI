@@ -610,7 +610,25 @@
               <el-descriptions-item label="资质提交时间">{{ auditQualificationInfo.createTime }}</el-descriptions-item>
               <el-descriptions-item label="资质审核意见">{{ auditQualificationInfo.auditRemark }}</el-descriptions-item>
             </el-descriptions>
-            <div class="qualification-section-title audit-material-title">本次提交的资质材料</div>
+            <div class="qualification-section-title audit-material-title material-title-row">
+              <span>本次提交的资质材料</span>
+              <el-button
+                v-if="!auditMaterialEditing"
+                type="primary"
+                plain
+                icon="Edit"
+                @click="auditMaterialEditing = true"
+              >修改材料</el-button>
+              <el-button v-else plain @click="cancelAuditQualificationEdit">取消修改</el-button>
+            </div>
+            <el-alert
+              title="企业近三个月纳税记录 / 企业社保证明二选一必填"
+              description="请上传企业近三个月纳税记录或企业社保证明，二选一提交即可"
+              type="warning"
+              :closable="false"
+              show-icon
+              class="qualification-required-tip"
+            />
             <div v-if="auditMaterialFiles.length" class="material-grid audit-material-grid">
               <div v-for="file in auditMaterialFiles" :key="`audit-${file.label}-${file.url}`" class="material-card">
                 <div class="material-label">{{ file.label }}</div>
@@ -632,9 +650,35 @@
                   <span>{{ file.name || file.label }}</span>
                   <el-button link type="primary" @click="openExternal(file.url)">打开</el-button>
                 </div>
+                <div v-if="auditMaterialEditing" class="material-edit-actions">
+                  <el-button type="danger" plain size="small" icon="Delete" @click="removeAuditQualification(file)">移除</el-button>
+                </div>
               </div>
             </div>
             <el-empty v-else description="本次申请未获取到可预览的企业资质材料" :image-size="80" />
+            <div v-if="auditMaterialEditing" class="qualification-upload-grid">
+              <div v-for="item in qualificationUploadFields" :key="item.field" class="qualification-upload-item">
+                <div>
+                  <strong>{{ item.label }}</strong>
+                  <span>{{ splitValues(auditQualificationIds[item.field]).length ? `已上传 ${splitValues(auditQualificationIds[item.field]).length} 份` : '尚未上传' }}</span>
+                </div>
+                <el-upload
+                  :show-file-list="false"
+                  :disabled="Boolean(auditMaterialUploadingField) || auditMaterialSaving"
+                  accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                  :before-upload="(file: File) => beforeAuditQualificationUpload(file, item.field)"
+                  :http-request="(options: UploadRequestOptions) => uploadAuditQualification(options, item.field)"
+                >
+                  <el-button
+                    type="primary"
+                    plain
+                    size="small"
+                    icon="Upload"
+                    :loading="auditMaterialUploadingField === item.field"
+                  >{{ singleQualificationFields.has(item.field) && auditQualificationIds[item.field] ? '更换' : '上传' }}</el-button>
+                </el-upload>
+              </div>
+            </div>
           </template>
         </div>
 
@@ -672,9 +716,16 @@
       <template #footer>
         <el-button :disabled="auditSubmitting" @click="auditVisible = false">取消</el-button>
         <el-button
+          v-if="auditTargets.length === 1 && auditMaterialEditing"
+          type="success"
+          :loading="auditMaterialSaving"
+          :disabled="Boolean(auditMaterialUploadingField)"
+          @click="saveAuditQualification"
+        >保存材料修改</el-button>
+        <el-button
           type="primary"
           :loading="auditSubmitting"
-          :disabled="auditTargets.length === 1 && (auditDetailLoading || Boolean(auditDetailError))"
+          :disabled="auditTargets.length === 1 && (auditDetailLoading || Boolean(auditDetailError) || auditMaterialEditing || auditMaterialSaving || Boolean(auditMaterialUploadingField))"
           @click="submitApprove"
         >确认通过</el-button>
       </template>
@@ -1202,7 +1253,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type UploadRequestOptions } from 'element-plus';
 import { getAuditHistory, getCompany, getCompanyAuditHistory, listCompanyMaterials, type AuditLogVO } from '@/api/recruitment';
 import { useUserStore } from '@/store/modules/user';
 import { encrypt } from '@/utils/jsencrypt';
@@ -1230,13 +1281,16 @@ import {
   updateCompanySettlementCommissionRate,
   updateSettlementGlobalSettings,
   updateSettlementPaymentAccountProfile,
+  updateSettlementQualification,
   updateSettlementSubAccount,
   updateSettlementCmbConfig,
+  uploadSettlementQualification,
   type SettlementCmbConfig,
   type SettlementCmbConfigRequest,
   type SettlementSubAccountQuery,
   type SettlementSubAccountStatistics,
   type SettlementSubAccountUpdateRequest,
+  type SettlementQualificationUpdateRequest,
   type SettlementSubAccountVO,
   type SettlementPaymentAccount,
   type SubAccountAuditStatus
@@ -1247,11 +1301,15 @@ type DetailTab = 'application' | 'materials' | 'logs';
 type CommissionRateMode = 'GLOBAL' | 'INDIVIDUAL';
 
 interface MaterialFile {
+  field: QualificationMaterialField;
   label: string;
   url: string;
   kind: 'image' | 'document';
   name?: string;
+  ossId?: string;
 }
+
+type QualificationMaterialField = keyof SettlementQualificationUpdateRequest;
 
 const FILTER_STORAGE_KEY = 'admin:sub-account:filters:v2';
 const COLUMN_STORAGE_KEY = 'admin:sub-account:columns:v2';
@@ -1326,6 +1384,34 @@ const auditDetailError = ref('');
 const auditCurrentCompany = ref<Record<string, any>>();
 const auditCurrentCert = ref<Record<string, any>>();
 const auditMaterialFiles = ref<MaterialFile[]>([]);
+const auditMaterialEditing = ref(false);
+const auditMaterialSaving = ref(false);
+const auditMaterialUploadingField = ref<QualificationMaterialField | ''>('');
+const auditQualificationIds = reactive<SettlementQualificationUpdateRequest>({
+  businessLicense: '',
+  legalPersonIdFront: '',
+  legalPersonIdBack: '',
+  bankAccountProof: '',
+  authLetter: '',
+  taxRecords: '',
+  socialSecurityProofs: '',
+  officePhotos: ''
+});
+const singleQualificationFields = new Set<QualificationMaterialField>([
+  'businessLicense', 'legalPersonIdFront', 'legalPersonIdBack', 'authLetter'
+]);
+const qualificationFieldLabels: Record<QualificationMaterialField, string> = {
+  businessLicense: '营业执照',
+  legalPersonIdFront: '法人身份证正面',
+  legalPersonIdBack: '法人身份证反面',
+  bankAccountProof: '对公账户凭证',
+  authLetter: '企业授权书',
+  taxRecords: '企业近三个月纳税记录',
+  socialSecurityProofs: '企业社保证明',
+  officePhotos: '经营场地照片'
+};
+const qualificationUploadFields = (Object.keys(qualificationFieldLabels) as QualificationMaterialField[])
+  .map((field) => ({ field, label: qualificationFieldLabels[field] }));
 const auditCurrentRow = computed(() => auditTargets.value.length === 1 ? auditTargets.value[0] : undefined);
 const auditQualificationInfo = computed(() =>
   buildQualificationInfo(auditCurrentCompany.value, auditCurrentCert.value, auditCurrentRow.value)
@@ -1337,7 +1423,8 @@ const auditCheckOptions = [
   { value: 'legalPerson', label: '法人身份证材料完整' },
   { value: 'beneficiary', label: '受益所有人信息已核验' },
   { value: 'delegate', label: '代发授权委托书已盖章且在有效期' },
-  { value: 'bankForm', label: '银企申请表与对公账户信息一致' }
+  { value: 'bankForm', label: '银企申请表与对公账户信息一致' },
+  { value: 'taxOrSocial', label: '近三个月纳税记录或企业社保证明已核验' }
 ];
 const auditRules: FormRules = {
   checks: [{ type: 'array', required: true, min: auditCheckOptions.length, message: '请完成全部材料校验项', trigger: 'change' }],
@@ -1895,6 +1982,7 @@ async function loadAuditApplicationDetail(row: SettlementSubAccountVO) {
     if (!Object.keys(cert).length) throw new Error('未找到该企业本次提交的资质申请，请确认 B 端已完成提交');
     auditCurrentCompany.value = {};
     auditCurrentCert.value = cert;
+    seedAuditQualificationIds(cert);
     const materialSource = mergeQualificationMaterialSource({}, cert);
     auditMaterialFiles.value = await resolveMaterials(materialSource, row.companyId);
   } catch (error) {
@@ -1911,6 +1999,102 @@ function clearAuditApplicationDetail() {
   auditCurrentCompany.value = undefined;
   auditCurrentCert.value = undefined;
   auditMaterialFiles.value = [];
+  auditMaterialEditing.value = false;
+  auditMaterialSaving.value = false;
+  auditMaterialUploadingField.value = '';
+  seedAuditQualificationIds({});
+}
+
+function seedAuditQualificationIds(cert: Record<string, any>) {
+  (Object.keys(auditQualificationIds) as QualificationMaterialField[]).forEach((field) => {
+    auditQualificationIds[field] = splitValues(cert?.[field])
+      .filter((value) => /^\d+$/.test(value))
+      .join(',');
+  });
+}
+
+function beforeAuditQualificationUpload(file: File, field: QualificationMaterialField) {
+  const suffix = fileExt(file.name);
+  const imageOnly = field === 'legalPersonIdFront' || field === 'legalPersonIdBack' || field === 'officePhotos';
+  const allowed = imageOnly ? ['jpg', 'jpeg', 'png'] : ['pdf', 'jpg', 'jpeg', 'png'];
+  if (!allowed.includes(suffix)) {
+    ElMessage.error(`${qualificationFieldLabels[field]}${imageOnly ? '仅支持 JPG、JPEG、PNG 图片' : '仅支持 PDF、JPG、JPEG、PNG 文件'}`);
+    return false;
+  }
+  if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
+    ElMessage.error('资质附件大小不能超过10MB');
+    return false;
+  }
+  return true;
+}
+
+async function uploadAuditQualification(options: UploadRequestOptions, field: QualificationMaterialField) {
+  auditMaterialUploadingField.value = field;
+  try {
+    const file = options.file as File;
+    const response: any = await uploadSettlementQualification(file);
+    const data = response?.data || {};
+    const ossId = String(data.ossId || '');
+    const url = String(data.url || '');
+    if (!ossId || !url) throw new Error('上传成功但未返回有效文件信息');
+    const ids = splitValues(auditQualificationIds[field]);
+    if (singleQualificationFields.has(field)) {
+      ids.splice(0, ids.length, ossId);
+      auditMaterialFiles.value = auditMaterialFiles.value.filter((item) => item.field !== field);
+    } else {
+      const limit = field === 'officePhotos' ? 3 : 5;
+      if (ids.length >= limit) throw new Error(`${qualificationFieldLabels[field]}最多上传${limit}个文件`);
+      ids.push(ossId);
+    }
+    auditQualificationIds[field] = Array.from(new Set(ids)).join(',');
+    auditMaterialFiles.value.push({
+      field,
+      label: qualificationFieldLabels[field],
+      url,
+      name: String(data.originalName || data.fileName || file.name),
+      ossId,
+      kind: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(fileExt(data.fileSuffix || file.name)) ? 'image' : 'document'
+    });
+    options.onSuccess?.(response);
+    ElMessage.success(`${qualificationFieldLabels[field]}已上传，请点击保存修改`);
+  } catch (error: any) {
+    options.onError?.(error);
+    ElMessage.error(error?.message || '资质附件上传失败');
+  } finally {
+    auditMaterialUploadingField.value = '';
+  }
+}
+
+function removeAuditQualification(file: MaterialFile) {
+  const ids = splitValues(auditQualificationIds[file.field]).filter((id) => id !== file.ossId);
+  auditQualificationIds[file.field] = ids.join(',');
+  auditMaterialFiles.value = auditMaterialFiles.value.filter((item) => item !== file);
+}
+
+async function cancelAuditQualificationEdit() {
+  const cert = auditCurrentCert.value || {};
+  seedAuditQualificationIds(cert);
+  auditMaterialFiles.value = auditCurrentRow.value
+    ? await resolveMaterials(cert, auditCurrentRow.value.companyId)
+    : [];
+  auditMaterialEditing.value = false;
+}
+
+async function saveAuditQualification() {
+  const row = auditCurrentRow.value;
+  if (!row) return;
+  if (!auditQualificationIds.taxRecords && !auditQualificationIds.socialSecurityProofs) {
+    return ElMessage.error('请上传企业近三个月纳税记录或企业社保证明，二选一提交即可');
+  }
+  auditMaterialSaving.value = true;
+  try {
+    await updateSettlementQualification(row.applicationId, { ...auditQualificationIds });
+    auditCurrentCert.value = { ...(auditCurrentCert.value || {}), ...auditQualificationIds };
+    auditMaterialEditing.value = false;
+    ElMessage.success('企业资质材料已保存');
+  } finally {
+    auditMaterialSaving.value = false;
+  }
 }
 
 async function submitApprove() {
@@ -2194,10 +2378,12 @@ async function hydrateMaterials(company: Record<string, any>, companyId: string 
 
 async function resolveMaterials(company: Record<string, any>, companyId: string | number) {
   const fields = [
-    { key: 'businessLicense', label: '营业执照', kind: 'image' as const },
+    { key: 'businessLicense', label: '营业执照', kind: 'auto' as const },
     { key: 'legalPersonIdFront', label: '法人身份证正面', kind: 'image' as const },
     { key: 'legalPersonIdBack', label: '法人身份证反面', kind: 'image' as const },
-    { key: 'bankAccountProof', label: '对公账户凭证', kind: 'image' as const },
+    { key: 'bankAccountProof', label: '对公账户凭证', kind: 'auto' as const },
+    { key: 'taxRecords', label: '企业近三个月纳税记录', kind: 'auto' as const },
+    { key: 'socialSecurityProofs', label: '企业社保证明', kind: 'auto' as const },
     { key: 'authLetter', label: '企业授权书', kind: 'auto' as const },
     { key: 'officePhotos', label: '经营场地照片', kind: 'image' as const }
   ];
@@ -2220,7 +2406,14 @@ async function resolveMaterials(company: Record<string, any>, companyId: string 
       if (!url) return null;
       const suffix = fileExt(oss?.fileSuffix || oss?.originalName || url);
       const kind = item.kind === 'image' || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(suffix) ? 'image' : 'document';
-      return { label: item.label, url, kind, name: oss?.originalName } as MaterialFile;
+      return {
+        field: item.key as QualificationMaterialField,
+        label: item.label,
+        url,
+        kind,
+        name: oss?.originalName,
+        ossId: /^\d+$/.test(item.value) ? item.value : undefined
+      } as MaterialFile;
     })
     .filter(Boolean) as MaterialFile[];
 }
@@ -3194,6 +3387,18 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
   margin-top: 18px;
 }
 
+.material-title-row {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.qualification-required-tip {
+  margin-bottom: 14px;
+}
+
 .audit-material-grid {
   margin-bottom: 8px;
 }
@@ -3349,6 +3554,48 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
   white-space: nowrap;
 }
 
+.material-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.qualification-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: var(--el-fill-color-lighter);
+}
+
+.qualification-upload-item {
+  display: flex;
+  min-width: 0;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+  background: var(--el-bg-color);
+}
+
+.qualification-upload-item > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.qualification-upload-item span {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
 .payment-account-company.is-empty {
   color: var(--el-text-color-placeholder);
 }
@@ -3470,6 +3717,7 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
 
 @media (max-width: 1200px) {
   .material-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qualification-upload-grid { grid-template-columns: 1fr; }
   .memory-hint { margin-left: 0; }
   .payment-account-add-form { grid-template-columns: 1fr; }
   .payment-account-add-action { justify-self: stretch; }

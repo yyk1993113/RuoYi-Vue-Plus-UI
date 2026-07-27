@@ -166,6 +166,17 @@ export interface SettlementPaymentAccountCreateRequest {
   contactPhone: string;
 }
 
+export interface SettlementQualificationUpdateRequest {
+  businessLicense: string;
+  legalPersonIdFront: string;
+  legalPersonIdBack: string;
+  bankAccountProof: string;
+  authLetter: string;
+  taxRecords: string;
+  socialSecurityProofs: string;
+  officePhotos: string;
+}
+
 export interface SettlementPaymentAccountProfileRequest {
   accountName: string;
   subjectCompanyName: string;
@@ -340,6 +351,22 @@ export function addSettlementPaymentAccount(applicationId: string | number, data
     method: 'post',
     headers: { isEncrypt: true },
     data
+  });
+}
+
+/** 审核通过前保存管理端补充或更换的企业资质附件，字段值均为稳定 OSS ID。 */
+export function updateSettlementQualification(
+  applicationId: string | number,
+  data: SettlementQualificationUpdateRequest
+) {
+  return request.put(`${baseUrl}/${applicationId}/qualification`, data);
+}
+
+export function uploadSettlementQualification(file: File) {
+  const data = new FormData();
+  data.append('file', file);
+  return request.post<any>('/resource/oss/upload', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
   });
 }
 

@@ -669,6 +669,8 @@ export interface CompanyCertVO {
   legalPersonIdFront?: string;
   legalPersonIdBack?: string;
   bankAccountProof?: string;
+  taxRecords?: string;
+  socialSecurityProofs?: string;
   authLetter?: string;
   // 办公场地实景照片，可能为逗号分隔的多图地址
   officePhotos?: string;
