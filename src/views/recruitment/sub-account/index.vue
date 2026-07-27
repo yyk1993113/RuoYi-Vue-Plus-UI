@@ -2167,21 +2167,15 @@ async function loadAuditApplicationDetail(row: SettlementSubAccountVO) {
   auditDetailLoading.value = true;
   auditDetailError.value = '';
   try {
-    // 企业认证只提供主体信息和认证状态；附件必须来自本次子单元申请的独立快照。
-    const [historyResponse, snapshotResponse]: any[] = await Promise.all([
-      getCompanyAuditHistory(row.companyId),
-      getSettlementQualification(row.applicationId)
-    ]);
-    const history = historyResponse.data || {};
-    const enterpriseCert = selectApplicationCert(history.certHistory);
+    // 本次提交的材料只允许来自白名单申请快照，不能混入企业表当前资质。
+    const snapshotResponse: any = await getSettlementQualification(row.applicationId);
     const snapshot = snapshotResponse.data || {};
     if (!Object.keys(snapshot).length) throw new Error('未找到该企业本次提交的资质附件快照，请确认 B 端已完成提交');
-    const cert = mergeApplicationQualificationSnapshot(enterpriseCert, snapshot);
+    const cert = { ...snapshot };
     auditCurrentCompany.value = {};
     auditCurrentCert.value = cert;
     seedAuditQualificationIds(cert);
-    const materialSource = mergeQualificationMaterialSource({}, cert);
-    auditMaterialFiles.value = await resolveMaterials(materialSource, row.companyId);
+    auditMaterialFiles.value = await resolveMaterials(snapshot, row.companyId);
   } catch (error) {
     console.error('加载白名单审核申请资料失败', error);
     auditDetailError.value = error instanceof Error ? error.message : '本次提交的企业资质加载失败，请关闭后重试';
@@ -2575,14 +2569,13 @@ async function openDetail(row: SettlementSubAccountVO, tab: DetailTab = 'applica
   ]);
   const company = companyResult.status === 'fulfilled' ? (((companyResult.value as any).data || {}) as Record<string, any>) : {};
   const companyHistory = companyHistoryResult.status === 'fulfilled' ? (companyHistoryResult.value as any).data || {} : {};
-  const enterpriseCert = selectApplicationCert(companyHistory.certHistory);
   const qualificationSnapshot = qualificationResult.status === 'fulfilled' ? (qualificationResult.value as any).data || {} : {};
   const hasQualificationSnapshot = Object.keys(qualificationSnapshot).length > 0;
-  const latestCert = hasQualificationSnapshot ? mergeApplicationQualificationSnapshot(enterpriseCert, qualificationSnapshot) : {};
+  const latestCert = hasQualificationSnapshot ? { ...qualificationSnapshot } : {};
   currentCompany.value = company;
   currentCert.value = latestCert;
   seedDetailQualificationIds(latestCert);
-  const materialSource = hasQualificationSnapshot ? mergeQualificationMaterialSource({}, latestCert) : {};
+  const materialSource = hasQualificationSnapshot ? { ...qualificationSnapshot } : {};
   await hydrateMaterials(materialSource, row.companyId);
   const companyLogs = companyHistory.auditLogs || [];
   const subAccountPayload = subAccountHistoryResult.status === 'fulfilled' ? (subAccountHistoryResult.value as any).data : [];
@@ -2590,34 +2583,6 @@ async function openDetail(row: SettlementSubAccountVO, tab: DetailTab = 'applica
   auditLogs.value = deduplicateAuditLogs([...subAccountLogs, ...companyLogs]);
   if (companyResult.status === 'rejected') ElMessage.warning('企业扩展资料加载失败，申请信息仍可查看');
   detailLoading.value = false;
-}
-
-function selectApplicationCert(certHistory: unknown) {
-  const certs = Array.isArray(certHistory)
-    ? (certHistory.filter((cert) => cert && (cert as Record<string, any>).remark !== '记账子单元白名单申请提交的企业资质快照') as Record<
-        string,
-        any
-      >[])
-    : [];
-  if (!certs.length) return {};
-  // 企业认证与白名单审核已经解耦，这里始终读取真实企业认证记录，不再优先取白名单待审快照。
-  return (
-    [...certs].sort((left, right) => {
-      const timeDiff = Date.parse(String(right.createTime || '')) - Date.parse(String(left.createTime || ''));
-      if (Number.isFinite(timeDiff) && timeDiff !== 0) return timeDiff;
-      return String(right.certId || '').localeCompare(String(left.certId || ''));
-    })[0] || {}
-  );
-}
-
-function mergeApplicationQualificationSnapshot(enterpriseCert: Record<string, any>, snapshot: Record<string, any>) {
-  if (!Object.keys(snapshot).length) return { ...enterpriseCert };
-  const merged = { ...enterpriseCert, ...snapshot };
-  // 认证状态和审核信息只能来自真实 company_cert，附件快照无权改变认证结果。
-  merged.status = enterpriseCert.status || snapshot.status || '';
-  merged.auditRemark = enterpriseCert.auditRemark || '';
-  merged.auditTime = enterpriseCert.auditTime;
-  return merged;
 }
 
 function buildQualificationInfo(companySource?: Record<string, any>, certSource?: Record<string, any>, row?: SettlementSubAccountVO) {
@@ -2638,11 +2603,6 @@ function buildQualificationInfo(companySource?: Record<string, any>, certSource?
     auditTime: formatMinute(hasCertSnapshot ? cert.auditTime : company.auditTime),
     auditRemark: hasCertSnapshot ? cert.auditRemark || '无' : company.auditRemark || company.remark || '无'
   };
-}
-
-function mergeQualificationMaterialSource(company: Record<string, any>, cert: Record<string, any>) {
-  // 一旦存在认证申请快照，材料必须完全来自该快照，不能用企业主表的旧附件补空而误导审核人。
-  return Object.keys(cert).length ? { ...cert } : { ...company };
 }
 
 async function openAuthorizationLetter(row?: SettlementSubAccountVO) {
