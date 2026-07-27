@@ -575,7 +575,7 @@
             <div class="qualification-section-title material-section-title material-title-row">
               <span>资质材料</span>
               <el-button
-                v-if="detailTarget?.status === 'APPROVED' && !detailMaterialEditing"
+                v-if="detailTarget?.status === 'PENDING' && !detailMaterialEditing"
                 v-hasPermi="['settlement:subAccount:audit']"
                 type="primary"
                 plain
@@ -1537,7 +1537,7 @@ const currentCompany = ref<Record<string, any>>();
 const currentCert = ref<Record<string, any>>();
 const materialFiles = ref<MaterialFile[]>([]);
 const auditLogs = ref<AuditLogVO[]>([]);
-// 白名单详情弹窗的资质材料编辑态：仅在申请状态为 APPROVED 时提供修改入口，避免误改待审或已驳回资料。
+// 白名单详情弹窗的资质材料编辑态：仅待审核申请可改，保存到申请快照，审核通过后再同步企业资料。
 const detailMaterialEditing = ref(false);
 const detailMaterialSaving = ref(false);
 const detailMaterialUploadingField = ref<QualificationMaterialField | ''>('');
@@ -2174,8 +2174,9 @@ async function loadAuditApplicationDetail(row: SettlementSubAccountVO) {
     ]);
     const history = historyResponse.data || {};
     const enterpriseCert = selectApplicationCert(history.certHistory);
-    const cert = mergeApplicationQualificationSnapshot(enterpriseCert, snapshotResponse.data || {});
-    if (!Object.keys(cert).length) throw new Error('未找到该企业本次提交的资质附件快照，请确认 B 端已完成提交');
+    const snapshot = snapshotResponse.data || {};
+    if (!Object.keys(snapshot).length) throw new Error('未找到该企业本次提交的资质附件快照，请确认 B 端已完成提交');
+    const cert = mergeApplicationQualificationSnapshot(enterpriseCert, snapshot);
     auditCurrentCompany.value = {};
     auditCurrentCert.value = cert;
     seedAuditQualificationIds(cert);
@@ -2576,11 +2577,12 @@ async function openDetail(row: SettlementSubAccountVO, tab: DetailTab = 'applica
   const companyHistory = companyHistoryResult.status === 'fulfilled' ? (companyHistoryResult.value as any).data || {} : {};
   const enterpriseCert = selectApplicationCert(companyHistory.certHistory);
   const qualificationSnapshot = qualificationResult.status === 'fulfilled' ? (qualificationResult.value as any).data || {} : {};
-  const latestCert = mergeApplicationQualificationSnapshot(enterpriseCert, qualificationSnapshot);
+  const hasQualificationSnapshot = Object.keys(qualificationSnapshot).length > 0;
+  const latestCert = hasQualificationSnapshot ? mergeApplicationQualificationSnapshot(enterpriseCert, qualificationSnapshot) : {};
   currentCompany.value = company;
   currentCert.value = latestCert;
   seedDetailQualificationIds(latestCert);
-  const materialSource = mergeQualificationMaterialSource(company, latestCert);
+  const materialSource = hasQualificationSnapshot ? mergeQualificationMaterialSource({}, latestCert) : {};
   await hydrateMaterials(materialSource, row.companyId);
   const companyLogs = companyHistory.auditLogs || [];
   const subAccountPayload = subAccountHistoryResult.status === 'fulfilled' ? (subAccountHistoryResult.value as any).data : [];
