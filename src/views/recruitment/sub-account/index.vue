@@ -826,12 +826,30 @@
               >
             </div>
           </el-form-item>
+          <el-form-item label="审核结论" prop="decision">
+            <el-select v-model="auditForm.decision" placeholder="请选择审核结论" style="width: 220px" @change="changeAuditDecision">
+              <el-option v-for="item in auditDecisionOptions" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="材料清单" prop="checks">
-            <el-checkbox-group v-model="auditForm.checks" class="audit-checklist">
-              <el-checkbox v-for="item in auditCheckOptions" :key="item.value" :label="item.value">{{ item.label }}</el-checkbox>
-            </el-checkbox-group>
+            <div class="audit-checklist-wrap">
+              <!-- 审核材料全选需要显式确认，避免误点后直接绕过逐项核验。 -->
+              <el-checkbox
+                :model-value="isAuditChecksAllSelected"
+                :indeterminate="isAuditChecksIndeterminate"
+                @change="toggleAuditChecksAll"
+              >
+                全选
+              </el-checkbox>
+              <el-checkbox-group v-model="auditForm.checks" class="audit-checklist">
+                <el-checkbox v-for="item in auditCheckOptions" :key="item.value" :label="item.value">{{ item.label }}</el-checkbox>
+              </el-checkbox-group>
+            </div>
           </el-form-item>
           <el-form-item label="审核意见" prop="opinion">
+            <el-select v-model="auditForm.opinion" class="audit-opinion-template" placeholder="选择常用意见">
+              <el-option v-for="item in auditOpinionOptions" :key="item" :label="item" :value="item" />
+            </el-select>
             <el-input
               v-model="auditForm.opinion"
               type="textarea"
@@ -857,14 +875,14 @@
           >保存材料修改</el-button
         >
         <el-button
-          type="primary"
+          :type="auditForm.decision === 'APPROVE' ? 'primary' : 'danger'"
           :loading="auditSubmitting"
           :disabled="
             auditTargets.length === 1 &&
             (auditDetailLoading || Boolean(auditDetailError) || auditMaterialEditing || auditMaterialSaving || Boolean(auditMaterialUploadingField))
           "
           @click="submitApprove"
-          >确认通过</el-button
+          >{{ auditForm.decision === 'APPROVE' ? '确认通过' : '确认不通过' }}</el-button
         >
       </template>
     </el-dialog>
@@ -1602,7 +1620,16 @@ const qualificationUploadFields = (Object.keys(qualificationFieldLabels) as Qual
 const auditCurrentRow = computed(() => (auditTargets.value.length === 1 ? auditTargets.value[0] : undefined));
 const auditQualificationInfo = computed(() => buildQualificationInfo(auditCurrentCompany.value, auditCurrentCert.value, auditCurrentRow.value));
 const auditFormRef = ref<FormInstance>();
-const auditForm = reactive({ checks: [] as string[], opinion: '', riskConfirmed: false });
+type AuditDecision = 'APPROVE' | 'REJECT';
+const auditDecisionOptions: Array<{ label: string; value: AuditDecision }> = [
+  { label: '通过', value: 'APPROVE' },
+  { label: '不通过', value: 'REJECT' }
+];
+const auditOpinionTemplates: Record<AuditDecision, string[]> = {
+  APPROVE: ['审核通过', '材料齐全，委托授权有效，同意开通记账子单元', '资质核验通过，账户信息与申请主体一致'],
+  REJECT: ['材料不符合开户要求，请补充后重新提交', '代发授权委托书或企业资质材料不完整，请补充后重新提交', '账户信息与申请主体不一致，请核对后重新提交']
+};
+const auditForm = reactive({ decision: 'APPROVE' as AuditDecision, checks: [] as string[], opinion: '审核通过', riskConfirmed: false });
 const auditCheckOptions = [
   { value: 'license', label: '营业执照真实有效' },
   { value: 'legalPerson', label: '法人身份证材料完整' },
@@ -1611,13 +1638,33 @@ const auditCheckOptions = [
   { value: 'bankForm', label: '银企申请表与对公账户信息一致' },
   { value: 'taxOrSocial', label: '近三个月纳税记录或企业社保证明已核验' }
 ];
+const isAuditChecksAllSelected = computed(() => auditForm.checks.length === auditCheckOptions.length);
+const isAuditChecksIndeterminate = computed(() => auditForm.checks.length > 0 && auditForm.checks.length < auditCheckOptions.length);
+const auditOpinionOptions = computed(() => auditOpinionTemplates[auditForm.decision]);
 const auditRules: FormRules = {
-  checks: [{ type: 'array', required: true, min: auditCheckOptions.length, message: '请完成全部材料校验项', trigger: 'change' }],
+  decision: [{ required: true, message: '请选择审核结论', trigger: 'change' }],
+  checks: [
+    {
+      validator: (_rule, value, callback) => {
+        if (auditForm.decision !== 'APPROVE' || (Array.isArray(value) && value.length >= auditCheckOptions.length)) return callback();
+        callback(new Error('请完成全部材料校验项'));
+      },
+      trigger: 'change'
+    }
+  ],
   opinion: [
     { required: true, message: '请输入审核意见', trigger: 'blur' },
-    { min: 5, max: 300, message: '审核意见需为5到300个字符', trigger: 'blur' }
+    { min: 2, max: 300, message: '审核意见需为2到300个字符', trigger: 'blur' }
   ],
-  riskConfirmed: [{ validator: (_rule, value, callback) => (value ? callback() : callback(new Error('请确认风险校验结果'))), trigger: 'change' }]
+  riskConfirmed: [
+    {
+      validator: (_rule, value, callback) => {
+        if (auditForm.decision !== 'APPROVE' || value) return callback();
+        callback(new Error('请确认风险校验结果'));
+      },
+      trigger: 'change'
+    }
+  ]
 };
 
 const rejectVisible = ref(false);
@@ -2167,11 +2214,32 @@ function openAudit(targets: SettlementSubAccountVO[]) {
   auditTargets.value = targets.filter((row) => row.status === 'PENDING').slice(0, 20);
   if (!auditTargets.value.length) return ElMessage.warning('请选择待审核工单');
   if (targets.length > 20) ElMessage.warning('单次最多处理 20 条，已截取前 20 条');
-  Object.assign(auditForm, { checks: [], opinion: '', riskConfirmed: false });
+  Object.assign(auditForm, { decision: 'APPROVE', checks: [], opinion: '审核通过', riskConfirmed: false });
   clearAuditApplicationDetail();
   auditVisible.value = true;
   if (auditTargets.value.length === 1) void loadAuditApplicationDetail(auditTargets.value[0]);
   auditFormRef.value?.clearValidate();
+}
+
+function changeAuditDecision(value: AuditDecision) {
+  auditForm.opinion = auditOpinionTemplates[value][0];
+  auditFormRef.value?.clearValidate(['checks', 'opinion', 'riskConfirmed']);
+}
+
+async function toggleAuditChecksAll(value: string | number | boolean) {
+  if (!value) {
+    auditForm.checks = [];
+    auditFormRef.value?.validateField('checks').catch(() => undefined);
+    return;
+  }
+  const confirmed = await ElMessageBox.confirm('我已核对以上材料', '材料清单确认', {
+    type: 'warning',
+    confirmButtonText: '确认全选',
+    cancelButtonText: '取消'
+  }).catch(() => false);
+  if (!confirmed) return;
+  auditForm.checks = auditCheckOptions.map((item) => item.value);
+  auditFormRef.value?.validateField('checks').catch(() => undefined);
 }
 
 async function loadAuditApplicationDetail(row: SettlementSubAccountVO) {
@@ -2379,17 +2447,21 @@ async function submitApprove() {
   if (auditTargets.value.length === 1 && auditDetailError.value) return ElMessage.warning('请先重新打开审核弹窗并确认申请资料已完整加载');
   const valid = await auditFormRef.value.validate().catch(() => false);
   if (!valid) return;
-  const confirmed = await ElMessageBox.confirm(`确认通过 ${auditTargets.value.length} 家企业的记账子单元申请？`, '审核确认', {
+  const isApprove = auditForm.decision === 'APPROVE';
+  const actionText = isApprove ? '通过' : '不通过';
+  const confirmed = await ElMessageBox.confirm(`确认${actionText} ${auditTargets.value.length} 家企业的记账子单元申请？`, '审核确认', {
     type: 'warning',
-    confirmButtonText: '确认通过'
+    confirmButtonText: `确认${actionText}`
   }).catch(() => false);
   if (!confirmed) return;
   auditSubmitting.value = true;
   const opinion = auditForm.opinion.trim();
-  const result = await runBatch(auditTargets.value, (row) => approveSettlementSubAccount(row.applicationId, opinion));
+  const result = await runBatch(auditTargets.value, (row) =>
+    isApprove ? approveSettlementSubAccount(row.applicationId, opinion) : rejectSettlementSubAccount(row.applicationId, opinion)
+  );
   auditSubmitting.value = false;
   auditVisible.value = false;
-  showBatchResult('审核通过', result, true);
+  showBatchResult(isApprove ? '审核通过' : '审核不通过', result, true);
   await refreshAll();
 }
 
@@ -3790,9 +3862,19 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
   gap: 6px;
 }
 
+.audit-checklist-wrap {
+  display: grid;
+  gap: 8px;
+}
+
 .audit-checklist {
   display: grid;
   grid-template-columns: 1fr;
+}
+
+.audit-opinion-template {
+  margin-bottom: 8px;
+  width: 100%;
 }
 
 .payment-account-dialog {
