@@ -1040,12 +1040,17 @@
           <span class="rate-unit">%</span>
         </el-form-item>
         <el-form-item label="全局配置主账号" prop="mainAccountNo">
-          <el-input
-            v-model="globalSettingsForm.mainAccountNo"
-            maxlength="35"
-            clearable
-            :placeholder="globalMainAccountConfigured ? `已配置 ${globalMainAccountNoMasked}，留空不修改` : '请输入6至35位主账号'"
-          />
+          <div class="global-main-account-editor">
+            <el-input
+              v-model="globalSettingsForm.mainAccountNo"
+              maxlength="35"
+              clearable
+              :placeholder="globalMainAccountConfigured ? '输入新主账号可替换当前配置' : '请输入6至35位主账号'"
+            />
+            <div v-if="globalMainAccountConfigured" class="global-main-account-status">
+              当前生效主账号：<span class="masked-account">{{ globalMainAccountNoMasked }}</span>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="允许多个主账号">
           <el-switch v-model="globalSettingsForm.allowMultipleMainAccounts" active-text="允许" inactive-text="仅单个" />
@@ -1453,6 +1458,7 @@ import {
   uploadSettlementQualification,
   type SettlementCmbConfig,
   type SettlementCmbConfigRequest,
+  type SettlementGlobalSettings,
   type SettlementSubAccountQuery,
   type SettlementSubAccountStatistics,
   type SettlementSubAccountUpdateRequest,
@@ -1918,20 +1924,23 @@ async function loadGlobalCommissionRate() {
   return globalCommissionRate.value;
 }
 
+function applyGlobalSettings(data: Partial<SettlementGlobalSettings>) {
+  globalCommissionRate.value = Number(data.globalCommissionRate ?? 5);
+  globalMainAccountNoMasked.value = data.globalMainAccountNoMasked || '';
+  globalMainAccountConfigured.value = data.globalMainAccountConfigured === true;
+  Object.assign(globalSettingsForm, {
+    commissionRate: globalCommissionRate.value,
+    mainAccountNo: '',
+    allowMultipleMainAccounts: data.allowMultipleMainAccounts === true
+  });
+}
+
 async function openGlobalSettings() {
   globalSettingsVisible.value = true;
   globalSettingsLoading.value = true;
   try {
     const res: any = await getSettlementGlobalSettings();
-    const data = res.data || {};
-    globalCommissionRate.value = Number(data.globalCommissionRate ?? 5);
-    globalMainAccountNoMasked.value = data.globalMainAccountNoMasked || '';
-    globalMainAccountConfigured.value = data.globalMainAccountConfigured === true;
-    Object.assign(globalSettingsForm, {
-      commissionRate: globalCommissionRate.value,
-      mainAccountNo: '',
-      allowMultipleMainAccounts: data.allowMultipleMainAccounts === true
-    });
+    applyGlobalSettings(res.data || {});
     globalSettingsFormRef.value?.clearValidate();
   } finally {
     globalSettingsLoading.value = false;
@@ -1949,9 +1958,11 @@ async function submitGlobalSettings() {
       mainAccountNo: globalSettingsForm.mainAccountNo.trim() || undefined,
       allowMultipleMainAccounts: globalSettingsForm.allowMultipleMainAccounts
     });
-    globalCommissionRate.value = globalSettingsForm.commissionRate;
+    // 主账号查询接口只返回掩码；保存后以后台回读结果确认当前生效配置。
+    const refreshed: any = await getSettlementGlobalSettings();
+    applyGlobalSettings(refreshed.data || {});
     globalSettingsVisible.value = false;
-    ElMessage.success('全局设置已更新');
+    ElMessage.success('全局设置已保存并生效');
     await loadData();
   } finally {
     globalSettingsSubmitting.value = false;
@@ -3558,6 +3569,17 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
 .rate-unit {
   margin-left: 8px;
   color: var(--el-text-color-secondary);
+}
+
+.global-main-account-editor {
+  width: 100%;
+}
+
+.global-main-account-status {
+  margin-top: 6px;
+  color: var(--el-color-success);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .main-account-policy {
