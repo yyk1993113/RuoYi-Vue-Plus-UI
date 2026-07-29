@@ -91,7 +91,9 @@ export interface SettlementGlobalSettings {
   globalMainAccountNoMasked?: string;
   globalMainAccountConfigured: boolean;
   allowMultipleMainAccounts: boolean;
+  /** 兼容旧后端返回的单值字段。 */
   invoiceSubjectName?: string;
+  invoiceSubjectNames?: string[];
 }
 
 export interface SettlementGlobalSettingsRequest {
@@ -99,8 +101,8 @@ export interface SettlementGlobalSettingsRequest {
   /** 留空表示保留后端已加密保存的全局结算账户。 */
   mainAccountNo?: string;
   allowMultipleMainAccounts: boolean;
-  /** 运营后台统一维护的企业结算开票科目；空字符串表示清空。 */
-  invoiceSubjectName: string;
+  /** 运营后台统一维护的企业结算开票科目列表；空数组表示清空。 */
+  invoiceSubjectNames: string[];
 }
 
 export interface SettlementMainAccountSettings {
@@ -269,7 +271,8 @@ export function getSettlementGlobalSettings() {
           globalMainAccountNoMasked: cmbResponse?.data?.parentAccountNoMasked || '',
           globalMainAccountConfigured: cmbResponse?.data?.parentAccountConfigured === true,
           allowMultipleMainAccounts: false,
-          invoiceSubjectName: ''
+          invoiceSubjectName: '',
+          invoiceSubjectNames: []
         }
       };
     });

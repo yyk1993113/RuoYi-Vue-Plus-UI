@@ -1084,8 +1084,20 @@
         <el-form-item label="允许多个结算账户">
           <el-switch v-model="globalSettingsForm.allowMultipleMainAccounts" active-text="允许" inactive-text="仅单个" />
         </el-form-item>
-        <el-form-item label="结算开票科目" prop="invoiceSubjectName">
-          <el-input v-model="globalSettingsForm.invoiceSubjectName" maxlength="100" show-word-limit clearable placeholder="请输入企业结算开票科目" />
+        <el-form-item label="结算开票科目" prop="invoiceSubjectNames">
+          <div class="invoice-subject-editor">
+            <el-select
+              v-model="globalSettingsForm.invoiceSubjectNames"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              clearable
+              :reserve-keyword="false"
+              placeholder="输入科目后按回车添加，可配置多个"
+            />
+            <div class="invoice-subject-tip">每输入一个科目按回车确认，点击标签关闭按钮可删除。</div>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -1836,7 +1848,7 @@ const globalSettingsForm = reactive({
   commissionRate: 5,
   mainAccountNo: '',
   allowMultipleMainAccounts: false,
-  invoiceSubjectName: ''
+  invoiceSubjectNames: [] as string[]
 });
 const commissionRateRules: FormRules = {
   commissionRate: [
@@ -1852,7 +1864,16 @@ const commissionRateRules: FormRules = {
     }
   ],
   mainAccountNo: [{ pattern: /^$|^\d{6,35}$/, message: '全局结算账号必须为6至35位数字', trigger: 'blur' }],
-  invoiceSubjectName: [{ max: 100, message: '结算开票科目不能超过100个字符', trigger: 'blur' }]
+  invoiceSubjectNames: [{
+    validator: (_rule, value, callback) => {
+      const names = normalizeInvoiceSubjectNames(value);
+      if (names.length > 20) return callback(new Error('结算开票科目不能超过20个'));
+      if (names.some((name) => name.length > 100)) return callback(new Error('单个结算开票科目不能超过100个字符'));
+      if (JSON.stringify(names).length > 500) return callback(new Error('结算开票科目总长度不能超过500个字符'));
+      callback();
+    },
+    trigger: 'change'
+  }]
 };
 
 // 列表比例采用独立轻量弹窗，避免为只改抽佣比例打开完整企业编辑表单。
@@ -2000,15 +2021,23 @@ async function loadGlobalCommissionRate() {
   return globalCommissionRate.value;
 }
 
+function normalizeInvoiceSubjectNames(values: unknown): string[] {
+  if (!Array.isArray(values)) return [];
+  return [...new Set(values.map((item) => String(item || '').trim()).filter(Boolean))];
+}
+
 function applyGlobalSettings(data: Partial<SettlementGlobalSettings>) {
   globalCommissionRate.value = Number(data.globalCommissionRate ?? 5);
   globalMainAccountNoMasked.value = data.globalMainAccountNoMasked || '';
   globalMainAccountConfigured.value = data.globalMainAccountConfigured === true;
+  const invoiceSubjectNames = Array.isArray(data.invoiceSubjectNames)
+    ? normalizeInvoiceSubjectNames(data.invoiceSubjectNames)
+    : normalizeInvoiceSubjectNames(data.invoiceSubjectName ? [data.invoiceSubjectName] : []);
   Object.assign(globalSettingsForm, {
     commissionRate: globalCommissionRate.value,
     mainAccountNo: '',
     allowMultipleMainAccounts: data.allowMultipleMainAccounts === true,
-    invoiceSubjectName: data.invoiceSubjectName || ''
+    invoiceSubjectNames
   });
 }
 
@@ -2034,7 +2063,7 @@ async function submitGlobalSettings() {
       commissionRate: globalSettingsForm.commissionRate,
       mainAccountNo: globalSettingsForm.mainAccountNo.trim() || undefined,
       allowMultipleMainAccounts: globalSettingsForm.allowMultipleMainAccounts,
-      invoiceSubjectName: globalSettingsForm.invoiceSubjectName.trim()
+      invoiceSubjectNames: normalizeInvoiceSubjectNames(globalSettingsForm.invoiceSubjectNames)
     });
     // 结算账户查询接口只返回掩码；保存后以后台回读结果确认当前生效配置。
     const refreshed: any = await getSettlementGlobalSettings();
@@ -3688,6 +3717,21 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
 
 .global-main-account-editor {
   width: 100%;
+}
+
+.invoice-subject-editor {
+  width: 100%;
+}
+
+.invoice-subject-editor :deep(.el-select) {
+  width: 100%;
+}
+
+.invoice-subject-tip {
+  margin-top: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .global-main-account-status {
