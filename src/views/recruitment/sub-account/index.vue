@@ -275,7 +275,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="主账号设置" width="125" align="center">
+        <el-table-column label="结算账户设置" width="125" align="center">
           <template #default="{ row }">
             <el-button
               v-if="row.status === 'APPROVED' && row.openingStatus === 'SUCCESS'"
@@ -426,7 +426,7 @@
                       v-hasPermi="['settlement:subAccount:config']"
                       command="paymentAccounts"
                       icon="CreditCard"
-                      >主账号设置</el-dropdown-item
+                      >结算账户设置</el-dropdown-item
                     >
                     <el-dropdown-item v-hasPermi="['settlement:subAccount:decrypt']" command="account" icon="View">查看完整账号</el-dropdown-item>
                     <el-dropdown-item
@@ -553,7 +553,7 @@
               type="info"
               :closable="false"
               show-icon
-              title="主结算户、CMB UID、委托有效期与代发限额尚未进入当前接口契约，页面不展示推测数据。"
+              title="结算账户、CMB UID、委托有效期与代发限额尚未进入当前接口契约，页面不展示推测数据。"
             />
           </el-tab-pane>
           <el-tab-pane label="企业资质详情" name="materials">
@@ -847,9 +847,6 @@
             </div>
           </el-form-item>
           <el-form-item label="审核意见" prop="opinion">
-            <el-select v-model="auditForm.opinion" class="audit-opinion-template" placeholder="选择常用意见">
-              <el-option v-for="item in auditOpinionOptions" :key="item" :label="item" :value="item" />
-            </el-select>
             <el-input
               v-model="auditForm.opinion"
               type="textarea"
@@ -1061,7 +1058,7 @@
 
     <el-dialog v-model="globalSettingsVisible" title="全局设置" width="600px" append-to-body @closed="globalSettingsForm.mainAccountNo = ''">
       <el-alert
-        title="抽佣比例和多主账号开关作为企业默认值；修改全局主账号不会批量替换企业已有的银行关联。"
+        title="抽佣比例和多结算账户开关作为企业默认值；修改全局结算账户不会批量替换企业已有的银行关联。"
         type="info"
         :closable="false"
         show-icon
@@ -1078,20 +1075,20 @@
           <el-input-number v-model="globalSettingsForm.commissionRate" :min="3" :max="100" :precision="1" :step="0.1" controls-position="right" />
           <span class="rate-unit">%</span>
         </el-form-item>
-        <el-form-item label="全局配置主账号" prop="mainAccountNo">
+        <el-form-item label="全局结算账户" prop="mainAccountNo">
           <div class="global-main-account-editor">
             <el-input
               v-model="globalSettingsForm.mainAccountNo"
               maxlength="35"
               clearable
-              :placeholder="globalMainAccountConfigured ? '输入新主账号可替换当前配置' : '请输入6至35位主账号'"
+              :placeholder="globalMainAccountConfigured ? '输入新结算账号可替换当前配置' : '请输入6至35位结算账号'"
             />
             <div v-if="globalMainAccountConfigured" class="global-main-account-status">
-              当前生效主账号：<span class="masked-account">{{ globalMainAccountNoMasked }}</span>
+              当前生效结算账户：<span class="masked-account">{{ globalMainAccountNoMasked }}</span>
             </div>
           </div>
         </el-form-item>
-        <el-form-item label="允许多个主账号">
+        <el-form-item label="允许多个结算账户">
           <el-switch v-model="globalSettingsForm.allowMultipleMainAccounts" active-text="允许" inactive-text="仅单个" />
         </el-form-item>
       </el-form>
@@ -1142,7 +1139,7 @@
       />
       <el-alert
         class="mb-4"
-        title="密钥和主账号不会回显明文；已配置的敏感项留空即可保留原值。启用后，审核通过会异步调用招行生产 NTDMAADD。"
+        title="密钥和结算账户不会回显明文；已配置的敏感项留空即可保留原值。启用后，审核通过会异步调用招行生产 NTDMAADD。"
         type="info"
         :closable="false"
         show-icon
@@ -1174,7 +1171,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="主结算账号" prop="parentAccountNo">
+            <el-form-item label="结算账户" prop="parentAccountNo">
               <el-input
                 v-model="cmbConfigForm.parentAccountNo"
                 maxlength="35"
@@ -1268,7 +1265,7 @@
 
     <el-dialog
       v-model="paymentAccountVisible"
-      :title="`${paymentAccountTarget?.companyName || ''} · 主账号设置`"
+      :title="`${paymentAccountTarget?.companyName || ''} · 结算账户设置`"
       width="min(1360px, 94vw)"
       append-to-body
       destroy-on-close
@@ -1276,14 +1273,14 @@
     >
       <div v-loading="paymentAccountLoading" class="payment-account-dialog">
         <el-alert
-          title="默认主账号根据开户成功的子账号归属记录判定：匹配显示正常，不匹配显示未绑定，本地开户记录异常时显示异常。"
+          title="默认结算账户根据开户成功的子账号归属记录判定：匹配显示正常，不匹配显示未绑定，本地开户记录异常时显示异常。"
           type="info"
           :closable="false"
           show-icon
         />
         <div class="main-account-policy">
           <div>
-            <span class="policy-label">允许多个主账号</span>
+            <span class="policy-label">允许多个结算账户</span>
             <el-tag v-if="paymentAccountSettingSource === 'GLOBAL'" type="info" size="small" effect="plain">当前继承全局</el-tag>
           </div>
           <el-switch v-model="paymentAccountAllowMultiple" active-text="开启" inactive-text="关闭" @change="handleMultipleMainAccountChange" />
@@ -1301,7 +1298,7 @@
               />
             </template>
           </el-table-column>
-          <el-table-column label="开户行" min-width="180">
+          <el-table-column label="结算名称" min-width="180">
             <template #default="{ row }">
               <div class="payment-account-name-cell">
                 <span
@@ -1318,7 +1315,7 @@
                   />
                   <template v-else>{{ paymentAccountBankBrand(row.accountName).glyph }}</template>
                 </span>
-                <span class="payment-account-name">{{ row.accountName || '-' }}</span>
+                <span class="payment-account-name">{{ settlementAccountName(row.accountName) || '-' }}</span>
               </div>
             </template>
           </el-table-column>
@@ -1366,7 +1363,7 @@
               /></el-radio>
             </template>
           </el-table-column>
-          <el-table-column label="默认主账号关系" min-width="210">
+          <el-table-column label="默认结算账户关系" min-width="210">
             <template #default="{ row }">
               <div class="payment-account-status-cell">
                 <el-tooltip v-if="paymentAccountStatusDetail(row)" :content="paymentAccountStatusDetail(row)" placement="top" :show-after="200">
@@ -1399,32 +1396,32 @@
             </template>
           </el-table-column>
         </el-table>
-        <el-divider content-position="left">结算账号资料</el-divider>
+        <el-divider content-position="left">结算账户资料</el-divider>
         <el-form class="payment-account-add-form" label-width="96px" @submit.prevent>
-          <el-form-item label="选择结算账号" class="payment-account-profile-account">
+          <el-form-item label="结算通道" class="payment-account-profile-account">
             <div class="payment-account-selector-row">
-              <el-select v-model="paymentAccountProfileAccountId" placeholder="请选择已有结算账号" @change="selectPaymentAccountProfile">
+              <el-select v-model="paymentAccountProfileAccountId" placeholder="请选择结算通道" @change="selectPaymentAccountProfile">
                 <el-option
                   v-for="item in paymentAccountRows"
                   :key="String(item.accountId)"
-                  :label="`${item.accountName || '开户行待补充'}（${item.subjectCompanyName || '结算企业待补充'}）`"
+                  :label="`${settlementAccountName(item.accountName) || '结算名称待补充'}（${item.subjectCompanyName || '结算企业待补充'}）`"
                   :value="String(item.accountId)"
                 />
-                <el-option label="新增结算账号" :value="NEW_PAYMENT_ACCOUNT_ID" />
+                <el-option label="新增结算账户" :value="NEW_PAYMENT_ACCOUNT_ID" />
               </el-select>
               <el-button type="primary" plain :disabled="isCreatingPaymentAccount" @click="selectPaymentAccountProfile(NEW_PAYMENT_ACCOUNT_ID)"
-                >＋ 添加结算账号</el-button
+                >＋ 添加结算账户</el-button
               >
             </div>
           </el-form-item>
-          <el-form-item label="开户行">
-            <el-input v-model="paymentAccountEditor.accountName" maxlength="64" placeholder="请输入开户行名称" />
+          <el-form-item label="结算名称">
+            <el-input v-model="paymentAccountEditor.accountName" maxlength="64" placeholder="请输入结算名称" />
           </el-form-item>
           <el-form-item label="结算企业">
             <el-input v-model="paymentAccountEditor.subjectCompanyName" maxlength="100" placeholder="请输入结算企业名称" />
           </el-form-item>
           <el-form-item label="联系人">
-            <el-input v-model="paymentAccountEditor.contactName" maxlength="50" placeholder="请输入该主账号联系人姓名" />
+            <el-input v-model="paymentAccountEditor.contactName" maxlength="50" placeholder="请输入该结算账户联系人姓名" />
           </el-form-item>
           <el-form-item label="联系方式">
             <el-input
@@ -1446,7 +1443,7 @@
               :disabled="!paymentAccountProfileAccountId"
               :loading="paymentAccountAdding || paymentAccountProfileSubmitting"
               @click="savePaymentAccountEditor"
-              >{{ isCreatingPaymentAccount ? '添加结算账号' : '保存结算账号资料' }}</el-button
+              >{{ isCreatingPaymentAccount ? '添加结算账户' : '保存结算账户资料' }}</el-button
             >
           </el-form-item>
         </el-form>
@@ -1646,9 +1643,10 @@ const auditDecisionOptions: Array<{ label: string; value: AuditDecision }> = [
   { label: '通过', value: 'APPROVE' },
   { label: '不通过', value: 'REJECT' }
 ];
-const auditOpinionTemplates: Record<AuditDecision, string[]> = {
-  APPROVE: ['审核通过', '材料齐全，委托授权有效，同意开通记账子单元', '资质核验通过，账户信息与申请主体一致'],
-  REJECT: ['材料不符合开户要求，请补充后重新提交', '代发授权委托书或企业资质材料不完整，请补充后重新提交', '账户信息与申请主体不一致，请核对后重新提交']
+// 切换审核结论时仅提供简短默认值，具体意见由审核人员按实际情况填写。
+const auditDefaultOpinions: Record<AuditDecision, string> = {
+  APPROVE: '审核通过',
+  REJECT: '审核不通过'
 };
 const auditForm = reactive({ decision: 'APPROVE' as AuditDecision, checks: [] as string[], opinion: '审核通过', riskConfirmed: false });
 const auditCheckOptions = [
@@ -1661,7 +1659,6 @@ const auditCheckOptions = [
 ];
 const isAuditChecksAllSelected = computed(() => auditForm.checks.length === auditCheckOptions.length);
 const isAuditChecksIndeterminate = computed(() => auditForm.checks.length > 0 && auditForm.checks.length < auditCheckOptions.length);
-const auditOpinionOptions = computed(() => auditOpinionTemplates[auditForm.decision]);
 const auditRules: FormRules = {
   decision: [{ required: true, message: '请选择审核结论', trigger: 'change' }],
   checks: [
@@ -1674,8 +1671,13 @@ const auditRules: FormRules = {
     }
   ],
   opinion: [
-    { required: true, message: '请输入审核意见', trigger: 'blur' },
-    { min: 2, max: 300, message: '审核意见需为2到300个字符', trigger: 'blur' }
+    {
+      validator: (_rule, value, callback) => {
+        if (typeof value === 'string' && value.trim()) return callback();
+        callback(new Error('请输入审核意见'));
+      },
+      trigger: 'blur'
+    }
   ],
   riskConfirmed: [
     {
@@ -1853,7 +1855,7 @@ const commissionRateRules: FormRules = {
       trigger: 'change'
     }
   ],
-  mainAccountNo: [{ pattern: /^$|^\d{6,35}$/, message: '全局主账号必须为6至35位数字', trigger: 'blur' }]
+  mainAccountNo: [{ pattern: /^$|^\d{6,35}$/, message: '全局结算账号必须为6至35位数字', trigger: 'blur' }]
 };
 
 // 列表比例采用独立轻量弹窗，避免为只改抽佣比例打开完整企业编辑表单。
@@ -1928,8 +1930,8 @@ const cmbConfigRules: FormRules = {
   ],
   uid: [{ validator: configuredOrInput(() => cmbConfigStatus.uidConfigured, '企业网银 UID'), trigger: 'blur' }],
   parentAccountNo: [
-    { validator: configuredOrInput(() => cmbConfigStatus.parentAccountConfigured, '主结算账号'), trigger: 'blur' },
-    { pattern: /^$|^[0-9]{6,35}$/, message: '主结算账号必须为6至35位数字', trigger: 'blur' }
+    { validator: configuredOrInput(() => cmbConfigStatus.parentAccountConfigured, '结算账户'), trigger: 'blur' },
+    { pattern: /^$|^[0-9]{6,35}$/, message: '结算账户必须为6至35位数字', trigger: 'blur' }
   ],
   privateKeyBase64: [{ validator: configuredOrInput(() => cmbConfigStatus.privateKeyConfigured, '用户 SM2 私钥'), trigger: 'blur' }],
   bankPublicKeyBase64: [{ validator: configuredOrInput(() => cmbConfigStatus.bankPublicKeyConfigured, '招行 SM2 公钥'), trigger: 'blur' }],
@@ -2035,7 +2037,7 @@ async function submitGlobalSettings() {
       mainAccountNo: globalSettingsForm.mainAccountNo.trim() || undefined,
       allowMultipleMainAccounts: globalSettingsForm.allowMultipleMainAccounts
     });
-    // 主账号查询接口只返回掩码；保存后以后台回读结果确认当前生效配置。
+    // 结算账户查询接口只返回掩码；保存后以后台回读结果确认当前生效配置。
     const refreshed: any = await getSettlementGlobalSettings();
     applyGlobalSettings(refreshed.data || {});
     globalSettingsVisible.value = false;
@@ -2252,7 +2254,7 @@ function openAudit(targets: SettlementSubAccountVO[]) {
 }
 
 function changeAuditDecision(value: AuditDecision) {
-  auditForm.opinion = auditOpinionTemplates[value][0];
+  auditForm.opinion = auditDefaultOpinions[value];
   auditFormRef.value?.clearValidate(['checks', 'opinion', 'riskConfirmed']);
 }
 
@@ -2974,6 +2976,11 @@ function paymentAccountBankBrand(accountName?: string): PaymentBankBrand {
   );
 }
 
+// 历史账户名称可能仍由后端返回“主账号/主账户”，运营台统一按“结算账户”口径展示并保存。
+function settlementAccountName(accountName?: string) {
+  return String(accountName || '').replace(/主账号|主账户/g, '结算账户');
+}
+
 function paymentAccountNoText(row: SettlementPaymentAccount) {
   return revealedPaymentAccountNos[String(row.accountId)] || row.accountNoMasked || '-';
 }
@@ -3031,7 +3038,7 @@ function selectPaymentAccountProfile(accountId: string | number) {
   }
   const account = paymentAccountRows.value.find((item) => String(item.accountId) === id);
   paymentAccountProfileAccountId.value = account ? id : '';
-  paymentAccountEditor.accountName = account?.accountName || '';
+  paymentAccountEditor.accountName = settlementAccountName(account?.accountName);
   paymentAccountEditor.subjectCompanyName = account?.subjectCompanyName || '';
   paymentAccountEditor.contactName = account?.contactName || '';
   paymentAccountEditor.contactPhone = '';
@@ -3058,7 +3065,7 @@ async function loadPaymentAccounts() {
         paymentAccountRows.value.find((item) => item.assigned)?.accountId ??
         ''
     );
-    // 编辑区只读取主账号自身资料，不使用当前 B 端申请企业兜底，防止错误归属被保存。
+    // 编辑区只读取结算账户自身资料，不使用当前 B 端申请企业兜底，防止错误归属被保存。
     const profileAccount =
       paymentAccountRows.value.find((item) => String(item.accountId) === paymentAccountProfileAccountId.value) ??
       paymentAccountRows.value.find((item) => String(item.accountId) === paymentAccountDefaultId.value) ??
@@ -3105,7 +3112,7 @@ function handleMultipleMainAccountChange(enabled: boolean | string | number) {
   const retainedId = paymentAccountDefaultId.value || paymentAccountSelectedIds.value[0] || '';
   paymentAccountSelectedIds.value = retainedId ? [retainedId] : [];
   paymentAccountDefaultId.value = retainedId;
-  ElMessage.info('已保留当前默认主账号，其余账号将在保存后解除分配');
+  ElMessage.info('已保留当前默认结算账户，其余账户将在保存后解除分配');
 }
 
 async function persistPaymentAccount(accountName: string, accountNo: string, subjectCompanyName: string, contactName: string, contactPhone: string) {
@@ -3117,7 +3124,7 @@ async function persistPaymentAccount(accountName: string, accountNo: string, sub
     contactPhone
   });
   const savedAccount = response?.data;
-  if (!savedAccount?.accountId) throw new Error('新增结算账号后未返回账户信息，请刷新后重试');
+  if (!savedAccount?.accountId) throw new Error('新增结算账户后未返回账户信息，请刷新后重试');
   const existingIndex = paymentAccountRows.value.findIndex((item) => String(item.accountId) === String(savedAccount.accountId));
   // 新增接口按银行卡号幂等返回实际记录，弹窗始终以服务端账户 ID 作为后续分配依据。
   if (existingIndex >= 0) paymentAccountRows.value.splice(existingIndex, 1, savedAccount);
@@ -3127,7 +3134,7 @@ async function persistPaymentAccount(accountName: string, accountNo: string, sub
 
 function normalizedPaymentAccountDraft() {
   return {
-    accountName: paymentAccountEditor.accountName.trim(),
+    accountName: settlementAccountName(paymentAccountEditor.accountName).trim(),
     accountNo: paymentAccountEditor.accountNo.replace(/\s/g, ''),
     subjectCompanyName: paymentAccountEditor.subjectCompanyName.trim(),
     contactName: paymentAccountEditor.contactName.trim(),
@@ -3142,7 +3149,7 @@ function validatePaymentAccountDraft(draft: ReturnType<typeof normalizedPaymentA
 
 function normalizedPaymentAccountProfileDraft() {
   return {
-    accountName: paymentAccountEditor.accountName.trim(),
+    accountName: settlementAccountName(paymentAccountEditor.accountName).trim(),
     subjectCompanyName: paymentAccountEditor.subjectCompanyName.trim(),
     contactName: paymentAccountEditor.contactName.trim(),
     contactPhone: paymentAccountEditor.contactPhone.trim()
@@ -3153,7 +3160,7 @@ function validatePaymentAccountProfile(
   draft: { accountName: string; subjectCompanyName: string; contactName: string; contactPhone: string },
   requirePhone: boolean
 ) {
-  if (!draft.accountName) return '请输入开户行名称';
+  if (!draft.accountName) return '请输入结算名称';
   if (!draft.subjectCompanyName) return '请输入结算企业名称';
   if (!draft.contactName) return '请输入联系人';
   if (requirePhone && !draft.contactPhone) return '请输入联系人联系方式';
@@ -3185,7 +3192,7 @@ async function persistPaymentAccountProfile() {
     contactPhone: draft.contactPhone || undefined
   });
   const savedAccount = response?.data;
-  if (!savedAccount?.accountId) throw new Error('保存结算账号资料后未返回账户信息，请刷新后重试');
+  if (!savedAccount?.accountId) throw new Error('保存结算账户资料后未返回账户信息，请刷新后重试');
   const index = paymentAccountRows.value.findIndex((item) => String(item.accountId) === String(savedAccount.accountId));
   if (index >= 0) paymentAccountRows.value.splice(index, 1, savedAccount);
   selectPaymentAccountProfile(savedAccount.accountId);
@@ -3199,7 +3206,7 @@ async function savePaymentAccountEditor() {
   }
   paymentAccountProfileSubmitting.value = true;
   try {
-    if (await persistPaymentAccountProfile()) ElMessage.success('结算账号资料已保存');
+    if (await persistPaymentAccountProfile()) ElMessage.success('结算账户资料已保存');
   } finally {
     paymentAccountProfileSubmitting.value = false;
   }
@@ -3224,7 +3231,7 @@ async function addPaymentAccount() {
     );
     await loadPaymentAccounts();
     selectPaymentAccountProfile(savedAccount.accountId);
-    ElMessage.success(existing ? '该结算账号已存在，当前保持原关联状态' : '结算账号已添加，当前未关联子账号');
+    ElMessage.success(existing ? '该结算账户已存在，当前保持原关联状态' : '结算账户已添加，当前未关联子账号');
     return true;
   } finally {
     paymentAccountAdding.value = false;
@@ -3235,8 +3242,8 @@ async function confirmDeletePaymentAccount(row: SettlementPaymentAccount) {
   if (!paymentAccountTarget.value) return;
   const accountId = String(row.accountId);
   const confirmed = await ElMessageBox.confirm(
-    `确认删除结算账号“${row.accountName || '未填写开户行'}”吗？删除后该账号将不再显示，且不可直接恢复。`,
-    '删除结算账号',
+    `确认删除结算账户“${settlementAccountName(row.accountName) || '未填写结算名称'}”吗？删除后该账户将不再显示，且不可直接恢复。`,
+    '删除结算账户',
     {
       type: 'warning',
       confirmButtonText: '确认删除',
@@ -3247,7 +3254,7 @@ async function confirmDeletePaymentAccount(row: SettlementPaymentAccount) {
     .catch(() => false);
   if (!confirmed) return;
   if (row.assigned) {
-    ElMessage.warning('该主账号仍关联当前子账号，请先关闭关联并保存配置后再删除');
+    ElMessage.warning('该结算账户仍关联当前子账号，请先关闭关联并保存配置后再删除');
     return;
   }
   paymentAccountDeletingIds.value.push(accountId);
@@ -3255,7 +3262,7 @@ async function confirmDeletePaymentAccount(row: SettlementPaymentAccount) {
     await deleteSettlementPaymentAccount(paymentAccountTarget.value.applicationId, row.accountId);
     if (paymentAccountProfileAccountId.value === accountId) paymentAccountProfileAccountId.value = '';
     await loadPaymentAccounts();
-    ElMessage.success('主账号已删除');
+    ElMessage.success('结算账户已删除');
   } finally {
     paymentAccountDeletingIds.value = paymentAccountDeletingIds.value.filter((item) => item !== accountId);
   }
@@ -3265,7 +3272,7 @@ async function submitPaymentAccounts() {
   if (!paymentAccountTarget.value) return;
   paymentAccountSubmitting.value = true;
   try {
-    // 新增模式下填写了任一资料时，底部“保存配置”会先创建并选中该主账号。
+    // 新增模式下填写了任一资料时，底部“保存配置”会先创建并选中该结算账户。
     const hasNewAccountDraft = [
       paymentAccountEditor.accountName,
       paymentAccountEditor.subjectCompanyName,
@@ -3277,19 +3284,21 @@ async function submitPaymentAccounts() {
       if (!(await addPaymentAccount())) return;
     }
     if (!paymentAccountSelectedIds.value.length || !paymentAccountDefaultId.value) {
-      return ElMessage.warning('请至少选择一个主账号并指定默认账号');
+      return ElMessage.warning('请至少选择一个结算账户并指定默认账户');
     }
     if (paymentAccountProfileAccountId.value && !isCreatingPaymentAccount.value && !(await persistPaymentAccountProfile())) return;
     const incompleteAccount = selectedPaymentAccountMissingProfile();
     if (incompleteAccount) {
-      return ElMessage.warning(`请先完善结算账号“${incompleteAccount.accountName || '开户行待补充'}”的开户行与结算企业资料`);
+      return ElMessage.warning(
+        `请先完善结算账户“${settlementAccountName(incompleteAccount.accountName) || '结算名称待补充'}”的结算名称与结算企业资料`
+      );
     }
     await assignSettlementPaymentAccounts(paymentAccountTarget.value.applicationId, {
       accountIds: paymentAccountSelectedIds.value,
       defaultAccountId: paymentAccountDefaultId.value,
       allowMultipleMainAccounts: paymentAccountAllowMultiple.value
     });
-    ElMessage.success('主账号设置已提交，银行确认后企业端即可选择');
+    ElMessage.success('结算账户设置已提交，银行确认后企业端即可选择');
     paymentAccountVisible.value = false;
   } finally {
     paymentAccountSubmitting.value = false;
@@ -3305,7 +3314,7 @@ function paymentAccountStatusText(status?: string) {
   return texts[String(status || '')] || '异常';
 }
 
-// 页面只保留父子账号关系三态；默认主账号与开户记录匹配才表示正常。
+// 页面只保留父子账号关系三态；默认结算账户与开户记录匹配才表示正常。
 function paymentAccountDisplayStatus(row: SettlementPaymentAccount) {
   const status = String(row.syncStatus || '');
   if (status === 'SUCCESS') return 'SUCCESS';
@@ -3907,11 +3916,6 @@ function deduplicateAuditLogs(logs: AuditLogVO[]) {
 .audit-checklist {
   display: grid;
   grid-template-columns: 1fr;
-}
-
-.audit-opinion-template {
-  margin-bottom: 8px;
-  width: 100%;
 }
 
 .payment-account-dialog {

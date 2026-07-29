@@ -97,7 +97,7 @@ export interface SettlementGlobalSettings {
 
 export interface SettlementGlobalSettingsRequest {
   commissionRate: number;
-  /** 留空表示保留后端已加密保存的全局主账号。 */
+  /** 留空表示保留后端已加密保存的全局结算账户。 */
   mainAccountNo?: string;
   allowMultipleMainAccounts: boolean;
 }
@@ -156,7 +156,7 @@ export interface SettlementPaymentAccount {
   contactPhoneMasked?: string;
   assigned: boolean;
   defaultAccount: boolean;
-  /** 开户成功子账号记录确认的所属主账号状态：SUCCESS/UNASSIGNED/ERROR。 */
+  /** 开户成功子账号记录确认的所属结算账户状态：SUCCESS/UNASSIGNED/ERROR。 */
   syncStatus: 'SUCCESS' | 'UNASSIGNED' | 'ERROR' | string;
   syncCode?: string;
   syncMessage?: string;
@@ -197,7 +197,7 @@ export interface SettlementPaymentAccountProfileRequest {
   accountName: string;
   subjectCompanyName: string;
   contactName: string;
-  /** 留空表示保留该主账号已经加密保存的联系方式。 */
+  /** 留空表示保留该结算账户已经加密保存的联系方式。 */
   contactPhone?: string;
 }
 
@@ -248,7 +248,7 @@ export function updateSettlementCommissionRate(commissionRate: number) {
   return request.put(commissionRateUrl, { commissionRate });
 }
 
-/** 全局主账号仅返回掩码；完整账号只在加密保存请求中提交。 */
+/** 全局结算账户仅返回掩码；完整账号只在加密保存请求中提交。 */
 export function getSettlementGlobalSettings() {
   return request({ url: `${baseUrl}/global-settings`, method: 'get', silent: true } as any)
     .then((response: any) => ({
@@ -282,7 +282,7 @@ export function updateSettlementGlobalSettings(data: SettlementGlobalSettingsReq
     data
   } as any).catch((error: any) => {
     if (!isMissingEndpoint(error)) throw error;
-    // 旧后端只能更新抽佣；主账号仍读取既有招行测试配置，重启新后端后即可保存完整全局规则。
+    // 旧后端只能更新抽佣；结算账户仍读取既有招行测试配置，重启新后端后即可保存完整全局规则。
     return updateSettlementCommissionRate(data.commissionRate);
   });
 }
@@ -342,7 +342,7 @@ export function getSettlementPaymentAccounts(applicationId: string | number) {
   return request.get<SettlementPaymentAccount[]>(`${baseUrl}/${applicationId}/payment-accounts`);
 }
 
-/** 完整主账号卡号使用加密响应，前端仅在当前弹窗内短暂展示。 */
+/** 完整结算账户卡号使用加密响应，前端仅在当前弹窗内短暂展示。 */
 export function getSettlementPaymentAccountNo(applicationId: string | number, accountId: string | number) {
   return request.get<{ accountNo: string }>(`${baseUrl}/${applicationId}/payment-accounts/${accountId}/account-no`);
 }
