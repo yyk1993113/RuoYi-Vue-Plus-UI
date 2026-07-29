@@ -844,7 +844,30 @@
         <el-descriptions :column="2" border class="mb-4">
           <el-descriptions-item label="岗位名称">{{ nanjingTagJob?.jobName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="岗位编码">{{ nanjingTagJob?.jobNo || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="维护状态">
+            <el-tag :type="selectedNanjingTagIds.length ? 'success' : 'warning'">
+              {{ selectedNanjingTagIds.length ? '已维护' : '待维护' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="已选标签">{{ selectedNanjingTagIds.length }} 个</el-descriptions-item>
         </el-descriptions>
+
+        <div v-if="nanjingTagSuggestions.length" class="nanjing-tag-suggestions mb-4">
+          <div class="nanjing-tag-suggestions__header">
+            <div>
+              <div class="nanjing-tag-group__title">根据岗位资料生成的维护建议</div>
+              <div class="field-hint">只生成建议，不会自动保存；采用后仍可手工调整。</div>
+            </div>
+            <el-button type="primary" plain size="small" @click="applyNanjingTagSuggestions">采用建议</el-button>
+          </div>
+          <div class="nanjing-tag-options">
+            <el-tooltip v-for="item in nanjingTagSuggestions" :key="item.tagId" :content="item.reason" placement="top">
+              <el-tag :type="item.tagType === 'REGION' ? 'success' : 'primary'" effect="plain">
+                {{ item.tagType === 'REGION' ? '片区' : '产业' }} · {{ item.tagName }}
+              </el-tag>
+            </el-tooltip>
+          </div>
+        </div>
 
         <el-checkbox-group v-if="nanjingTagOptions.length" v-model="selectedNanjingTagIds" class="nanjing-tag-groups">
           <section v-if="nanjingRegionTags.length" class="nanjing-tag-group">
@@ -882,6 +905,7 @@ import {
   listJob,
   listNanjingIndustryTags,
   getJobNanjingIndustryTags,
+  getJobNanjingIndustryTagSuggestions,
   updateJobNanjingIndustryTags,
   getJobStatistics,
   getJobFullDetail,
@@ -895,7 +919,7 @@ import {
   listApply,
   listInvoiceManage
 } from '@/api/recruitment';
-import type { InvoiceManageVO, JobFullVO, NanjingIndustryTagOptionVO } from '@/api/recruitment';
+import type { InvoiceManageVO, JobFullVO, JobNanjingTagSuggestionVO, NanjingIndustryTagOptionVO } from '@/api/recruitment';
 import { getBizNoChainByCompanyId, type BizNoChainVO } from '@/api/recruitment/serialRule';
 import { download } from '@/utils/request';
 import { REGIONS } from '@/utils/region-data';
@@ -947,6 +971,7 @@ const nanjingTagLoading = ref(false);
 const nanjingTagSubmitting = ref(false);
 const nanjingTagJob = ref<any | null>(null);
 const nanjingTagOptions = ref<NanjingIndustryTagOptionVO[]>([]);
+const nanjingTagSuggestions = ref<JobNanjingTagSuggestionVO[]>([]);
 const selectedNanjingTagIds = ref<Array<number | string>>([]);
 const nanjingRegionTags = computed(() => nanjingTagOptions.value.filter((tag) => tag.tagType === 'REGION'));
 const nanjingIndustryTags = computed(() => nanjingTagOptions.value.filter((tag) => tag.tagType === 'INDUSTRY'));
@@ -955,21 +980,31 @@ const nanjingIndustryTags = computed(() => nanjingTagOptions.value.filter((tag) 
 async function handleNanjingTags(row: any) {
   nanjingTagJob.value = row;
   selectedNanjingTagIds.value = [];
+  nanjingTagSuggestions.value = [];
   nanjingTagVisible.value = true;
   nanjingTagLoading.value = true;
   try {
-    const [tagRes, assignmentRes] = await Promise.all([
+    const [tagRes, assignmentRes, suggestionRes] = await Promise.all([
       listNanjingIndustryTags(),
-      getJobNanjingIndustryTags(row.jobId)
+      getJobNanjingIndustryTags(row.jobId),
+      getJobNanjingIndustryTagSuggestions(row.jobId).catch(() => ({ data: [] }))
     ]);
     nanjingTagOptions.value = tagRes.data || [];
     selectedNanjingTagIds.value = assignmentRes.data?.tagIds || [];
+    nanjingTagSuggestions.value = suggestionRes.data || [];
   } catch (error) {
     nanjingTagVisible.value = false;
     ElMessage.error('南京产业标签加载失败');
   } finally {
     nanjingTagLoading.value = false;
   }
+}
+
+function applyNanjingTagSuggestions() {
+  selectedNanjingTagIds.value = Array.from(
+    new Set([...selectedNanjingTagIds.value, ...nanjingTagSuggestions.value.map((item) => item.tagId)])
+  );
+  ElMessage.success('已采用维护建议，请确认后保存标签');
 }
 
 async function submitNanjingTags() {
@@ -2489,6 +2524,21 @@ function formatStartDate(val?: string | number): string {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.nanjing-tag-suggestions {
+  padding: 14px 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: var(--el-fill-color-light);
+}
+
+.nanjing-tag-suggestions__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
 }
 
 .nanjing-tag-group__title {

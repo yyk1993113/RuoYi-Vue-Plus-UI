@@ -37,7 +37,6 @@ export interface SettlementSubAccountVO {
   commissionRateSource?: 'INDIVIDUAL' | 'GLOBAL';
   settlementChannelName?: string;
   arrivalTime?: string;
-  invoiceSubjectName?: string;
   authorizationLetterUploaded?: boolean;
   createTime: string;
   status: SubAccountAuditStatus;
@@ -79,7 +78,6 @@ export interface SettlementSubAccountUpdateRequest {
   commissionRate?: number;
   settlementChannelName?: string;
   arrivalTime?: string;
-  invoiceSubjectName?: string;
   reason: string;
   version: number;
 }
@@ -93,6 +91,7 @@ export interface SettlementGlobalSettings {
   globalMainAccountNoMasked?: string;
   globalMainAccountConfigured: boolean;
   allowMultipleMainAccounts: boolean;
+  invoiceSubjectName?: string;
 }
 
 export interface SettlementGlobalSettingsRequest {
@@ -100,6 +99,8 @@ export interface SettlementGlobalSettingsRequest {
   /** 留空表示保留后端已加密保存的全局结算账户。 */
   mainAccountNo?: string;
   allowMultipleMainAccounts: boolean;
+  /** 运营后台统一维护的企业结算开票科目；空字符串表示清空。 */
+  invoiceSubjectName: string;
 }
 
 export interface SettlementMainAccountSettings {
@@ -267,7 +268,8 @@ export function getSettlementGlobalSettings() {
           globalCommissionRate: normalizeCommissionRate(rateResponse?.data?.globalCommissionRate),
           globalMainAccountNoMasked: cmbResponse?.data?.parentAccountNoMasked || '',
           globalMainAccountConfigured: cmbResponse?.data?.parentAccountConfigured === true,
-          allowMultipleMainAccounts: false
+          allowMultipleMainAccounts: false,
+          invoiceSubjectName: ''
         }
       };
     });

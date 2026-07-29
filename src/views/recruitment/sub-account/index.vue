@@ -834,11 +834,7 @@
           <el-form-item label="材料清单" prop="checks">
             <div class="audit-checklist-wrap">
               <!-- 审核材料全选需要显式确认，避免误点后直接绕过逐项核验。 -->
-              <el-checkbox
-                :model-value="isAuditChecksAllSelected"
-                :indeterminate="isAuditChecksIndeterminate"
-                @change="toggleAuditChecksAll"
-              >
+              <el-checkbox :model-value="isAuditChecksAllSelected" :indeterminate="isAuditChecksIndeterminate" @change="toggleAuditChecksAll">
                 全选
               </el-checkbox>
               <el-checkbox-group v-model="auditForm.checks" class="audit-checklist">
@@ -990,9 +986,6 @@
             <el-option label="T+1" value="T+1" />
           </el-select>
         </el-form-item>
-        <el-form-item label="开票科目" prop="invoiceSubjectName">
-          <el-input v-model="editForm.invoiceSubjectName" maxlength="100" show-word-limit placeholder="请输入企业结算开票科目" />
-        </el-form-item>
         <template v-if="editTarget?.status === 'APPROVED' && canManageCommissionRate">
           <el-divider content-position="left">抽佣比例</el-divider>
           <el-form-item label="全局抽佣比例">{{ commissionRateText(globalCommissionRate) }}</el-form-item>
@@ -1058,7 +1051,7 @@
 
     <el-dialog v-model="globalSettingsVisible" title="全局设置" width="600px" append-to-body @closed="globalSettingsForm.mainAccountNo = ''">
       <el-alert
-        title="抽佣比例和多结算账户开关作为企业默认值；修改全局结算账户不会批量替换企业已有的银行关联。"
+        title="抽佣比例、多结算账户开关和结算开票科目作为全局配置；修改全局结算账户不会批量替换企业已有的银行关联。"
         type="info"
         :closable="false"
         show-icon
@@ -1090,6 +1083,9 @@
         </el-form-item>
         <el-form-item label="允许多个结算账户">
           <el-switch v-model="globalSettingsForm.allowMultipleMainAccounts" active-text="允许" inactive-text="仅单个" />
+        </el-form-item>
+        <el-form-item label="结算开票科目" prop="invoiceSubjectName">
+          <el-input v-model="globalSettingsForm.invoiceSubjectName" maxlength="100" show-word-limit clearable placeholder="请输入企业结算开票科目" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -1716,7 +1712,6 @@ interface SettlementSubAccountEditForm {
   commissionRate: number;
   settlementChannelName: string;
   arrivalTime: string;
-  invoiceSubjectName: string;
   reason: string;
 }
 
@@ -1735,7 +1730,6 @@ const editForm = reactive<SettlementSubAccountEditForm>({
   commissionRate: 5,
   settlementChannelName: '',
   arrivalTime: '实时',
-  invoiceSubjectName: '',
   reason: ''
 });
 const editRules: FormRules = {
@@ -1772,7 +1766,6 @@ const editRules: FormRules = {
   ],
   settlementChannelName: [{ max: 100, message: '结算通道名称不能超过100个字符', trigger: 'blur' }],
   arrivalTime: [{ max: 32, message: '到账时效不能超过32个字符', trigger: 'change' }],
-  invoiceSubjectName: [{ max: 100, message: '开票科目不能超过100个字符', trigger: 'blur' }],
   reason: [
     { required: true, message: '请输入修改原因', trigger: 'blur' },
     { max: 500, message: '修改原因不能超过500个字符', trigger: 'blur' }
@@ -1838,7 +1831,13 @@ const globalSettingsSubmitting = ref(false);
 const globalSettingsFormRef = ref<FormInstance>();
 const globalMainAccountNoMasked = ref('');
 const globalMainAccountConfigured = ref(false);
-const globalSettingsForm = reactive({ commissionRate: 5, mainAccountNo: '', allowMultipleMainAccounts: false });
+// 开票科目只从全局设置接口读写，避免再次落回企业白名单单条编辑。
+const globalSettingsForm = reactive({
+  commissionRate: 5,
+  mainAccountNo: '',
+  allowMultipleMainAccounts: false,
+  invoiceSubjectName: ''
+});
 const commissionRateRules: FormRules = {
   commissionRate: [
     { required: true, message: '请输入抽佣比例', trigger: 'change' },
@@ -1852,7 +1851,8 @@ const commissionRateRules: FormRules = {
       trigger: 'change'
     }
   ],
-  mainAccountNo: [{ pattern: /^$|^\d{6,35}$/, message: '全局结算账号必须为6至35位数字', trigger: 'blur' }]
+  mainAccountNo: [{ pattern: /^$|^\d{6,35}$/, message: '全局结算账号必须为6至35位数字', trigger: 'blur' }],
+  invoiceSubjectName: [{ max: 100, message: '结算开票科目不能超过100个字符', trigger: 'blur' }]
 };
 
 // 列表比例采用独立轻量弹窗，避免为只改抽佣比例打开完整企业编辑表单。
@@ -2007,7 +2007,8 @@ function applyGlobalSettings(data: Partial<SettlementGlobalSettings>) {
   Object.assign(globalSettingsForm, {
     commissionRate: globalCommissionRate.value,
     mainAccountNo: '',
-    allowMultipleMainAccounts: data.allowMultipleMainAccounts === true
+    allowMultipleMainAccounts: data.allowMultipleMainAccounts === true,
+    invoiceSubjectName: data.invoiceSubjectName || ''
   });
 }
 
@@ -2032,7 +2033,8 @@ async function submitGlobalSettings() {
     await updateSettlementGlobalSettings({
       commissionRate: globalSettingsForm.commissionRate,
       mainAccountNo: globalSettingsForm.mainAccountNo.trim() || undefined,
-      allowMultipleMainAccounts: globalSettingsForm.allowMultipleMainAccounts
+      allowMultipleMainAccounts: globalSettingsForm.allowMultipleMainAccounts,
+      invoiceSubjectName: globalSettingsForm.invoiceSubjectName.trim()
     });
     // 结算账户查询接口只返回掩码；保存后以后台回读结果确认当前生效配置。
     const refreshed: any = await getSettlementGlobalSettings();
@@ -2532,10 +2534,9 @@ async function openEditRecord(row: SettlementSubAccountVO) {
     contactPhone: '',
     commissionRateMode: row.commissionRateSource === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'GLOBAL',
     commissionRate: Number(row.individualCommissionRate ?? row.effectiveCommissionRate ?? 5),
-    // 结算展示配置由运营维护；历史数据默认实时到账，其他字段不臆造。
+    // 企业级结算展示只保留通道和到账时效；开票科目改由全局设置统一维护。
     settlementChannelName: row.settlementChannelName || row.companyName || '',
     arrivalTime: row.arrivalTime || '实时',
-    invoiceSubjectName: row.invoiceSubjectName || '',
     reason: ''
   });
   editVisible.value = true;
@@ -2572,7 +2573,6 @@ async function submitEditRecord() {
     contactName: editForm.contactName.trim(),
     settlementChannelName: editForm.settlementChannelName.trim(),
     arrivalTime: editForm.arrivalTime.trim(),
-    invoiceSubjectName: editForm.invoiceSubjectName.trim(),
     reason: editForm.reason.trim(),
     version: Number(target.version ?? 0)
   };

@@ -100,6 +100,13 @@ export interface JobNanjingTagAssignmentVO {
   tagIds: Array<number | string>;
 }
 
+export interface JobNanjingTagSuggestionVO {
+  tagId: number | string;
+  tagName: string;
+  tagType: 'REGION' | 'INDUSTRY';
+  reason: string;
+}
+
 // 岗位完整字段 VO（运营台审核详情用）。
 // 数据来源：后端 AdminJobDetailController.getJobFullDetail
 //   (GET /admin/recruitment/jobDetail/{jobId}) → com.ruoyi.project.domain.vo.JobFullVO。
@@ -1405,6 +1412,11 @@ export function listNanjingIndustryTags() {
 
 export function getJobNanjingIndustryTags(jobId: number | string) {
   return request.get<JobNanjingTagAssignmentVO>(`${baseUrl}/nanjing-tags/jobs/${jobId}`);
+}
+
+/** 只读生成维护建议，管理员确认前不会写入岗位标签。 */
+export function getJobNanjingIndustryTagSuggestions(jobId: number | string) {
+  return request.get<JobNanjingTagSuggestionVO[]>(`${baseUrl}/nanjing-tags/jobs/${jobId}/suggestions`);
 }
 
 export function updateJobNanjingIndustryTags(jobId: number | string, tagIds: Array<number | string>) {
