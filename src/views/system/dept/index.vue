@@ -139,6 +139,20 @@
             <el-tooltip v-else :content="scope.row.companyId ? '查看企业完整资料' : '该历史企业节点尚未关联企业主体'" placement="top">
               <el-button link type="primary" icon="View" :disabled="!scope.row.companyId" @click="handleCompanyDetail(scope.row)">查看详情</el-button>
             </el-tooltip>
+            <el-tooltip v-if="isCompanyRoot(scope.row)" content="将企业部门和可登录人员同步到 OA" placement="top">
+              <el-button
+                v-hasPermi="['system:dept:add']"
+                v-hasRole="['superadmin', 'operations_manager', 'operator']"
+                link
+                type="success"
+                icon="Connection"
+                :loading="isCompanySyncing(scope.row)"
+                :disabled="!scope.row.companyId"
+                @click="handleSyncCompanyToOa(scope.row)"
+              >
+                同步OA
+              </el-button>
+            </el-tooltip>
           </template>
         </el-table-column>
       </el-table>
@@ -488,7 +502,8 @@ import {
   updateDept,
   listDeptExcludeChild,
   importCompanyDepartments,
-  entryCompanyDepartment
+  entryCompanyDepartment,
+  syncCompanyOrganizationToOa
 } from '@/api/system/dept';
 import { DeptForm, DeptQuery, DeptVO } from '@/api/system/dept/types';
 import { UserVO } from '@/api/system/user/types';
@@ -557,6 +572,7 @@ const enterpriseImportTotal = ref(0);
 const selectedEnterpriseIds = ref<Array<number | string>>([]);
 const activeOrgScope = ref<'internal' | 'company'>('internal');
 const companyDetailLoading = ref(false);
+const syncingCompanyIds = ref<Set<string>>(new Set());
 const companyDetail = ref<Record<string, any>>();
 const companyCertStatus = ref('not_submitted');
 
@@ -866,6 +882,31 @@ const handleCompanyDetail = async (row: DeptVO) => {
     proxy?.$modal.msgError('获取企业详情失败');
   } finally {
     companyDetailLoading.value = false;
+  }
+};
+
+const isCompanySyncing = (row: DeptVO) => row.companyId !== null && row.companyId !== undefined && syncingCompanyIds.value.has(String(row.companyId));
+
+// 管理页只触发一次后端同步；OA 地址、签名和密码摘要均由两端服务处理，不暴露给浏览器。
+const handleSyncCompanyToOa = async (row: DeptVO) => {
+  if (row.companyId === null || row.companyId === undefined || isCompanySyncing(row)) return;
+  try {
+    await proxy?.$modal.confirm(`确认将“${row.deptName}”的组织和人员同步到 OA 吗？`);
+  } catch {
+    return;
+  }
+  const companyKey = String(row.companyId);
+  syncingCompanyIds.value = new Set([...syncingCompanyIds.value, companyKey]);
+  try {
+    const response = await syncCompanyOrganizationToOa(row.companyId);
+    const result = response.data || {};
+    proxy?.$modal.msgSuccess(
+      `OA同步完成：部门新增${Number(result.departmentCreated || 0)}、更新${Number(result.departmentUpdated || 0)}；人员新增${Number(result.userCreated || 0)}、更新${Number(result.userUpdated || 0)}`
+    );
+  } finally {
+    const next = new Set(syncingCompanyIds.value);
+    next.delete(companyKey);
+    syncingCompanyIds.value = next;
   }
 };
 

@@ -975,6 +975,27 @@
             placeholder="不填写则保留当前电话"
           />
         </el-form-item>
+        <el-divider content-position="left">企业端结算展示</el-divider>
+        <el-form-item label="结算通道名称" prop="settlementChannelName">
+          <el-input v-model="editForm.settlementChannelName" maxlength="100" show-word-limit placeholder="例如：壹合科技" />
+        </el-form-item>
+        <el-form-item label="到账时效" prop="arrivalTime">
+          <el-select
+            v-model="editForm.arrivalTime"
+            filterable
+            allow-create
+            default-first-option
+            placeholder="请选择或填写到账时效"
+            style="width: 100%"
+          >
+            <el-option label="实时" value="实时" />
+            <el-option label="T+0" value="T+0" />
+            <el-option label="T+1" value="T+1" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="开票科目" prop="invoiceSubjectName">
+          <el-input v-model="editForm.invoiceSubjectName" maxlength="100" show-word-limit placeholder="请输入企业结算开票科目" />
+        </el-form-item>
         <template v-if="editTarget?.status === 'APPROVED' && canManageCommissionRate">
           <el-divider content-position="left">抽佣比例</el-divider>
           <el-form-item label="全局抽佣比例">{{ commissionRateText(globalCommissionRate) }}</el-form-item>
@@ -1280,7 +1301,7 @@
               />
             </template>
           </el-table-column>
-          <el-table-column label="主账号名称" min-width="180">
+          <el-table-column label="开户行" min-width="180">
             <template #default="{ row }">
               <div class="payment-account-name-cell">
                 <span
@@ -1301,18 +1322,18 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="主账号企业" min-width="180" show-overflow-tooltip>
+          <el-table-column label="结算企业" min-width="180" show-overflow-tooltip>
             <template #default="{ row }">
               <span :class="['payment-account-company', { 'is-empty': !row.subjectCompanyName }]">
                 {{ row.subjectCompanyName || '待补充' }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="银行卡号" min-width="190">
+          <el-table-column label="结算账号" min-width="190">
             <template #default="{ row }">
               <div class="sensitive-value-row masked-account">
                 <span>{{ paymentAccountNoText(row) }}</span>
-                <el-tooltip :content="isPaymentAccountNoRevealed(row) ? '隐藏完整银行卡号' : '查看完整银行卡号'" placement="top">
+                <el-tooltip :content="isPaymentAccountNoRevealed(row) ? '隐藏完整结算账号' : '查看完整结算账号'" placement="top">
                   <el-button
                     v-hasPermi="['settlement:subAccount:decrypt']"
                     class="sensitive-eye-button"
@@ -1320,7 +1341,7 @@
                     type="primary"
                     :icon="isPaymentAccountNoRevealed(row) ? 'Hide' : 'View'"
                     :loading="isPaymentAccountNoLoading(row)"
-                    :aria-label="isPaymentAccountNoRevealed(row) ? '隐藏完整主账号银行卡号' : '查看完整主账号银行卡号'"
+                    :aria-label="isPaymentAccountNoRevealed(row) ? '隐藏完整结算账号' : '查看完整结算账号'"
                     @click.stop="togglePaymentAccountNo(row)"
                   />
                 </el-tooltip>
@@ -1378,29 +1399,29 @@
             </template>
           </el-table-column>
         </el-table>
-        <el-divider content-position="left">主账号资料</el-divider>
+        <el-divider content-position="left">结算账号资料</el-divider>
         <el-form class="payment-account-add-form" label-width="96px" @submit.prevent>
-          <el-form-item label="选择主账号" class="payment-account-profile-account">
+          <el-form-item label="选择结算账号" class="payment-account-profile-account">
             <div class="payment-account-selector-row">
-              <el-select v-model="paymentAccountProfileAccountId" placeholder="请选择已有主账号" @change="selectPaymentAccountProfile">
+              <el-select v-model="paymentAccountProfileAccountId" placeholder="请选择已有结算账号" @change="selectPaymentAccountProfile">
                 <el-option
                   v-for="item in paymentAccountRows"
                   :key="String(item.accountId)"
-                  :label="`${item.accountName || '未命名主账号'}（${item.subjectCompanyName || '企业待补充'}）`"
+                  :label="`${item.accountName || '开户行待补充'}（${item.subjectCompanyName || '结算企业待补充'}）`"
                   :value="String(item.accountId)"
                 />
-                <el-option label="新增主账号" :value="NEW_PAYMENT_ACCOUNT_ID" />
+                <el-option label="新增结算账号" :value="NEW_PAYMENT_ACCOUNT_ID" />
               </el-select>
               <el-button type="primary" plain :disabled="isCreatingPaymentAccount" @click="selectPaymentAccountProfile(NEW_PAYMENT_ACCOUNT_ID)"
-                >＋ 添加主账号</el-button
+                >＋ 添加结算账号</el-button
               >
             </div>
           </el-form-item>
-          <el-form-item label="主账号名称">
-            <el-input v-model="paymentAccountEditor.accountName" maxlength="64" placeholder="请输入主账号名称" />
+          <el-form-item label="开户行">
+            <el-input v-model="paymentAccountEditor.accountName" maxlength="64" placeholder="请输入开户行名称" />
           </el-form-item>
-          <el-form-item label="主账号企业">
-            <el-input v-model="paymentAccountEditor.subjectCompanyName" maxlength="100" placeholder="请输入该主账号实际开户企业名称" />
+          <el-form-item label="结算企业">
+            <el-input v-model="paymentAccountEditor.subjectCompanyName" maxlength="100" placeholder="请输入结算企业名称" />
           </el-form-item>
           <el-form-item label="联系人">
             <el-input v-model="paymentAccountEditor.contactName" maxlength="50" placeholder="请输入该主账号联系人姓名" />
@@ -1414,8 +1435,8 @@
               "
             />
           </el-form-item>
-          <el-form-item label="银行卡号">
-            <el-input v-if="isCreatingPaymentAccount" v-model="paymentAccountEditor.accountNo" maxlength="35" placeholder="请输入完整银行卡号" />
+          <el-form-item label="结算账号">
+            <el-input v-if="isCreatingPaymentAccount" v-model="paymentAccountEditor.accountNo" maxlength="35" placeholder="请输入完整结算账号" />
             <el-input v-else :model-value="currentPaymentAccount?.accountNoMasked || '-'" disabled />
           </el-form-item>
           <el-form-item class="payment-account-add-action">
@@ -1425,7 +1446,7 @@
               :disabled="!paymentAccountProfileAccountId"
               :loading="paymentAccountAdding || paymentAccountProfileSubmitting"
               @click="savePaymentAccountEditor"
-              >{{ isCreatingPaymentAccount ? '添加主账号' : '保存主账号资料' }}</el-button
+              >{{ isCreatingPaymentAccount ? '添加结算账号' : '保存结算账号资料' }}</el-button
             >
           </el-form-item>
         </el-form>
@@ -1694,6 +1715,9 @@ interface SettlementSubAccountEditForm {
   contactPhone: string;
   commissionRateMode: CommissionRateMode;
   commissionRate: number;
+  settlementChannelName: string;
+  arrivalTime: string;
+  invoiceSubjectName: string;
   reason: string;
 }
 
@@ -1710,6 +1734,9 @@ const editForm = reactive<SettlementSubAccountEditForm>({
   contactPhone: '',
   commissionRateMode: 'GLOBAL',
   commissionRate: 5,
+  settlementChannelName: '',
+  arrivalTime: '实时',
+  invoiceSubjectName: '',
   reason: ''
 });
 const editRules: FormRules = {
@@ -1744,6 +1771,9 @@ const editRules: FormRules = {
       trigger: 'change'
     }
   ],
+  settlementChannelName: [{ max: 100, message: '结算通道名称不能超过100个字符', trigger: 'blur' }],
+  arrivalTime: [{ max: 32, message: '到账时效不能超过32个字符', trigger: 'change' }],
+  invoiceSubjectName: [{ max: 100, message: '开票科目不能超过100个字符', trigger: 'blur' }],
   reason: [
     { required: true, message: '请输入修改原因', trigger: 'blur' },
     { max: 500, message: '修改原因不能超过500个字符', trigger: 'blur' }
@@ -2503,6 +2533,10 @@ async function openEditRecord(row: SettlementSubAccountVO) {
     contactPhone: '',
     commissionRateMode: row.commissionRateSource === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'GLOBAL',
     commissionRate: Number(row.individualCommissionRate ?? row.effectiveCommissionRate ?? 5),
+    // 结算展示配置由运营维护；历史数据默认实时到账，其他字段不臆造。
+    settlementChannelName: row.settlementChannelName || row.companyName || '',
+    arrivalTime: row.arrivalTime || '实时',
+    invoiceSubjectName: row.invoiceSubjectName || '',
     reason: ''
   });
   editVisible.value = true;
@@ -2537,6 +2571,9 @@ async function submitEditRecord() {
     accountType: editForm.accountType,
     bankBranch: editForm.bankBranch.trim(),
     contactName: editForm.contactName.trim(),
+    settlementChannelName: editForm.settlementChannelName.trim(),
+    arrivalTime: editForm.arrivalTime.trim(),
+    invoiceSubjectName: editForm.invoiceSubjectName.trim(),
     reason: editForm.reason.trim(),
     version: Number(target.version ?? 0)
   };
@@ -2961,7 +2998,7 @@ async function togglePaymentAccountNo(row: SettlementPaymentAccount) {
   try {
     const response: any = await getSettlementPaymentAccountNo(paymentAccountTarget.value.applicationId, row.accountId);
     const accountNo = response?.data?.accountNo;
-    if (!accountNo) return ElMessage.warning('未获取到完整银行卡号');
+    if (!accountNo) return ElMessage.warning('未获取到完整结算账号');
     if (!paymentAccountVisible.value || revealVersion !== paymentAccountRevealVersion.value) return;
     revealedPaymentAccountNos[accountId] = accountNo;
   } finally {
@@ -3080,7 +3117,7 @@ async function persistPaymentAccount(accountName: string, accountNo: string, sub
     contactPhone
   });
   const savedAccount = response?.data;
-  if (!savedAccount?.accountId) throw new Error('新增主账号后未返回账户信息，请刷新后重试');
+  if (!savedAccount?.accountId) throw new Error('新增结算账号后未返回账户信息，请刷新后重试');
   const existingIndex = paymentAccountRows.value.findIndex((item) => String(item.accountId) === String(savedAccount.accountId));
   // 新增接口按银行卡号幂等返回实际记录，弹窗始终以服务端账户 ID 作为后续分配依据。
   if (existingIndex >= 0) paymentAccountRows.value.splice(existingIndex, 1, savedAccount);
@@ -3099,7 +3136,7 @@ function normalizedPaymentAccountDraft() {
 }
 
 function validatePaymentAccountDraft(draft: ReturnType<typeof normalizedPaymentAccountDraft>) {
-  if (!/^\d{6,35}$/.test(draft.accountNo)) return '请输入6至35位银行卡号';
+  if (!/^\d{6,35}$/.test(draft.accountNo)) return '请输入6至35位结算账号';
   return validatePaymentAccountProfile(draft, true);
 }
 
@@ -3116,8 +3153,8 @@ function validatePaymentAccountProfile(
   draft: { accountName: string; subjectCompanyName: string; contactName: string; contactPhone: string },
   requirePhone: boolean
 ) {
-  if (!draft.accountName) return '请输入主账号名称';
-  if (!draft.subjectCompanyName) return '请输入主账号企业名称';
+  if (!draft.accountName) return '请输入开户行名称';
+  if (!draft.subjectCompanyName) return '请输入结算企业名称';
   if (!draft.contactName) return '请输入联系人';
   if (requirePhone && !draft.contactPhone) return '请输入联系人联系方式';
   if (draft.contactPhone && !/^[0-9+()\-\s]{6,32}$/.test(draft.contactPhone)) return '请输入正确的联系人联系方式';
@@ -3148,7 +3185,7 @@ async function persistPaymentAccountProfile() {
     contactPhone: draft.contactPhone || undefined
   });
   const savedAccount = response?.data;
-  if (!savedAccount?.accountId) throw new Error('保存主账号企业资料后未返回账户信息，请刷新后重试');
+  if (!savedAccount?.accountId) throw new Error('保存结算账号资料后未返回账户信息，请刷新后重试');
   const index = paymentAccountRows.value.findIndex((item) => String(item.accountId) === String(savedAccount.accountId));
   if (index >= 0) paymentAccountRows.value.splice(index, 1, savedAccount);
   selectPaymentAccountProfile(savedAccount.accountId);
@@ -3162,7 +3199,7 @@ async function savePaymentAccountEditor() {
   }
   paymentAccountProfileSubmitting.value = true;
   try {
-    if (await persistPaymentAccountProfile()) ElMessage.success('主账号企业与联系人资料已保存');
+    if (await persistPaymentAccountProfile()) ElMessage.success('结算账号资料已保存');
   } finally {
     paymentAccountProfileSubmitting.value = false;
   }
@@ -3187,7 +3224,7 @@ async function addPaymentAccount() {
     );
     await loadPaymentAccounts();
     selectPaymentAccountProfile(savedAccount.accountId);
-    ElMessage.success(existing ? '该银行卡号已存在，当前保持原关联状态' : '主账号已添加，当前未关联子账号');
+    ElMessage.success(existing ? '该结算账号已存在，当前保持原关联状态' : '结算账号已添加，当前未关联子账号');
     return true;
   } finally {
     paymentAccountAdding.value = false;
@@ -3198,8 +3235,8 @@ async function confirmDeletePaymentAccount(row: SettlementPaymentAccount) {
   if (!paymentAccountTarget.value) return;
   const accountId = String(row.accountId);
   const confirmed = await ElMessageBox.confirm(
-    `确认删除主账号“${row.accountName || '未命名主账号'}”吗？删除后该账号将不再显示，且不可直接恢复。`,
-    '删除主账号',
+    `确认删除结算账号“${row.accountName || '未填写开户行'}”吗？删除后该账号将不再显示，且不可直接恢复。`,
+    '删除结算账号',
     {
       type: 'warning',
       confirmButtonText: '确认删除',
@@ -3245,7 +3282,7 @@ async function submitPaymentAccounts() {
     if (paymentAccountProfileAccountId.value && !isCreatingPaymentAccount.value && !(await persistPaymentAccountProfile())) return;
     const incompleteAccount = selectedPaymentAccountMissingProfile();
     if (incompleteAccount) {
-      return ElMessage.warning(`请先完善主账号“${incompleteAccount.accountName || '未命名主账号'}”的企业与联系人资料`);
+      return ElMessage.warning(`请先完善结算账号“${incompleteAccount.accountName || '开户行待补充'}”的开户行与结算企业资料`);
     }
     await assignSettlementPaymentAccounts(paymentAccountTarget.value.applicationId, {
       accountIds: paymentAccountSelectedIds.value,

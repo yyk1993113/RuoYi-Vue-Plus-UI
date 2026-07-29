@@ -81,3 +81,11 @@ export const entryCompanyDepartment = (data: Record<string, unknown>) => {
     data
   });
 };
+
+// 由招聘后端签名后服务端直连 OA；浏览器只传企业 ID，不接触 OA 地址或共享密钥。
+export const syncCompanyOrganizationToOa = (companyId: number | string) => {
+  return request({
+    url: `/admin/recruitment/company-department/${companyId}/sync-oa`,
+    method: 'post'
+  });
+};

@@ -35,6 +35,9 @@ export interface SettlementSubAccountVO {
   individualCommissionRate?: number | null;
   effectiveCommissionRate?: number;
   commissionRateSource?: 'INDIVIDUAL' | 'GLOBAL';
+  settlementChannelName?: string;
+  arrivalTime?: string;
+  invoiceSubjectName?: string;
   authorizationLetterUploaded?: boolean;
   createTime: string;
   status: SubAccountAuditStatus;
@@ -74,6 +77,9 @@ export interface SettlementSubAccountUpdateRequest {
   encryptedContactPhone?: string;
   commissionRateMode?: 'GLOBAL' | 'INDIVIDUAL';
   commissionRate?: number;
+  settlementChannelName?: string;
+  arrivalTime?: string;
+  invoiceSubjectName?: string;
   reason: string;
   version: number;
 }

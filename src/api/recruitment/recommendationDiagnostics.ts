@@ -72,7 +72,10 @@ export interface RecommendationSearchTestRequest {
 export interface RecommendationSearchHit {
   entityId: number;
   entityCode?: string;
+  /** 岗位方向返回岗位名称，候选人方向返回求职者姓名。 */
   entityName?: string;
+  /** 仅岗位推荐结果返回岗位所属公司名称。 */
+  companyName?: string;
   score: number;
 }
 
@@ -108,6 +111,72 @@ export interface RecommendationMemoryStatusResult {
   modelVersion?: string;
   schemaVersion?: string;
   message: string;
+}
+
+export interface RecommendationRerankWeightConfig {
+  strategyCode: RecommendationCrowdStrategy;
+  vectorWeight: number;
+  localWeight: number;
+  industryWeight: number;
+  salaryWeight: number;
+  version: number;
+  mode: 'OFF' | 'SHADOW' | 'ON';
+}
+
+export type RecommendationCrowdStrategy = 'GENERAL' | 'WHITE_COLLAR' | 'BLUE_COLLAR';
+export type RecommendationCrowdMatchField = 'JOB_NAME' | 'CATEGORY' | 'JOB_TYPE' | 'SALARY_UNIT';
+
+export interface RecommendationCrowdRule {
+  ruleId?: number | string;
+  strategyCode: Exclude<RecommendationCrowdStrategy, 'GENERAL'>;
+  matchField: RecommendationCrowdMatchField;
+  matchValues: string;
+  priority: number;
+  status: '0' | '1';
+  description?: string;
+}
+
+export type RecommendationRerankWeightRequest = Pick<
+  RecommendationRerankWeightConfig,
+  'vectorWeight' | 'localWeight' | 'industryWeight' | 'salaryWeight'
+> & { strategyCode?: RecommendationCrowdStrategy };
+
+export type IndustryGraphNodeType = 'TRACK' | 'CHAIN_STAGE' | 'SUPPORT_SERVICE' | 'POSITION_FAMILY' | 'CAPABILITY';
+export type IndustryGraphRelationType =
+  | 'UPSTREAM'
+  | 'DOWNSTREAM'
+  | 'ADJACENT_STAGE'
+  | 'SUPPORT_SERVICE'
+  | 'SKILL_TRANSFER'
+  | 'CROSS_TRACK';
+
+export interface IndustryGraphNode {
+  nodeId?: number | string;
+  nodeCode: string;
+  nodeName: string;
+  nodeType: IndustryGraphNodeType;
+  parentId?: number | string;
+  trackCode?: string;
+  matchKeywords?: string;
+  description?: string;
+  sortOrder: number;
+  status: '0' | '1';
+  dataVersion?: number;
+}
+
+export interface IndustryGraphEdge {
+  edgeId?: number | string;
+  sourceNodeId: number | string;
+  sourceNodeName?: string;
+  targetNodeId: number | string;
+  targetNodeName?: string;
+  relationType: IndustryGraphRelationType;
+  relationWeight: number;
+  bidirectional: '0' | '1';
+  maxHops: number;
+  reason?: string;
+  status: '0' | '1';
+  dataVersion?: number;
 }
 
 export type RecommendationRefreshTaskStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
@@ -152,6 +221,55 @@ export function runRecommendationSearchTest(data: RecommendationSearchTestReques
 
 export function getRecommendationMemoryStatus(data: RecommendationMemoryStatusRequest) {
   return request.post<RecommendationMemoryStatusResult>(`${baseUrl}/memory-status`, data);
+}
+
+const rerankWeightUrl = '/admin/recommendation/rerank/weights';
+
+export function getRecommendationRerankWeights(strategyCode: RecommendationCrowdStrategy = 'GENERAL') {
+  return request.get<RecommendationRerankWeightConfig>(rerankWeightUrl, { params: { strategyCode } });
+}
+
+const industryGraphUrl = '/admin/recommendation/industry-graph';
+const crowdRuleUrl = '/admin/recommendation/crowd-rules';
+
+export function listRecommendationCrowdRules() {
+  return request.get<RecommendationCrowdRule[]>(crowdRuleUrl);
+}
+
+export function createRecommendationCrowdRule(data: RecommendationCrowdRule) {
+  return request.post<void>(crowdRuleUrl, data);
+}
+
+export function updateRecommendationCrowdRule(ruleId: number | string, data: RecommendationCrowdRule) {
+  return request.put<void>(`${crowdRuleUrl}/${ruleId}`, data);
+}
+
+export function listIndustryGraphNodes(params?: { nodeType?: IndustryGraphNodeType | ''; keyword?: string }) {
+  return request.get<IndustryGraphNode[]>(`${industryGraphUrl}/nodes`, { params });
+}
+
+export function createIndustryGraphNode(data: IndustryGraphNode) {
+  return request.post<IndustryGraphNode>(`${industryGraphUrl}/nodes`, data);
+}
+
+export function updateIndustryGraphNode(nodeId: number | string, data: IndustryGraphNode) {
+  return request.put<IndustryGraphNode>(`${industryGraphUrl}/nodes/${nodeId}`, data);
+}
+
+export function listIndustryGraphEdges() {
+  return request.get<IndustryGraphEdge[]>(`${industryGraphUrl}/edges`);
+}
+
+export function createIndustryGraphEdge(data: IndustryGraphEdge) {
+  return request.post<void>(`${industryGraphUrl}/edges`, data);
+}
+
+export function updateIndustryGraphEdge(edgeId: number | string, data: IndustryGraphEdge) {
+  return request.put<void>(`${industryGraphUrl}/edges/${edgeId}`, data);
+}
+
+export function updateRecommendationRerankWeights(data: RecommendationRerankWeightRequest) {
+  return request.put<RecommendationRerankWeightConfig>(rerankWeightUrl, data);
 }
 
 const offlineRefreshUrl = '/admin/recommendation/offline-refresh/tasks';

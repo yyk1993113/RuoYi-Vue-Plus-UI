@@ -250,6 +250,8 @@
                     <el-dropdown-item v-if="row.status === '0'" icon="Close" @click="handleAudit(row, '6')">审核拒绝</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '1'" icon="Bottom" @click="handleStatusChange(row, '2')">下架</el-dropdown-item>
                     <el-dropdown-item v-if="row.status === '2'" icon="Top" @click="handleStatusChange(row, '1')">上架</el-dropdown-item>
+                    <!-- 南京标签是独立旁路数据，不修改岗位本身，也不触发上下架或推荐刷新。 -->
+                    <el-dropdown-item icon="PriceTag" @click="handleNanjingTags(row)">南京标签</el-dropdown-item>
                     <!-- 复制发布：进入代发整页并按 jobId 回填原岗位信息，少量修改即可重发 -->
                     <el-dropdown-item v-if="canShowSettlementIntent(row)" icon="Tickets" @click="handleSettlementIntent(row)"
                       >意向结算</el-dropdown-item
@@ -829,6 +831,46 @@
         />
       </template>
     </el-dialog>
+
+    <el-dialog v-model="nanjingTagVisible" title="南京产业标签" width="680px" append-to-body destroy-on-close>
+      <div v-loading="nanjingTagLoading">
+        <el-alert
+          title="标签仅保存到独立标签库，不会修改岗位内容、状态或现有推荐结果"
+          type="info"
+          :closable="false"
+          show-icon
+          class="mb-4"
+        />
+        <el-descriptions :column="2" border class="mb-4">
+          <el-descriptions-item label="岗位名称">{{ nanjingTagJob?.jobName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="岗位编码">{{ nanjingTagJob?.jobNo || '-' }}</el-descriptions-item>
+        </el-descriptions>
+
+        <el-checkbox-group v-if="nanjingTagOptions.length" v-model="selectedNanjingTagIds" class="nanjing-tag-groups">
+          <section v-if="nanjingRegionTags.length" class="nanjing-tag-group">
+            <div class="nanjing-tag-group__title">南京产业片区</div>
+            <div class="nanjing-tag-options">
+              <el-checkbox v-for="tag in nanjingRegionTags" :key="tag.tagId" :value="tag.tagId" border>
+                {{ tag.tagName }}
+              </el-checkbox>
+            </div>
+          </section>
+          <section v-if="nanjingIndustryTags.length" class="nanjing-tag-group">
+            <div class="nanjing-tag-group__title">产业赛道</div>
+            <div class="nanjing-tag-options">
+              <el-checkbox v-for="tag in nanjingIndustryTags" :key="tag.tagId" :value="tag.tagId" border>
+                {{ tag.tagName }}
+              </el-checkbox>
+            </div>
+          </section>
+        </el-checkbox-group>
+        <el-empty v-else-if="!nanjingTagLoading" description="暂无可用标签" />
+      </div>
+      <template #footer>
+        <el-button @click="nanjingTagVisible = false">取消</el-button>
+        <el-button type="primary" :loading="nanjingTagSubmitting" @click="submitNanjingTags">保存标签</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -838,6 +880,9 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   listJob,
+  listNanjingIndustryTags,
+  getJobNanjingIndustryTags,
+  updateJobNanjingIndustryTags,
   getJobStatistics,
   getJobFullDetail,
   auditJob,
@@ -850,7 +895,7 @@ import {
   listApply,
   listInvoiceManage
 } from '@/api/recruitment';
-import type { InvoiceManageVO, JobFullVO } from '@/api/recruitment';
+import type { InvoiceManageVO, JobFullVO, NanjingIndustryTagOptionVO } from '@/api/recruitment';
 import { getBizNoChainByCompanyId, type BizNoChainVO } from '@/api/recruitment/serialRule';
 import { download } from '@/utils/request';
 import { REGIONS } from '@/utils/region-data';
@@ -897,6 +942,50 @@ const queryFormRef = ref();
 const auditFormRef = ref();
 const dateRange = ref<[string, string] | []>([]);
 const showMoreQuery = ref(false);
+const nanjingTagVisible = ref(false);
+const nanjingTagLoading = ref(false);
+const nanjingTagSubmitting = ref(false);
+const nanjingTagJob = ref<any | null>(null);
+const nanjingTagOptions = ref<NanjingIndustryTagOptionVO[]>([]);
+const selectedNanjingTagIds = ref<Array<number | string>>([]);
+const nanjingRegionTags = computed(() => nanjingTagOptions.value.filter((tag) => tag.tagType === 'REGION'));
+const nanjingIndustryTags = computed(() => nanjingTagOptions.value.filter((tag) => tag.tagType === 'INDUSTRY'));
+
+/** 打开独立标签弹窗；不复用岗位编辑提交，避免触碰现有岗位业务字段。 */
+async function handleNanjingTags(row: any) {
+  nanjingTagJob.value = row;
+  selectedNanjingTagIds.value = [];
+  nanjingTagVisible.value = true;
+  nanjingTagLoading.value = true;
+  try {
+    const [tagRes, assignmentRes] = await Promise.all([
+      listNanjingIndustryTags(),
+      getJobNanjingIndustryTags(row.jobId)
+    ]);
+    nanjingTagOptions.value = tagRes.data || [];
+    selectedNanjingTagIds.value = assignmentRes.data?.tagIds || [];
+  } catch (error) {
+    nanjingTagVisible.value = false;
+    ElMessage.error('南京产业标签加载失败');
+  } finally {
+    nanjingTagLoading.value = false;
+  }
+}
+
+async function submitNanjingTags() {
+  const jobId = nanjingTagJob.value?.jobId;
+  if (!jobId) return;
+  nanjingTagSubmitting.value = true;
+  try {
+    await updateJobNanjingIndustryTags(jobId, selectedNanjingTagIds.value);
+    ElMessage.success('南京产业标签保存成功');
+    nanjingTagVisible.value = false;
+  } catch (error) {
+    ElMessage.error('南京产业标签保存失败');
+  } finally {
+    nanjingTagSubmitting.value = false;
+  }
+}
 
 function parseMaybeJson(value?: unknown): unknown {
   if (typeof value !== 'string') return value;
@@ -2394,6 +2483,28 @@ function formatStartDate(val?: string | number): string {
   gap: 4px;
   font-size: 13px;
   color: #909399;
+}
+
+.nanjing-tag-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.nanjing-tag-group__title {
+  margin-bottom: 10px;
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+}
+
+.nanjing-tag-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.nanjing-tag-options :deep(.el-checkbox) {
+  margin-right: 0;
 }
 
 .stat-mini-card {

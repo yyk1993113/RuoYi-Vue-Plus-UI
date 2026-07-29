@@ -295,6 +295,14 @@
                     <el-dropdown-menu>
                       <!-- 人员：已认证企业的人员管理入口，置于菜单最上方（行为待接，后端接口待补） -->
                       <el-dropdown-item v-if="row.status === '1'" icon="User" @click="handleStaff(row)">人员</el-dropdown-item>
+                      <el-dropdown-item
+                        v-if="['1', '3'].includes(String(row.status)) && canCompanyAudit"
+                        icon="Connection"
+                        :disabled="syncingOaCompanyIds.has(String(row.companyId))"
+                        @click="handleSyncCompanyToOa(row)"
+                      >
+                        {{ syncingOaCompanyIds.has(String(row.companyId)) ? '同步中...' : '同步OA' }}
+                      </el-dropdown-item>
                       <el-dropdown-item v-if="row.status === '0' && canCompanyAudit" icon="CircleCheck" @click="handleAudit(row, '1')">
                         审核通过
                       </el-dropdown-item>
@@ -972,6 +980,7 @@ import {
   listCompany,
   getCompanyStatistics,
   getCompany,
+  syncCompanyOrganizationToOa,
   listCompanyMaterials,
   getCompanyAuditHistory,
   auditCompany,
@@ -1014,6 +1023,7 @@ import { useUserStore } from '@/store/modules/user';
 const router = useRouter();
 const route = useRoute();
 const userStore = useUserStore();
+const syncingOaCompanyIds = ref<Set<string>>(new Set());
 
 // 企业按钮优先跟随后台菜单权限；保留原角色矩阵作为兼容兜底，避免已在岗账号因本次对齐突然失去操作入口。
 const hasPermissionOrLegacyRole = (permission: string, legacyRoles: string[]): boolean => {
@@ -1940,6 +1950,35 @@ async function handleSettlementContacted(row: any) {
     loadData();
   } catch (error) {
     ElMessage.error('标记已联系失败');
+  }
+}
+
+// 单个企业同步为全量幂等操作；重复点击只会更新 OA 已映射的部门、账号和员工信息。
+async function handleSyncCompanyToOa(row: any) {
+  const companyId = row?.companyId;
+  const companyKey = String(companyId ?? '');
+  if (!companyId || syncingOaCompanyIds.value.has(companyKey)) return;
+  try {
+    await ElMessageBox.confirm(`确认将“${row.companyName || '该企业'}”的组织和人员同步到 OA 吗？`, '同步OA', {
+      confirmButtonText: '确认同步',
+      cancelButtonText: '取消',
+      type: 'warning'
+    });
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') ElMessage.error('无法发起同步');
+    return;
+  }
+  syncingOaCompanyIds.value = new Set([...syncingOaCompanyIds.value, companyKey]);
+  try {
+    const response = await syncCompanyOrganizationToOa(companyId);
+    const result = response.data || {};
+    ElMessage.success(
+      `OA同步完成：部门新增${Number(result.departmentCreated || 0)}、更新${Number(result.departmentUpdated || 0)}；人员新增${Number(result.userCreated || 0)}、更新${Number(result.userUpdated || 0)}`
+    );
+  } finally {
+    const next = new Set(syncingOaCompanyIds.value);
+    next.delete(companyKey);
+    syncingOaCompanyIds.value = next;
   }
 }
 

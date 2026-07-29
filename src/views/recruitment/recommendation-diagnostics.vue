@@ -119,8 +119,11 @@
           <el-table-column :label="targetCodeLabel" prop="entityCode" min-width="190" align="center">
             <template #default="{ row }">{{ row.entityCode || '-' }}</template>
           </el-table-column>
-          <el-table-column v-if="testResult.direction === 'CANDIDATE_TO_JOB'" label="岗位名称" prop="entityName" min-width="180">
+          <el-table-column :label="targetNameLabel" prop="entityName" min-width="160">
             <template #default="{ row }">{{ row.entityName || '-' }}</template>
+          </el-table-column>
+          <el-table-column v-if="testResult.direction === 'CANDIDATE_TO_JOB'" label="公司名称" prop="companyName" min-width="200">
+            <template #default="{ row }">{{ row.companyName || '-' }}</template>
           </el-table-column>
           <el-table-column :label="targetIdLabel" prop="entityId" min-width="160" align="center" />
           <el-table-column label="相似度分数" min-width="160" align="center">
@@ -189,6 +192,218 @@
         </el-descriptions>
       </div>
     </el-card>
+
+    <el-card shadow="hover" class="mb-4">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <div class="section-title">白领 / 蓝领识别规则</div>
+            <div class="section-note">按岗位名称、分类、类型或薪资单位选择精排权重；未命中时使用通用策略</div>
+          </div>
+          <div class="count-tags">
+            <el-button icon="Refresh" :loading="crowdRuleLoading" @click="loadCrowdRules">刷新</el-button>
+            <el-button type="primary" @click="openCrowdRuleDialog()">新增规则</el-button>
+          </div>
+        </div>
+      </template>
+      <el-alert
+        title="规则默认关闭；规则只选择精排权重，不修改岗位、简历、投递和沟通流程。数字越小优先级越高。"
+        type="info"
+        :closable="false"
+        show-icon
+        class="mb-3"
+      />
+      <el-table v-loading="crowdRuleLoading" :data="crowdRules" border stripe>
+        <el-table-column label="策略" width="150">
+          <template #default="{ row }">{{ crowdStrategyLabel(row.strategyCode) }}</template>
+        </el-table-column>
+        <el-table-column label="匹配字段" width="140">
+          <template #default="{ row }">{{ crowdFieldLabel(row.matchField) }}</template>
+        </el-table-column>
+        <el-table-column label="匹配值" prop="matchValues" min-width="300" show-overflow-tooltip />
+        <el-table-column label="优先级" prop="priority" width="90" align="center" />
+        <el-table-column label="说明" prop="description" min-width="220" show-overflow-tooltip />
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row }"><el-tag :type="row.status === '0' ? 'success' : 'info'">{{ row.status === '0' ? '启用' : '停用' }}</el-tag></template>
+        </el-table-column>
+        <el-table-column label="操作" width="90" fixed="right" align="center">
+          <template #default="{ row }"><el-button link type="primary" @click="openCrowdRuleDialog(row)">编辑</el-button></template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-dialog v-model="crowdRuleDialogVisible" :title="crowdRuleForm.ruleId ? '编辑识别规则' : '新增识别规则'" width="620px" append-to-body>
+      <el-form :model="crowdRuleForm" label-width="100px">
+        <el-row :gutter="16">
+          <el-col :span="12"><el-form-item label="人群策略" required><el-select v-model="crowdRuleForm.strategyCode" style="width: 100%"><el-option label="白领/专业技术" value="WHITE_COLLAR" /><el-option label="蓝领/门店" value="BLUE_COLLAR" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="匹配字段" required><el-select v-model="crowdRuleForm.matchField" style="width: 100%"><el-option v-for="item in crowdFieldOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="匹配值" required><el-input v-model="crowdRuleForm.matchValues" type="textarea" :rows="3" maxlength="1000" placeholder="多个值使用中文或英文逗号分隔" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="优先级"><el-input-number v-model="crowdRuleForm.priority" :min="0" :max="100000" style="width: 100%" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="状态"><el-radio-group v-model="crowdRuleForm.status"><el-radio value="0">启用</el-radio><el-radio value="1">停用</el-radio></el-radio-group></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="运营说明"><el-input v-model="crowdRuleForm.description" type="textarea" :rows="2" maxlength="300" /></el-form-item></el-col>
+        </el-row>
+      </el-form>
+      <template #footer><el-button @click="crowdRuleDialogVisible = false">取消</el-button><el-button type="primary" :loading="crowdRuleSaving" @click="saveCrowdRule">保存</el-button></template>
+    </el-dialog>
+
+    <el-card shadow="hover" class="mb-4">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <div class="section-title">人岗精排动态权重</div>
+            <div class="section-note">仅调整新精排层，首页流量排序与现有招聘流程不受影响</div>
+          </div>
+          <el-tag :type="rerankModeTagType">精排模式 {{ rerankConfig?.mode || 'OFF' }}</el-tag>
+        </div>
+      </template>
+      <el-alert
+        title="四项权重之和必须等于 1；产业标签分来自管理员为岗位维护的南京标签。"
+        type="info"
+        :closable="false"
+        show-icon
+        class="mb-3"
+      />
+      <el-form v-loading="rerankLoading" :model="rerankForm" label-width="110px">
+        <el-form-item label="人群策略">
+          <el-radio-group v-model="rerankStrategy" @change="loadRerankWeights">
+            <el-radio-button value="GENERAL">通用</el-radio-button>
+            <el-radio-button value="WHITE_COLLAR">白领/专业技术</el-radio-button>
+            <el-radio-button value="BLUE_COLLAR">蓝领/门店</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-row :gutter="18">
+          <el-col v-for="item in rerankWeightItems" :key="item.key" :xs="24" :sm="12" :lg="6">
+            <el-form-item :label="item.label">
+              <el-input-number
+                v-model="rerankForm[item.key]"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                :precision="2"
+                controls-position="right"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <div class="test-actions">
+          <el-button type="primary" :loading="rerankSaving" :disabled="!rerankWeightValid" @click="saveRerankWeights">
+            保存权重
+          </el-button>
+          <span class="test-hint">当前合计 {{ rerankWeightTotal.toFixed(2) }}，配置版本 {{ rerankConfig?.version || 0 }}</span>
+        </div>
+      </el-form>
+    </el-card>
+
+    <el-card shadow="hover" class="mb-4">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <div class="section-title">南京私有产业关联图谱</div>
+            <div class="section-note">维护六大产业节点和一跳互通关系；只影响精排产业分，不修改招聘主数据</div>
+          </div>
+          <div class="count-tags">
+            <el-button icon="Refresh" :loading="graphLoading" @click="loadIndustryGraph">刷新</el-button>
+            <el-button v-if="graphTab === 'nodes'" type="primary" @click="openNodeDialog()">新增节点</el-button>
+            <el-button v-else type="primary" @click="openEdgeDialog()">新增关系</el-button>
+          </div>
+        </div>
+      </template>
+      <el-alert
+        title="图谱默认关闭；节点或关系修改后只刷新服务端缓存，开启 SHADOW/ON 前不会改变当前排序。"
+        type="info"
+        :closable="false"
+        show-icon
+        class="mb-3"
+      />
+      <el-tabs v-model="graphTab">
+        <el-tab-pane label="产业节点" name="nodes">
+          <el-form :inline="true" class="mb-3">
+            <el-form-item label="节点类型">
+              <el-select v-model="graphQuery.nodeType" clearable placeholder="全部" style="width: 180px" @change="loadGraphNodes">
+                <el-option v-for="item in graphNodeTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="关键词">
+              <el-input v-model="graphQuery.keyword" clearable placeholder="节点名称或编码" @keyup.enter="loadGraphNodes" />
+            </el-form-item>
+            <el-form-item><el-button type="primary" icon="Search" @click="loadGraphNodes">查询</el-button></el-form-item>
+          </el-form>
+          <el-table v-loading="graphLoading" :data="graphNodes" border stripe max-height="520">
+            <el-table-column label="节点名称" prop="nodeName" min-width="150" />
+            <el-table-column label="编码" prop="nodeCode" min-width="180" />
+            <el-table-column label="类型" width="130">
+              <template #default="{ row }">{{ graphNodeTypeLabel(row.nodeType) }}</template>
+            </el-table-column>
+            <el-table-column label="所属赛道" prop="trackCode" min-width="150">
+              <template #default="{ row }">{{ row.trackCode || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="关键词" prop="matchKeywords" min-width="260" show-overflow-tooltip />
+            <el-table-column label="状态" width="90" align="center">
+              <template #default="{ row }"><el-tag :type="row.status === '0' ? 'success' : 'info'">{{ row.status === '0' ? '启用' : '停用' }}</el-tag></template>
+            </el-table-column>
+            <el-table-column label="版本" prop="dataVersion" width="80" align="center" />
+            <el-table-column label="操作" width="90" fixed="right" align="center">
+              <template #default="{ row }"><el-button link type="primary" @click="openNodeDialog(row)">编辑</el-button></template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+        <el-tab-pane label="上下游与互通关系" name="edges">
+          <el-table v-loading="graphLoading" :data="graphEdges" border stripe max-height="520">
+            <el-table-column label="来源节点" prop="sourceNodeName" min-width="150" />
+            <el-table-column label="关系" width="130" align="center">
+              <template #default="{ row }">{{ graphRelationLabel(row.relationType) }}</template>
+            </el-table-column>
+            <el-table-column label="目标节点" prop="targetNodeName" min-width="150" />
+            <el-table-column label="权重" prop="relationWeight" width="90" align="center" />
+            <el-table-column label="方向" width="100" align="center">
+              <template #default="{ row }">{{ row.bidirectional === '1' ? '双向' : '单向' }}</template>
+            </el-table-column>
+            <el-table-column label="跳数" prop="maxHops" width="80" align="center" />
+            <el-table-column label="关系依据" prop="reason" min-width="260" show-overflow-tooltip />
+            <el-table-column label="状态" width="90" align="center">
+              <template #default="{ row }"><el-tag :type="row.status === '0' ? 'success' : 'info'">{{ row.status === '0' ? '启用' : '停用' }}</el-tag></template>
+            </el-table-column>
+            <el-table-column label="操作" width="90" fixed="right" align="center">
+              <template #default="{ row }"><el-button link type="primary" @click="openEdgeDialog(row)">编辑</el-button></template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+      </el-tabs>
+    </el-card>
+
+    <el-dialog v-model="nodeDialogVisible" :title="nodeForm.nodeId ? '编辑产业节点' : '新增产业节点'" width="680px" append-to-body>
+      <el-form :model="nodeForm" label-width="100px">
+        <el-row :gutter="16">
+          <el-col :span="12"><el-form-item label="节点名称" required><el-input v-model="nodeForm.nodeName" maxlength="100" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="节点编码" required><el-input v-model="nodeForm.nodeCode" maxlength="64" placeholder="大写字母、数字、下划线" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="节点类型" required><el-select v-model="nodeForm.nodeType" style="width: 100%"><el-option v-for="item in graphNodeTypeOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="上级节点"><el-select v-model="nodeForm.parentId" clearable filterable style="width: 100%"><el-option v-for="item in graphNodeOptions" :key="String(item.value)" :label="item.label" :value="item.value" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="所属赛道"><el-input v-model="nodeForm.trackCode" maxlength="64" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="排序"><el-input-number v-model="nodeForm.sortOrder" :min="0" :max="100000" style="width: 100%" /></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="匹配关键词"><el-input v-model="nodeForm.matchKeywords" type="textarea" :rows="2" maxlength="1000" placeholder="使用逗号分隔" /></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="运营说明"><el-input v-model="nodeForm.description" type="textarea" :rows="2" maxlength="500" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="状态"><el-radio-group v-model="nodeForm.status"><el-radio value="0">启用</el-radio><el-radio value="1">停用</el-radio></el-radio-group></el-form-item></el-col>
+        </el-row>
+      </el-form>
+      <template #footer><el-button @click="nodeDialogVisible = false">取消</el-button><el-button type="primary" :loading="graphSaving" @click="saveGraphNode">保存</el-button></template>
+    </el-dialog>
+
+    <el-dialog v-model="edgeDialogVisible" :title="edgeForm.edgeId ? '编辑产业关系' : '新增产业关系'" width="680px" append-to-body>
+      <el-form :model="edgeForm" label-width="100px">
+        <el-row :gutter="16">
+          <el-col :span="12"><el-form-item label="来源节点" required><el-select v-model="edgeForm.sourceNodeId" filterable style="width: 100%"><el-option v-for="item in graphNodeOptions" :key="`s-${item.value}`" :label="item.label" :value="item.value" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="目标节点" required><el-select v-model="edgeForm.targetNodeId" filterable style="width: 100%"><el-option v-for="item in graphNodeOptions" :key="`t-${item.value}`" :label="item.label" :value="item.value" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="关系类型" required><el-select v-model="edgeForm.relationType" style="width: 100%"><el-option v-for="item in graphRelationOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="关系权重" required><el-input-number v-model="edgeForm.relationWeight" :min="0" :max="1" :step="0.05" :precision="2" style="width: 100%" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="匹配方向"><el-radio-group v-model="edgeForm.bidirectional"><el-radio value="1">双向</el-radio><el-radio value="0">单向</el-radio></el-radio-group></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="最大跳数"><el-input-number v-model="edgeForm.maxHops" :min="1" :max="2" style="width: 100%" /></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="关系依据"><el-input v-model="edgeForm.reason" type="textarea" :rows="3" maxlength="500" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="状态"><el-radio-group v-model="edgeForm.status"><el-radio value="0">启用</el-radio><el-radio value="1">停用</el-radio></el-radio-group></el-form-item></el-col>
+        </el-row>
+      </el-form>
+      <template #footer><el-button @click="edgeDialogVisible = false">取消</el-button><el-button type="primary" :loading="graphSaving" @click="saveGraphEdge">保存</el-button></template>
+    </el-dialog>
 
     <el-card v-if="canManageOffline" shadow="hover" class="mb-4">
       <template #header>
@@ -373,19 +588,39 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { useUserStore } from '@/store/modules/user';
 import {
   cancelRecommendationRefreshTask,
+  createRecommendationCrowdRule,
+  createIndustryGraphEdge,
+  createIndustryGraphNode,
   createRecommendationRefreshTask,
   getRecommendationMemoryStatus,
   getRecommendationDiagnosticsOverview,
+  getRecommendationRerankWeights,
+  listIndustryGraphEdges,
+  listIndustryGraphNodes,
+  listRecommendationCrowdRules,
   listRecommendationOutbox,
   listRecommendationRefreshTasks,
   pauseRecommendationRefreshTask,
   resumeRecommendationRefreshTask,
   runRecommendationSearchTest,
+  updateRecommendationRerankWeights,
+  updateRecommendationCrowdRule,
+  updateIndustryGraphEdge,
+  updateIndustryGraphNode,
+  type IndustryGraphEdge,
+  type IndustryGraphNode,
+  type IndustryGraphNodeType,
+  type IndustryGraphRelationType,
   type OutboxStatus,
   type RecommendationDirection,
+  type RecommendationCrowdStrategy,
+  type RecommendationCrowdMatchField,
+  type RecommendationCrowdRule,
   type RecommendationDiagnosticsOverview,
   type RecommendationMemoryStatusRequest,
   type RecommendationMemoryStatusResult,
+  type RecommendationRerankWeightConfig,
+  type RecommendationRerankWeightRequest,
   type RecommendationRefreshTaskRequest,
   type RecommendationRefreshTaskRow,
   type RecommendationRefreshTaskStatus,
@@ -403,11 +638,26 @@ const testLoading = ref(false);
 const memoryLoading = ref(false);
 const taskLoading = ref(false);
 const taskCreating = ref(false);
+const rerankLoading = ref(false);
+const rerankSaving = ref(false);
+const graphLoading = ref(false);
+const graphSaving = ref(false);
+const crowdRuleLoading = ref(false);
+const crowdRuleSaving = ref(false);
 const overview = ref<RecommendationDiagnosticsOverview>();
 const outboxRows = ref<RecommendationOutboxRow[]>([]);
 const total = ref(0);
 const testResult = ref<RecommendationSearchTestResult>();
 const memoryResult = ref<RecommendationMemoryStatusResult>();
+const rerankConfig = ref<RecommendationRerankWeightConfig>();
+const graphNodes = ref<IndustryGraphNode[]>([]);
+const graphAllNodes = ref<IndustryGraphNode[]>([]);
+const graphEdges = ref<IndustryGraphEdge[]>([]);
+const crowdRules = ref<RecommendationCrowdRule[]>([]);
+const graphTab = ref<'nodes' | 'edges'>('nodes');
+const nodeDialogVisible = ref(false);
+const edgeDialogVisible = ref(false);
+const crowdRuleDialogVisible = ref(false);
 const testFormRef = ref<FormInstance>();
 const memoryFormRef = ref<FormInstance>();
 const refreshFormRef = ref<FormInstance>();
@@ -449,6 +699,46 @@ const refreshForm = reactive<RecommendationRefreshTaskRequest>({
 const refreshTasks = ref<RecommendationRefreshTaskRow[]>([]);
 const refreshTaskTotal = ref(0);
 const refreshTaskQuery = reactive({ pageNum: 1, pageSize: 10 });
+const rerankForm = reactive<RecommendationRerankWeightRequest>({
+  strategyCode: 'GENERAL',
+  vectorWeight: 0.45,
+  localWeight: 0.2,
+  industryWeight: 0.2,
+  salaryWeight: 0.15
+});
+const rerankStrategy = ref<RecommendationCrowdStrategy>('GENERAL');
+const crowdFieldOptions: Array<{ label: string; value: RecommendationCrowdMatchField }> = [
+  { label: '岗位名称', value: 'JOB_NAME' },
+  { label: '岗位分类', value: 'CATEGORY' },
+  { label: '岗位类型', value: 'JOB_TYPE' },
+  { label: '薪资单位', value: 'SALARY_UNIT' }
+];
+const graphQuery = reactive<{ nodeType: IndustryGraphNodeType | ''; keyword: string }>({ nodeType: '', keyword: '' });
+const graphNodeTypeOptions: Array<{ label: string; value: IndustryGraphNodeType }> = [
+  { label: '核心赛道', value: 'TRACK' },
+  { label: '产业链环节', value: 'CHAIN_STAGE' },
+  { label: '配套服务', value: 'SUPPORT_SERVICE' },
+  { label: '岗位族', value: 'POSITION_FAMILY' },
+  { label: '技能能力', value: 'CAPABILITY' }
+];
+const graphRelationOptions: Array<{ label: string; value: IndustryGraphRelationType }> = [
+  { label: '上游', value: 'UPSTREAM' },
+  { label: '下游', value: 'DOWNSTREAM' },
+  { label: '相邻环节', value: 'ADJACENT_STAGE' },
+  { label: '配套服务', value: 'SUPPORT_SERVICE' },
+  { label: '技能可迁移', value: 'SKILL_TRANSFER' },
+  { label: '跨产业互通', value: 'CROSS_TRACK' }
+];
+const nodeForm = reactive<IndustryGraphNode>(emptyGraphNode());
+const edgeForm = reactive<IndustryGraphEdge>(emptyGraphEdge());
+const crowdRuleForm = reactive<RecommendationCrowdRule>(emptyCrowdRule());
+type RerankWeightKey = 'vectorWeight' | 'localWeight' | 'industryWeight' | 'salaryWeight';
+const rerankWeightItems: Array<{ key: RerankWeightKey; label: string }> = [
+  { key: 'vectorWeight', label: '向量相似度' },
+  { key: 'localWeight', label: '南京本地化' },
+  { key: 'industryWeight', label: '产业标签' },
+  { key: 'salaryWeight', label: '薪资匹配' }
+];
 
 const testRules: FormRules = {
   direction: [{ required: true, message: '请选择检索方向', trigger: 'change' }],
@@ -475,9 +765,10 @@ const refreshRules: FormRules = {
 
 const sourceCodeLabel = computed(() => (testForm.direction === 'CANDIDATE_TO_JOB' ? '求职者编号' : '岗位编号'));
 const sourceCodePlaceholder = computed(() => (testForm.direction === 'CANDIDATE_TO_JOB' ? '如 SKR-...' : '如 JOB-...'));
-// 结果列以实际返回方向为准，避免检索完成后切换单选项导致旧结果标题错位。
+// 结果列以实际返回方向为准，避免检索完成后切换单选项导致旧结果标题或名称语义错位。
 const resultDirection = computed(() => testResult.value?.direction || testForm.direction);
 const targetCodeLabel = computed(() => (resultDirection.value === 'CANDIDATE_TO_JOB' ? '岗位编号' : '求职者编号'));
+const targetNameLabel = computed(() => (resultDirection.value === 'CANDIDATE_TO_JOB' ? '岗位名称' : '求职者姓名'));
 const targetIdLabel = computed(() => (resultDirection.value === 'CANDIDATE_TO_JOB' ? '岗位 ID' : '求职者用户 ID'));
 const memoryCodeLabel = computed(() => (memoryForm.direction === 'CANDIDATE_TO_JOB' ? '求职者编号' : '岗位编号'));
 const memoryCodePlaceholder = computed(() => (memoryForm.direction === 'CANDIDATE_TO_JOB' ? '如 SKR-...' : '如 JOB-...'));
@@ -489,6 +780,20 @@ const canManageOffline = computed(
   () => userStore.permissions.includes('*:*:*') || userStore.permissions.includes('recruitment:recommendation:offline-refresh')
 );
 const canCreateRefreshTask = computed(() => Boolean(overview.value?.offlineRolloutReady) && !taskCreating.value);
+const rerankWeightTotal = computed(
+  () => rerankForm.vectorWeight + rerankForm.localWeight + rerankForm.industryWeight + rerankForm.salaryWeight
+);
+const rerankWeightValid = computed(() => Math.abs(rerankWeightTotal.value - 1) < 0.0001 && !rerankSaving.value);
+const rerankModeTagType = computed<TagType>(() => {
+  if (rerankConfig.value?.mode === 'ON') return 'success';
+  if (rerankConfig.value?.mode === 'SHADOW') return 'warning';
+  return 'info';
+});
+const graphNodeOptions = computed(() =>
+  graphAllNodes.value
+    .filter((node) => node.status === '0' && String(node.nodeId || '') !== String(nodeForm.nodeId || ''))
+    .map((node) => ({ label: `${node.nodeName}（${node.nodeCode}）`, value: node.nodeId as number | string }))
+);
 
 // 灰度检查完全使用后端返回的非敏感状态，浏览器不推断也不接触 MQ、ES 或内部令牌配置。
 const offlineReadinessItems = computed(() => [
@@ -622,7 +927,221 @@ async function loadOutbox() {
 
 async function refreshAll() {
   await loadOverview();
-  await Promise.all([loadOutbox(), canManageOffline.value ? loadRefreshTasks() : Promise.resolve()]);
+  await Promise.all([
+    loadOutbox(),
+    loadRerankWeights(),
+    loadCrowdRules(),
+    loadIndustryGraph(),
+    canManageOffline.value ? loadRefreshTasks() : Promise.resolve()
+  ]);
+}
+
+async function loadRerankWeights() {
+  rerankLoading.value = true;
+  try {
+    const response: any = await getRecommendationRerankWeights(rerankStrategy.value);
+    const data = response.data as RecommendationRerankWeightConfig;
+    rerankConfig.value = data;
+    rerankForm.strategyCode = rerankStrategy.value;
+    rerankForm.vectorWeight = Number(data.vectorWeight);
+    rerankForm.localWeight = Number(data.localWeight);
+    rerankForm.industryWeight = Number(data.industryWeight);
+    rerankForm.salaryWeight = Number(data.salaryWeight);
+  } finally {
+    rerankLoading.value = false;
+  }
+}
+
+async function saveRerankWeights() {
+  if (!rerankWeightValid.value) {
+    ElMessage.warning('四项权重之和必须等于 1');
+    return;
+  }
+  rerankSaving.value = true;
+  try {
+    const response: any = await updateRecommendationRerankWeights({ ...rerankForm, strategyCode: rerankStrategy.value });
+    rerankConfig.value = response.data;
+    ElMessage.success('精排权重已更新');
+  } finally {
+    rerankSaving.value = false;
+  }
+}
+
+function emptyCrowdRule(): RecommendationCrowdRule {
+  return {
+    strategyCode: 'WHITE_COLLAR',
+    matchField: 'JOB_NAME',
+    matchValues: '',
+    priority: 100,
+    status: '0',
+    description: ''
+  };
+}
+
+async function loadCrowdRules() {
+  crowdRuleLoading.value = true;
+  try {
+    const response: any = await listRecommendationCrowdRules();
+    crowdRules.value = response.data || [];
+  } finally {
+    crowdRuleLoading.value = false;
+  }
+}
+
+function openCrowdRuleDialog(row?: RecommendationCrowdRule) {
+  Object.assign(crowdRuleForm, emptyCrowdRule(), row || {});
+  crowdRuleDialogVisible.value = true;
+}
+
+async function saveCrowdRule() {
+  if (!crowdRuleForm.matchValues.trim()) {
+    ElMessage.warning('请填写匹配值');
+    return;
+  }
+  crowdRuleSaving.value = true;
+  try {
+    const payload: RecommendationCrowdRule = {
+      ...crowdRuleForm,
+      matchValues: crowdRuleForm.matchValues.trim()
+    };
+    delete payload.ruleId;
+    if (crowdRuleForm.ruleId) await updateRecommendationCrowdRule(crowdRuleForm.ruleId, payload);
+    else await createRecommendationCrowdRule(payload);
+    crowdRuleDialogVisible.value = false;
+    ElMessage.success('人群识别规则已保存');
+    await loadCrowdRules();
+  } finally {
+    crowdRuleSaving.value = false;
+  }
+}
+
+function crowdStrategyLabel(strategy: RecommendationCrowdStrategy) {
+  if (strategy === 'WHITE_COLLAR') return '白领/专业技术';
+  if (strategy === 'BLUE_COLLAR') return '蓝领/门店';
+  return '通用';
+}
+
+function crowdFieldLabel(field: RecommendationCrowdMatchField) {
+  return crowdFieldOptions.find((item) => item.value === field)?.label || field;
+}
+
+function emptyGraphNode(): IndustryGraphNode {
+  return {
+    nodeCode: '',
+    nodeName: '',
+    nodeType: 'CHAIN_STAGE',
+    parentId: undefined,
+    trackCode: '',
+    matchKeywords: '',
+    description: '',
+    sortOrder: 0,
+    status: '0'
+  };
+}
+
+function emptyGraphEdge(): IndustryGraphEdge {
+  return {
+    sourceNodeId: '',
+    targetNodeId: '',
+    relationType: 'ADJACENT_STAGE',
+    relationWeight: 0.7,
+    bidirectional: '1',
+    maxHops: 1,
+    reason: '',
+    status: '0'
+  };
+}
+
+async function loadIndustryGraph() {
+  graphLoading.value = true;
+  try {
+    const [nodeResponse, edgeResponse]: any[] = await Promise.all([
+      listIndustryGraphNodes(),
+      listIndustryGraphEdges()
+    ]);
+    graphNodes.value = nodeResponse.data || [];
+    graphAllNodes.value = nodeResponse.data || [];
+    graphEdges.value = edgeResponse.data || [];
+  } finally {
+    graphLoading.value = false;
+  }
+}
+
+async function loadGraphNodes() {
+  graphLoading.value = true;
+  try {
+    const response: any = await listIndustryGraphNodes({
+      nodeType: graphQuery.nodeType,
+      keyword: graphQuery.keyword.trim()
+    });
+    graphNodes.value = response.data || [];
+  } finally {
+    graphLoading.value = false;
+  }
+}
+
+function openNodeDialog(row?: IndustryGraphNode) {
+  Object.assign(nodeForm, emptyGraphNode(), row || {});
+  nodeDialogVisible.value = true;
+}
+
+function openEdgeDialog(row?: IndustryGraphEdge) {
+  Object.assign(edgeForm, emptyGraphEdge(), row || {});
+  edgeDialogVisible.value = true;
+}
+
+async function saveGraphNode() {
+  if (!nodeForm.nodeName.trim() || !nodeForm.nodeCode.trim()) {
+    ElMessage.warning('请填写节点名称和编码');
+    return;
+  }
+  graphSaving.value = true;
+  try {
+    const payload: IndustryGraphNode = { ...nodeForm, nodeCode: nodeForm.nodeCode.trim().toUpperCase() };
+    delete payload.nodeId;
+    delete payload.dataVersion;
+    if (nodeForm.nodeId) await updateIndustryGraphNode(nodeForm.nodeId, payload);
+    else await createIndustryGraphNode(payload);
+    nodeDialogVisible.value = false;
+    ElMessage.success('产业节点已保存');
+    await loadIndustryGraph();
+  } finally {
+    graphSaving.value = false;
+  }
+}
+
+async function saveGraphEdge() {
+  if (!edgeForm.sourceNodeId || !edgeForm.targetNodeId) {
+    ElMessage.warning('请选择来源节点和目标节点');
+    return;
+  }
+  if (String(edgeForm.sourceNodeId) === String(edgeForm.targetNodeId)) {
+    ElMessage.warning('来源节点和目标节点不能相同');
+    return;
+  }
+  graphSaving.value = true;
+  try {
+    const payload: IndustryGraphEdge = { ...edgeForm };
+    delete payload.edgeId;
+    delete payload.sourceNodeName;
+    delete payload.targetNodeName;
+    delete payload.dataVersion;
+    if (edgeForm.edgeId) await updateIndustryGraphEdge(edgeForm.edgeId, payload);
+    else await createIndustryGraphEdge(payload);
+    edgeDialogVisible.value = false;
+    ElMessage.success('产业关系已保存');
+    await loadIndustryGraph();
+  } finally {
+    graphSaving.value = false;
+  }
+}
+
+function graphNodeTypeLabel(type: IndustryGraphNodeType) {
+  return graphNodeTypeOptions.find((item) => item.value === type)?.label || type;
+}
+
+function graphRelationLabel(type: IndustryGraphRelationType) {
+  return graphRelationOptions.find((item) => item.value === type)?.label || type;
 }
 
 function handleQuery() {

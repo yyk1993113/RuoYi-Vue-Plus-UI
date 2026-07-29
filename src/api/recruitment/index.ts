@@ -84,6 +84,22 @@ export interface JobVO {
   settlementCreateTime?: string;
 }
 
+/** 南京产业标签仅供运营后台人工标注，不并入现有岗位列表返回结构。 */
+export interface NanjingIndustryTagOptionVO {
+  tagId: number | string;
+  tagCode: string;
+  tagName: string;
+  tagType: 'REGION' | 'INDUSTRY';
+  district?: string;
+  description?: string;
+}
+
+export interface JobNanjingTagAssignmentVO {
+  jobId: number | string;
+  jobName?: string;
+  tagIds: Array<number | string>;
+}
+
 // 岗位完整字段 VO（运营台审核详情用）。
 // 数据来源：后端 AdminJobDetailController.getJobFullDetail
 //   (GET /admin/recruitment/jobDetail/{jobId}) → com.ruoyi.project.domain.vo.JobFullVO。
@@ -1175,6 +1191,11 @@ export function getCompany(companyId: number | string) {
   return request.get<any>(`${baseUrl}/company/${companyId}`);
 }
 
+// 企业组织同步由招聘后端签名后直连 OA；前端不持有 OA 共享密钥。
+export function syncCompanyOrganizationToOa(companyId: number | string) {
+  return request.post<any>(`${baseUrl}/company-department/${companyId}/sync-oa`);
+}
+
 // 企业详情/编辑按企业范围解析资质 OSS id，避免依赖系统文件管理权限。
 export function listCompanyMaterials(companyId: number | string, ossIds: string) {
   return request.get<any>(`${baseUrl}/company/${companyId}/materials/${ossIds}`);
@@ -1375,6 +1396,19 @@ export function listUsers(params?: { pageNum?: number; pageSize?: number; userNa
 
 export function listJob(query: JobQuery) {
   return request.get<any>(`${baseUrl}/job/list`, { params: query });
+}
+
+/** 独立查询南京产业标签，不改变岗位列表接口。 */
+export function listNanjingIndustryTags() {
+  return request.get<NanjingIndustryTagOptionVO[]>(`${baseUrl}/nanjing-tags`);
+}
+
+export function getJobNanjingIndustryTags(jobId: number | string) {
+  return request.get<JobNanjingTagAssignmentVO>(`${baseUrl}/nanjing-tags/jobs/${jobId}`);
+}
+
+export function updateJobNanjingIndustryTags(jobId: number | string, tagIds: Array<number | string>) {
+  return request.put<JobNanjingTagAssignmentVO>(`${baseUrl}/nanjing-tags/jobs/${jobId}`, { tagIds });
 }
 
 export function getJob(jobId: number) {
