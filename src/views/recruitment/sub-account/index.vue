@@ -2028,8 +2028,12 @@ function normalizeInvoiceSubjectNames(values: unknown): string[] {
 function validateInvoiceSubjectNames(names: string[]): string {
   if (names.length > 20) return '结算开票科目不能超过20个';
   if (names.some((name) => name.length > 100)) return '单个结算开票科目不能超过100个字符';
-  if (JSON.stringify(names).length > 500) return '结算开票科目总长度不能超过500个字符';
+  if (JSON.stringify(names).length > 3000) return '结算开票科目总长度不能超过3000个字符';
   return '';
+}
+
+function resolveGlobalSettingsSaveError(error: any): string {
+  return error?.response?.data?.msg || error?.response?.data?.message || error?.message || '全局设置保存失败，请稍后重试';
 }
 
 function applyGlobalSettings(data: Partial<SettlementGlobalSettings>) {
@@ -2060,7 +2064,10 @@ async function openGlobalSettings() {
 }
 
 async function submitGlobalSettings() {
-  if (globalSettingsSubmitting.value) return;
+  if (globalSettingsSubmitting.value) {
+    ElMessage.info('全局设置正在保存，请稍候');
+    return;
+  }
   if (!globalSettingsFormRef.value) {
     ElMessage.error('全局设置表单尚未加载完成，请关闭后重新打开');
     return;
@@ -2078,6 +2085,7 @@ async function submitGlobalSettings() {
     return;
   }
   globalSettingsSubmitting.value = true;
+  ElMessage.info('正在保存全局设置...');
   try {
     await updateSettlementGlobalSettings({
       commissionRate: globalSettingsForm.commissionRate,
@@ -2093,7 +2101,7 @@ async function submitGlobalSettings() {
     ElMessage.success('全局设置已保存并生效');
     await loadData();
   } catch (error: any) {
-    ElMessage.error(error?.message || '全局设置保存失败，请稍后重试');
+    ElMessage.error(resolveGlobalSettingsSaveError(error));
   } finally {
     globalSettingsSubmitting.value = false;
   }

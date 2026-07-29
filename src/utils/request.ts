@@ -78,7 +78,7 @@ service.interceptors.request.use(
     // 是否需要防止数据重复提交
     const isRepeatSubmit = config.headers?.repeatSubmit === false;
     // 是否需要加密
-    const isEncrypt = config.headers?.isEncrypt === 'true';
+    const isEncrypt = config.headers?.isEncrypt === true || config.headers?.isEncrypt === 'true';
 
     if (getToken() && !isToken) {
       config.headers['Authorization'] = 'Bearer ' + getToken(); // 让每个请求携带自定义token 请根据实际情况自行修改
@@ -156,7 +156,7 @@ service.interceptors.response.use(
     // 未设置状态码则默认成功状态
     const code = res.data.code || HttpStatus.SUCCESS;
     // 获取错误信息
-    const msg = errorCode[code] || res.data.msg || errorCode['default'];
+    const msg = res.data.msg || errorCode[code] || errorCode['default'];
     // 二进制数据则直接返回
     if (res.request.responseType === 'blob' || res.request.responseType === 'arraybuffer') {
       return res.data;
@@ -177,7 +177,7 @@ service.interceptors.response.use(
       if (!(res.config as any)?.silent) {
         ElNotification.error({ title: msg });
       }
-      return Promise.reject('error');
+      return Promise.reject(new Error(msg));
     } else {
       return Promise.resolve(res.data);
     }

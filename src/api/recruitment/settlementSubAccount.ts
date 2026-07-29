@@ -285,12 +285,7 @@ export function updateSettlementGlobalSettings(data: SettlementGlobalSettingsReq
     url: `${baseUrl}/global-settings`,
     method: 'put',
     headers: { isEncrypt: true },
-    silent: true,
     data
-  } as any).catch((error: any) => {
-    if (!isMissingEndpoint(error)) throw error;
-    // 旧后端只能更新抽佣；结算账户仍读取既有招行测试配置，重启新后端后即可保存完整全局规则。
-    return updateSettlementCommissionRate(data.commissionRate);
   });
 }
 
