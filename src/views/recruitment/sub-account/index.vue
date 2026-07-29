@@ -275,7 +275,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="结算账户设置" width="125" align="center">
+        <el-table-column label="结算通道配置" width="125" align="center">
           <template #default="{ row }">
             <el-button
               v-if="row.status === 'APPROVED' && row.openingStatus === 'SUCCESS'"
@@ -426,7 +426,7 @@
                       v-hasPermi="['settlement:subAccount:config']"
                       command="paymentAccounts"
                       icon="CreditCard"
-                      >结算账户设置</el-dropdown-item
+                      >结算通道配置</el-dropdown-item
                     >
                     <el-dropdown-item v-hasPermi="['settlement:subAccount:decrypt']" command="account" icon="View">查看完整账号</el-dropdown-item>
                     <el-dropdown-item
@@ -1265,7 +1265,7 @@
 
     <el-dialog
       v-model="paymentAccountVisible"
-      :title="`${paymentAccountTarget?.companyName || ''} · 结算账户设置`"
+      :title="`${paymentAccountTarget?.companyName || ''} · 结算通道配置`"
       width="min(1360px, 94vw)"
       append-to-body
       destroy-on-close
@@ -3298,7 +3298,7 @@ async function submitPaymentAccounts() {
       defaultAccountId: paymentAccountDefaultId.value,
       allowMultipleMainAccounts: paymentAccountAllowMultiple.value
     });
-    ElMessage.success('结算账户设置已提交，银行确认后企业端即可选择');
+    ElMessage.success('结算通道配置已提交，银行确认后企业端即可选择');
     paymentAccountVisible.value = false;
   } finally {
     paymentAccountSubmitting.value = false;
@@ -3325,7 +3325,7 @@ function paymentAccountDisplayStatus(row: SettlementPaymentAccount) {
 // 后端只返回已脱敏的异常；正常和未绑定状态不追加干扰信息。
 function paymentAccountStatusDetail(row: SettlementPaymentAccount) {
   if (paymentAccountDisplayStatus(row) !== 'ERROR') return '';
-  const message = String(row.syncMessage || '').trim();
+  const message = settlementAccountName(row.syncMessage).trim();
   const code = String(row.syncCode || '').trim();
   if (message && code && !message.includes(code)) return `${message}（返回码：${code}）`;
   return message || (code ? `银行返回码：${code}` : '银行未返回明确的绑定结果');
