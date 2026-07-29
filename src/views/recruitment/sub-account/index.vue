@@ -1298,7 +1298,7 @@
               />
             </template>
           </el-table-column>
-          <el-table-column label="结算名称" min-width="180">
+          <el-table-column label="开户行" min-width="180">
             <template #default="{ row }">
               <div class="payment-account-name-cell">
                 <span
@@ -1404,7 +1404,7 @@
                 <el-option
                   v-for="item in paymentAccountRows"
                   :key="String(item.accountId)"
-                  :label="`${settlementAccountName(item.accountName) || '结算名称待补充'}（${item.subjectCompanyName || '结算企业待补充'}）`"
+                  :label="`${settlementAccountName(item.accountName) || '开户行待补充'}（${item.subjectCompanyName || '结算企业待补充'}）`"
                   :value="String(item.accountId)"
                 />
                 <el-option label="新增结算账户" :value="NEW_PAYMENT_ACCOUNT_ID" />
@@ -1414,8 +1414,8 @@
               >
             </div>
           </el-form-item>
-          <el-form-item label="结算名称">
-            <el-input v-model="paymentAccountEditor.accountName" maxlength="64" placeholder="请输入结算名称" />
+          <el-form-item label="开户行">
+            <el-input v-model="paymentAccountEditor.accountName" maxlength="64" placeholder="请输入开户行" />
           </el-form-item>
           <el-form-item label="结算企业">
             <el-input v-model="paymentAccountEditor.subjectCompanyName" maxlength="100" placeholder="请输入结算企业名称" />
@@ -3160,7 +3160,7 @@ function validatePaymentAccountProfile(
   draft: { accountName: string; subjectCompanyName: string; contactName: string; contactPhone: string },
   requirePhone: boolean
 ) {
-  if (!draft.accountName) return '请输入结算名称';
+  if (!draft.accountName) return '请输入开户行';
   if (!draft.subjectCompanyName) return '请输入结算企业名称';
   if (!draft.contactName) return '请输入联系人';
   if (requirePhone && !draft.contactPhone) return '请输入联系人联系方式';
@@ -3242,7 +3242,7 @@ async function confirmDeletePaymentAccount(row: SettlementPaymentAccount) {
   if (!paymentAccountTarget.value) return;
   const accountId = String(row.accountId);
   const confirmed = await ElMessageBox.confirm(
-    `确认删除结算账户“${settlementAccountName(row.accountName) || '未填写结算名称'}”吗？删除后该账户将不再显示，且不可直接恢复。`,
+    `确认删除结算账户“${settlementAccountName(row.accountName) || '未填写开户行'}”吗？删除后该账户将不再显示，且不可直接恢复。`,
     '删除结算账户',
     {
       type: 'warning',
@@ -3290,7 +3290,7 @@ async function submitPaymentAccounts() {
     const incompleteAccount = selectedPaymentAccountMissingProfile();
     if (incompleteAccount) {
       return ElMessage.warning(
-        `请先完善结算账户“${settlementAccountName(incompleteAccount.accountName) || '结算名称待补充'}”的结算名称与结算企业资料`
+        `请先完善结算账户“${settlementAccountName(incompleteAccount.accountName) || '开户行待补充'}”的开户行与结算企业资料`
       );
     }
     await assignSettlementPaymentAccounts(paymentAccountTarget.value.applicationId, {
