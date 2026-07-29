@@ -103,6 +103,8 @@ export interface SettlementGlobalSettingsRequest {
   allowMultipleMainAccounts: boolean;
   /** 运营后台统一维护的企业结算开票科目列表；空数组表示清空。 */
   invoiceSubjectNames: string[];
+  /** 兼容尚未更新的后端进程，多个科目使用顿号拼接。 */
+  invoiceSubjectName?: string;
 }
 
 export interface SettlementMainAccountSettings {

@@ -1867,9 +1867,8 @@ const commissionRateRules: FormRules = {
   invoiceSubjectNames: [{
     validator: (_rule, value, callback) => {
       const names = normalizeInvoiceSubjectNames(value);
-      if (names.length > 20) return callback(new Error('结算开票科目不能超过20个'));
-      if (names.some((name) => name.length > 100)) return callback(new Error('单个结算开票科目不能超过100个字符'));
-      if (JSON.stringify(names).length > 500) return callback(new Error('结算开票科目总长度不能超过500个字符'));
+      const message = validateInvoiceSubjectNames(names);
+      if (message) return callback(new Error(message));
       callback();
     },
     trigger: 'change'
@@ -2026,6 +2025,13 @@ function normalizeInvoiceSubjectNames(values: unknown): string[] {
   return [...new Set(values.map((item) => String(item || '').trim()).filter(Boolean))];
 }
 
+function validateInvoiceSubjectNames(names: string[]): string {
+  if (names.length > 20) return '结算开票科目不能超过20个';
+  if (names.some((name) => name.length > 100)) return '单个结算开票科目不能超过100个字符';
+  if (JSON.stringify(names).length > 500) return '结算开票科目总长度不能超过500个字符';
+  return '';
+}
+
 function applyGlobalSettings(data: Partial<SettlementGlobalSettings>) {
   globalCommissionRate.value = Number(data.globalCommissionRate ?? 5);
   globalMainAccountNoMasked.value = data.globalMainAccountNoMasked || '';
@@ -2054,16 +2060,31 @@ async function openGlobalSettings() {
 }
 
 async function submitGlobalSettings() {
-  if (!globalSettingsFormRef.value) return;
+  if (globalSettingsSubmitting.value) return;
+  if (!globalSettingsFormRef.value) {
+    ElMessage.error('全局设置表单尚未加载完成，请关闭后重新打开');
+    return;
+  }
+  const invoiceSubjectNames = normalizeInvoiceSubjectNames(globalSettingsForm.invoiceSubjectNames);
+  globalSettingsForm.invoiceSubjectNames = invoiceSubjectNames;
+  const subjectValidationMessage = validateInvoiceSubjectNames(invoiceSubjectNames);
+  if (subjectValidationMessage) {
+    ElMessage.warning(subjectValidationMessage);
+    return;
+  }
   const valid = await globalSettingsFormRef.value.validate().catch(() => false);
-  if (!valid) return;
+  if (!valid) {
+    ElMessage.warning('请检查全局设置中标红的内容');
+    return;
+  }
   globalSettingsSubmitting.value = true;
   try {
     await updateSettlementGlobalSettings({
       commissionRate: globalSettingsForm.commissionRate,
       mainAccountNo: globalSettingsForm.mainAccountNo.trim() || undefined,
       allowMultipleMainAccounts: globalSettingsForm.allowMultipleMainAccounts,
-      invoiceSubjectNames: normalizeInvoiceSubjectNames(globalSettingsForm.invoiceSubjectNames)
+      invoiceSubjectNames,
+      invoiceSubjectName: invoiceSubjectNames.join('、')
     });
     // 结算账户查询接口只返回掩码；保存后以后台回读结果确认当前生效配置。
     const refreshed: any = await getSettlementGlobalSettings();
@@ -2071,6 +2092,8 @@ async function submitGlobalSettings() {
     globalSettingsVisible.value = false;
     ElMessage.success('全局设置已保存并生效');
     await loadData();
+  } catch (error: any) {
+    ElMessage.error(error?.message || '全局设置保存失败，请稍后重试');
   } finally {
     globalSettingsSubmitting.value = false;
   }
