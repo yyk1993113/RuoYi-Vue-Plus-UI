@@ -136,6 +136,31 @@ export interface RecommendationCrowdRule {
   description?: string;
 }
 
+export interface RecommendationCompanyTierRule {
+  ruleId?: number | string;
+  companyId?: number | string;
+  tierCode: 'L1' | 'L2' | 'L3' | 'L4';
+  tierName: string;
+  scoreBoost: number;
+  diversityBucket?: string;
+  reason?: string;
+  status: '0' | '1';
+}
+
+export interface RecommendationUniversityColdStartRule {
+  ruleId?: number | string;
+  universityName: string;
+  universityTier: 'A' | 'B' | 'C' | 'D';
+  matchKeywords: string;
+  preferredKeywords?: string;
+  parkKeywords?: string;
+  baseBoost: number;
+  industryBoost: number;
+  parkBoost: number;
+  reason?: string;
+  status: '0' | '1';
+}
+
 export type RecommendationRerankWeightRequest = Pick<
   RecommendationRerankWeightConfig,
   'vectorWeight' | 'localWeight' | 'industryWeight' | 'salaryWeight'
@@ -231,6 +256,7 @@ export function getRecommendationRerankWeights(strategyCode: RecommendationCrowd
 
 const industryGraphUrl = '/admin/recommendation/industry-graph';
 const crowdRuleUrl = '/admin/recommendation/crowd-rules';
+const localRuleUrl = '/admin/recommendation/local-rules';
 
 export function listRecommendationCrowdRules() {
   return request.get<RecommendationCrowdRule[]>(crowdRuleUrl);
@@ -242,6 +268,30 @@ export function createRecommendationCrowdRule(data: RecommendationCrowdRule) {
 
 export function updateRecommendationCrowdRule(ruleId: number | string, data: RecommendationCrowdRule) {
   return request.put<void>(`${crowdRuleUrl}/${ruleId}`, data);
+}
+
+export function listRecommendationCompanyTierRules() {
+  return request.get<RecommendationCompanyTierRule[]>(`${localRuleUrl}/company-tiers`);
+}
+
+export function createRecommendationCompanyTierRule(data: RecommendationCompanyTierRule) {
+  return request.post<void>(`${localRuleUrl}/company-tiers`, data);
+}
+
+export function updateRecommendationCompanyTierRule(ruleId: number | string, data: RecommendationCompanyTierRule) {
+  return request.put<void>(`${localRuleUrl}/company-tiers/${ruleId}`, data);
+}
+
+export function listRecommendationUniversityColdStartRules() {
+  return request.get<RecommendationUniversityColdStartRule[]>(`${localRuleUrl}/universities`);
+}
+
+export function createRecommendationUniversityColdStartRule(data: RecommendationUniversityColdStartRule) {
+  return request.post<void>(`${localRuleUrl}/universities`, data);
+}
+
+export function updateRecommendationUniversityColdStartRule(ruleId: number | string, data: RecommendationUniversityColdStartRule) {
+  return request.put<void>(`${localRuleUrl}/universities/${ruleId}`, data);
 }
 
 export function listIndustryGraphNodes(params?: { nodeType?: IndustryGraphNodeType | ''; keyword?: string }) {

@@ -250,6 +250,117 @@
       <template #header>
         <div class="card-header">
           <div>
+            <div class="section-title">南京本地企业四级分层</div>
+            <div class="section-note">按企业 ID 维护推荐增益；只写推荐旁路表，不修改企业资料和岗位状态</div>
+          </div>
+          <div class="count-tags">
+            <el-button icon="Refresh" :loading="companyTierLoading" @click="loadCompanyTierRules">刷新</el-button>
+            <el-button type="primary" @click="openCompanyTierDialog()">新增企业分层</el-button>
+          </div>
+        </div>
+      </template>
+      <el-alert
+        title="企业分层默认关闭；开启后只是精排小幅增益，不会改变岗位发布、审核、投递流程。"
+        type="info"
+        :closable="false"
+        show-icon
+        class="mb-3"
+      />
+      <el-table v-loading="companyTierLoading" :data="companyTierRules" border stripe>
+        <el-table-column label="企业ID" prop="companyId" width="140" align="center" />
+        <el-table-column label="层级" width="190">
+          <template #default="{ row }">{{ companyTierLabel(row.tierCode) }}</template>
+        </el-table-column>
+        <el-table-column label="层级名称" prop="tierName" min-width="150" />
+        <el-table-column label="精排增益" prop="scoreBoost" width="110" align="center" />
+        <el-table-column label="多样性分桶" prop="diversityBucket" min-width="130">
+          <template #default="{ row }">{{ row.diversityBucket || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="维护依据" prop="reason" min-width="240" show-overflow-tooltip />
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row }"><el-tag :type="row.status === '0' ? 'success' : 'info'">{{ row.status === '0' ? '启用' : '停用' }}</el-tag></template>
+        </el-table-column>
+        <el-table-column label="操作" width="90" fixed="right" align="center">
+          <template #default="{ row }"><el-button link type="primary" @click="openCompanyTierDialog(row)">编辑</el-button></template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-dialog v-model="companyTierDialogVisible" :title="companyTierForm.ruleId ? '编辑企业分层' : '新增企业分层'" width="640px" append-to-body>
+      <el-form :model="companyTierForm" label-width="110px">
+        <el-row :gutter="16">
+          <el-col :span="12"><el-form-item label="企业ID" required><el-input-number v-model="companyTierForm.companyId" :min="1" controls-position="right" style="width: 100%" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="企业层级" required><el-select v-model="companyTierForm.tierCode" style="width: 100%"><el-option label="L1 南京重点/专精特新" value="L1" /><el-option label="L2 园区规上重点" value="L2" /><el-option label="L3 普通中小企业" value="L3" /><el-option label="L4 小微/门店企业" value="L4" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="层级名称" required><el-input v-model="companyTierForm.tierName" maxlength="64" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="精排增益" required><el-input-number v-model="companyTierForm.scoreBoost" :min="0" :max="0.2" :step="0.01" :precision="2" style="width: 100%" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="分桶"><el-input v-model="companyTierForm.diversityBucket" maxlength="32" placeholder="可选，预留给打散" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="状态"><el-radio-group v-model="companyTierForm.status"><el-radio value="0">启用</el-radio><el-radio value="1">停用</el-radio></el-radio-group></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="维护依据"><el-input v-model="companyTierForm.reason" type="textarea" :rows="2" maxlength="500" /></el-form-item></el-col>
+        </el-row>
+      </el-form>
+      <template #footer><el-button @click="companyTierDialogVisible = false">取消</el-button><el-button type="primary" :loading="companyTierSaving" @click="saveCompanyTierRule">保存</el-button></template>
+    </el-dialog>
+
+    <el-card shadow="hover" class="mb-4">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <div class="section-title">南京高校应届生冷启动规则</div>
+            <div class="section-note">用已有教育经历文本识别高校，不新增简历必填项，不改变求职者端提交流程</div>
+          </div>
+          <div class="count-tags">
+            <el-button icon="Refresh" :loading="universityRuleLoading" @click="loadUniversityRules">刷新</el-button>
+            <el-button type="primary" @click="openUniversityRuleDialog()">新增高校规则</el-button>
+          </div>
+        </div>
+      </template>
+      <el-alert
+        title="高校冷启动默认关闭；开启后只对工作年限较短、命中南京高校关键词的简历叠加精排增益。"
+        type="info"
+        :closable="false"
+        show-icon
+        class="mb-3"
+      />
+      <el-table v-loading="universityRuleLoading" :data="universityRules" border stripe>
+        <el-table-column label="高校" prop="universityName" min-width="150" />
+        <el-table-column label="层级" prop="universityTier" width="80" align="center" />
+        <el-table-column label="匹配关键词" prop="matchKeywords" min-width="230" show-overflow-tooltip />
+        <el-table-column label="优势关键词" prop="preferredKeywords" min-width="250" show-overflow-tooltip />
+        <el-table-column label="园区关键词" prop="parkKeywords" min-width="180" show-overflow-tooltip />
+        <el-table-column label="基础/产业/园区" width="150" align="center">
+          <template #default="{ row }">{{ row.baseBoost }}/{{ row.industryBoost }}/{{ row.parkBoost }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row }"><el-tag :type="row.status === '0' ? 'success' : 'info'">{{ row.status === '0' ? '启用' : '停用' }}</el-tag></template>
+        </el-table-column>
+        <el-table-column label="操作" width="90" fixed="right" align="center">
+          <template #default="{ row }"><el-button link type="primary" @click="openUniversityRuleDialog(row)">编辑</el-button></template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-dialog v-model="universityRuleDialogVisible" :title="universityRuleForm.ruleId ? '编辑高校规则' : '新增高校规则'" width="720px" append-to-body>
+      <el-form :model="universityRuleForm" label-width="110px">
+        <el-row :gutter="16">
+          <el-col :span="12"><el-form-item label="高校名称" required><el-input v-model="universityRuleForm.universityName" maxlength="100" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="高校层级" required><el-select v-model="universityRuleForm.universityTier" style="width: 100%"><el-option label="A 头部优势高校" value="A" /><el-option label="B 本地重点高校" value="B" /><el-option label="C 应用型高校" value="C" /><el-option label="D 其他维护高校" value="D" /></el-select></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="匹配关键词" required><el-input v-model="universityRuleForm.matchKeywords" type="textarea" :rows="2" maxlength="1000" placeholder="如 南京大学,南大,NJU" /></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="优势关键词"><el-input v-model="universityRuleForm.preferredKeywords" type="textarea" :rows="2" maxlength="1000" placeholder="岗位、产业或技能关键词，逗号分隔" /></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="园区关键词"><el-input v-model="universityRuleForm.parkKeywords" type="textarea" :rows="2" maxlength="1000" placeholder="如 软件谷,江北新区,南京经开区" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="基础增益"><el-input-number v-model="universityRuleForm.baseBoost" :min="0" :max="0.2" :step="0.01" :precision="2" style="width: 100%" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="产业增益"><el-input-number v-model="universityRuleForm.industryBoost" :min="0" :max="0.2" :step="0.01" :precision="2" style="width: 100%" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="园区增益"><el-input-number v-model="universityRuleForm.parkBoost" :min="0" :max="0.2" :step="0.01" :precision="2" style="width: 100%" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="状态"><el-radio-group v-model="universityRuleForm.status"><el-radio value="0">启用</el-radio><el-radio value="1">停用</el-radio></el-radio-group></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="维护依据"><el-input v-model="universityRuleForm.reason" type="textarea" :rows="2" maxlength="500" /></el-form-item></el-col>
+        </el-row>
+      </el-form>
+      <template #footer><el-button @click="universityRuleDialogVisible = false">取消</el-button><el-button type="primary" :loading="universityRuleSaving" @click="saveUniversityRule">保存</el-button></template>
+    </el-dialog>
+
+    <el-card shadow="hover" class="mb-4">
+      <template #header>
+        <div class="card-header">
+          <div>
             <div class="section-title">人岗精排动态权重</div>
             <div class="section-note">仅调整新精排层，首页流量排序与现有招聘流程不受影响</div>
           </div>
@@ -305,7 +416,7 @@
           <div class="count-tags">
             <el-button icon="Refresh" :loading="graphLoading" @click="loadIndustryGraph">刷新</el-button>
             <el-button v-if="graphTab === 'nodes'" type="primary" @click="openNodeDialog()">新增节点</el-button>
-            <el-button v-else type="primary" @click="openEdgeDialog()">新增关系</el-button>
+            <el-button v-else-if="graphTab === 'edges'" type="primary" @click="openEdgeDialog()">新增关系</el-button>
           </div>
         </div>
       </template>
@@ -316,7 +427,13 @@
         show-icon
         class="mb-3"
       />
-      <el-tabs v-model="graphTab">
+      <el-tabs v-model="graphTab" @tab-change="handleGraphTabChange">
+        <el-tab-pane label="气泡关系图" name="chart">
+          <div class="graph-chart-toolbar mb-3">
+            <span class="section-note">气泡越大代表连接关系越多；线越粗代表关系权重越高。</span>
+          </div>
+          <div ref="industryGraphChartRef" class="industry-graph-chart"></div>
+        </el-tab-pane>
         <el-tab-pane label="产业节点" name="nodes">
           <el-form :inline="true" class="mb-3">
             <el-form-item label="节点类型">
@@ -582,37 +699,45 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import type { FormInstance, FormRules, TagProps } from 'element-plus';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import * as echarts from 'echarts';
 import { useUserStore } from '@/store/modules/user';
 import {
   cancelRecommendationRefreshTask,
+  createRecommendationCompanyTierRule,
   createRecommendationCrowdRule,
   createIndustryGraphEdge,
   createIndustryGraphNode,
   createRecommendationRefreshTask,
+  createRecommendationUniversityColdStartRule,
   getRecommendationMemoryStatus,
   getRecommendationDiagnosticsOverview,
   getRecommendationRerankWeights,
   listIndustryGraphEdges,
   listIndustryGraphNodes,
+  listRecommendationCompanyTierRules,
   listRecommendationCrowdRules,
   listRecommendationOutbox,
   listRecommendationRefreshTasks,
+  listRecommendationUniversityColdStartRules,
   pauseRecommendationRefreshTask,
   resumeRecommendationRefreshTask,
   runRecommendationSearchTest,
+  updateRecommendationCompanyTierRule,
   updateRecommendationRerankWeights,
   updateRecommendationCrowdRule,
   updateIndustryGraphEdge,
   updateIndustryGraphNode,
+  updateRecommendationUniversityColdStartRule,
   type IndustryGraphEdge,
   type IndustryGraphNode,
   type IndustryGraphNodeType,
   type IndustryGraphRelationType,
   type OutboxStatus,
   type RecommendationDirection,
+  type RecommendationCompanyTierRule,
   type RecommendationCrowdStrategy,
   type RecommendationCrowdMatchField,
   type RecommendationCrowdRule,
@@ -627,7 +752,8 @@ import {
   type RecommendationOutboxQuery,
   type RecommendationOutboxRow,
   type RecommendationSearchTestRequest,
-  type RecommendationSearchTestResult
+  type RecommendationSearchTestResult,
+  type RecommendationUniversityColdStartRule
 } from '@/api/recruitment/recommendationDiagnostics';
 
 type TagType = TagProps['type'];
@@ -644,6 +770,10 @@ const graphLoading = ref(false);
 const graphSaving = ref(false);
 const crowdRuleLoading = ref(false);
 const crowdRuleSaving = ref(false);
+const companyTierLoading = ref(false);
+const companyTierSaving = ref(false);
+const universityRuleLoading = ref(false);
+const universityRuleSaving = ref(false);
 const overview = ref<RecommendationDiagnosticsOverview>();
 const outboxRows = ref<RecommendationOutboxRow[]>([]);
 const total = ref(0);
@@ -654,15 +784,21 @@ const graphNodes = ref<IndustryGraphNode[]>([]);
 const graphAllNodes = ref<IndustryGraphNode[]>([]);
 const graphEdges = ref<IndustryGraphEdge[]>([]);
 const crowdRules = ref<RecommendationCrowdRule[]>([]);
-const graphTab = ref<'nodes' | 'edges'>('nodes');
+const companyTierRules = ref<RecommendationCompanyTierRule[]>([]);
+const universityRules = ref<RecommendationUniversityColdStartRule[]>([]);
+const graphTab = ref<'chart' | 'nodes' | 'edges'>('chart');
 const nodeDialogVisible = ref(false);
 const edgeDialogVisible = ref(false);
 const crowdRuleDialogVisible = ref(false);
+const companyTierDialogVisible = ref(false);
+const universityRuleDialogVisible = ref(false);
 const testFormRef = ref<FormInstance>();
 const memoryFormRef = ref<FormInstance>();
 const refreshFormRef = ref<FormInstance>();
 const queryFormRef = ref<FormInstance>();
+const industryGraphChartRef = ref<HTMLDivElement>();
 const userStore = useUserStore();
+let industryGraphChart: echarts.ECharts | null = null;
 
 const query = reactive<RecommendationOutboxQuery>({
   pageNum: 1,
@@ -732,6 +868,8 @@ const graphRelationOptions: Array<{ label: string; value: IndustryGraphRelationT
 const nodeForm = reactive<IndustryGraphNode>(emptyGraphNode());
 const edgeForm = reactive<IndustryGraphEdge>(emptyGraphEdge());
 const crowdRuleForm = reactive<RecommendationCrowdRule>(emptyCrowdRule());
+const companyTierForm = reactive<RecommendationCompanyTierRule>(emptyCompanyTierRule());
+const universityRuleForm = reactive<RecommendationUniversityColdStartRule>(emptyUniversityRule());
 type RerankWeightKey = 'vectorWeight' | 'localWeight' | 'industryWeight' | 'salaryWeight';
 const rerankWeightItems: Array<{ key: RerankWeightKey; label: string }> = [
   { key: 'vectorWeight', label: '向量相似度' },
@@ -794,6 +932,8 @@ const graphNodeOptions = computed(() =>
     .filter((node) => node.status === '0' && String(node.nodeId || '') !== String(nodeForm.nodeId || ''))
     .map((node) => ({ label: `${node.nodeName}（${node.nodeCode}）`, value: node.nodeId as number | string }))
 );
+
+const graphPalette = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#13C2C2', '#9B59B6', '#64748B'];
 
 // 灰度检查完全使用后端返回的非敏感状态，浏览器不推断也不接触 MQ、ES 或内部令牌配置。
 const offlineReadinessItems = computed(() => [
@@ -931,6 +1071,8 @@ async function refreshAll() {
     loadOutbox(),
     loadRerankWeights(),
     loadCrowdRules(),
+    loadCompanyTierRules(),
+    loadUniversityRules(),
     loadIndustryGraph(),
     canManageOffline.value ? loadRefreshTasks() : Promise.resolve()
   ]);
@@ -975,6 +1117,33 @@ function emptyCrowdRule(): RecommendationCrowdRule {
     priority: 100,
     status: '0',
     description: ''
+  };
+}
+
+function emptyCompanyTierRule(): RecommendationCompanyTierRule {
+  return {
+    companyId: undefined,
+    tierCode: 'L3',
+    tierName: '普通中小企业',
+    scoreBoost: 0.02,
+    diversityBucket: '',
+    reason: '',
+    status: '0'
+  };
+}
+
+function emptyUniversityRule(): RecommendationUniversityColdStartRule {
+  return {
+    universityName: '',
+    universityTier: 'B',
+    matchKeywords: '',
+    preferredKeywords: '',
+    parkKeywords: '',
+    baseBoost: 0.03,
+    industryBoost: 0.03,
+    parkBoost: 0.02,
+    reason: '',
+    status: '0'
   };
 }
 
@@ -1025,6 +1194,91 @@ function crowdFieldLabel(field: RecommendationCrowdMatchField) {
   return crowdFieldOptions.find((item) => item.value === field)?.label || field;
 }
 
+async function loadCompanyTierRules() {
+  companyTierLoading.value = true;
+  try {
+    const response: any = await listRecommendationCompanyTierRules();
+    companyTierRules.value = response.data || [];
+  } finally {
+    companyTierLoading.value = false;
+  }
+}
+
+function openCompanyTierDialog(row?: RecommendationCompanyTierRule) {
+  Object.assign(companyTierForm, emptyCompanyTierRule(), row || {});
+  companyTierDialogVisible.value = true;
+}
+
+async function saveCompanyTierRule() {
+  if (!companyTierForm.companyId || !companyTierForm.tierName.trim()) {
+    ElMessage.warning('请填写企业ID和层级名称');
+    return;
+  }
+  companyTierSaving.value = true;
+  try {
+    const payload: RecommendationCompanyTierRule = {
+      ...companyTierForm,
+      tierName: companyTierForm.tierName.trim()
+    };
+    delete payload.ruleId;
+    if (companyTierForm.ruleId) await updateRecommendationCompanyTierRule(companyTierForm.ruleId, payload);
+    else await createRecommendationCompanyTierRule(payload);
+    companyTierDialogVisible.value = false;
+    ElMessage.success('企业分层规则已保存');
+    await loadCompanyTierRules();
+  } finally {
+    companyTierSaving.value = false;
+  }
+}
+
+async function loadUniversityRules() {
+  universityRuleLoading.value = true;
+  try {
+    const response: any = await listRecommendationUniversityColdStartRules();
+    universityRules.value = response.data || [];
+  } finally {
+    universityRuleLoading.value = false;
+  }
+}
+
+function openUniversityRuleDialog(row?: RecommendationUniversityColdStartRule) {
+  Object.assign(universityRuleForm, emptyUniversityRule(), row || {});
+  universityRuleDialogVisible.value = true;
+}
+
+async function saveUniversityRule() {
+  if (!universityRuleForm.universityName.trim() || !universityRuleForm.matchKeywords.trim()) {
+    ElMessage.warning('请填写高校名称和匹配关键词');
+    return;
+  }
+  universityRuleSaving.value = true;
+  try {
+    const payload: RecommendationUniversityColdStartRule = {
+      ...universityRuleForm,
+      universityName: universityRuleForm.universityName.trim(),
+      matchKeywords: universityRuleForm.matchKeywords.trim()
+    };
+    delete payload.ruleId;
+    if (universityRuleForm.ruleId) await updateRecommendationUniversityColdStartRule(universityRuleForm.ruleId, payload);
+    else await createRecommendationUniversityColdStartRule(payload);
+    universityRuleDialogVisible.value = false;
+    ElMessage.success('高校冷启动规则已保存');
+    await loadUniversityRules();
+  } finally {
+    universityRuleSaving.value = false;
+  }
+}
+
+function companyTierLabel(value: RecommendationCompanyTierRule['tierCode']) {
+  const labels: Record<RecommendationCompanyTierRule['tierCode'], string> = {
+    L1: 'L1 南京重点/专精特新',
+    L2: 'L2 园区规上重点',
+    L3: 'L3 普通中小企业',
+    L4: 'L4 小微/门店企业'
+  };
+  return labels[value] || value;
+}
+
 function emptyGraphNode(): IndustryGraphNode {
   return {
     nodeCode: '',
@@ -1062,6 +1316,7 @@ async function loadIndustryGraph() {
     graphNodes.value = nodeResponse.data || [];
     graphAllNodes.value = nodeResponse.data || [];
     graphEdges.value = edgeResponse.data || [];
+    renderIndustryGraphChart();
   } finally {
     graphLoading.value = false;
   }
@@ -1078,6 +1333,122 @@ async function loadGraphNodes() {
   } finally {
     graphLoading.value = false;
   }
+}
+
+function handleGraphTabChange() {
+  renderIndustryGraphChart();
+}
+
+function renderIndustryGraphChart() {
+  if (graphTab.value !== 'chart') return;
+  nextTick(() => {
+    const el = industryGraphChartRef.value;
+    if (!el) return;
+    if (!industryGraphChart) industryGraphChart = echarts.init(el);
+
+    const enabledNodes = graphAllNodes.value.filter((node) => node.status === '0');
+    const enabledEdges = graphEdges.value.filter((edge) => edge.status === '0');
+    const degreeMap = new Map<string, number>();
+    enabledEdges.forEach((edge) => {
+      const source = String(edge.sourceNodeId || '');
+      const target = String(edge.targetNodeId || '');
+      if (source) degreeMap.set(source, (degreeMap.get(source) || 0) + 1);
+      if (target) degreeMap.set(target, (degreeMap.get(target) || 0) + 1);
+    });
+
+    const categories = buildGraphCategories(enabledNodes);
+    const categoryIndex = new Map(categories.map((item, index) => [item.name, index]));
+    const nodes = enabledNodes.map((node) => {
+      const degree = degreeMap.get(String(node.nodeId)) || 0;
+      const track = node.trackCode || node.nodeCode || '未分组';
+      return {
+        id: String(node.nodeId),
+        name: node.nodeName,
+        value: degree,
+        category: categoryIndex.get(track) || 0,
+        symbolSize: Math.min(72, 30 + degree * 8),
+        draggable: true,
+        label: { show: degree >= 2 || node.nodeType === 'TRACK' },
+        itemStyle: {
+          color: graphPalette[(categoryIndex.get(track) || 0) % graphPalette.length]
+        },
+        tooltip: {
+          formatter: `${node.nodeName}<br/>编码：${node.nodeCode}<br/>类型：${graphNodeTypeLabel(node.nodeType)}<br/>连接：${degree}`
+        }
+      };
+    });
+    const links = enabledEdges.map((edge) => {
+      const weight = Number(edge.relationWeight || 0);
+      return {
+        source: String(edge.sourceNodeId),
+        target: String(edge.targetNodeId),
+        value: weight,
+        label: { show: false, formatter: graphRelationLabel(edge.relationType) },
+        lineStyle: {
+          width: Math.max(1, weight * 5),
+          curveness: edge.bidirectional === '1' ? 0.12 : 0.22,
+          opacity: 0.72
+        },
+        tooltip: {
+          formatter: `${edge.sourceNodeName || edge.sourceNodeId} → ${edge.targetNodeName || edge.targetNodeId}<br/>关系：${graphRelationLabel(edge.relationType)}<br/>权重：${weight}`
+        }
+      };
+    });
+
+    industryGraphChart.setOption({
+      color: graphPalette,
+      tooltip: { trigger: 'item' },
+      legend: {
+        top: 0,
+        left: 'center',
+        type: 'scroll',
+        data: categories.map((item) => item.name)
+      },
+      series: [
+        {
+          type: 'graph',
+          layout: 'force',
+          roam: true,
+          categories,
+          data: nodes,
+          links,
+          top: 48,
+          bottom: 16,
+          left: 16,
+          right: 16,
+          force: {
+            repulsion: 280,
+            edgeLength: [90, 180],
+            gravity: 0.08
+          },
+          edgeSymbol: ['none', 'arrow'],
+          edgeSymbolSize: 8,
+          label: {
+            position: 'right',
+            color: '#303133',
+            fontSize: 12
+          },
+          emphasis: {
+            focus: 'adjacency',
+            lineStyle: { width: 4 }
+          },
+          lineStyle: {
+            color: 'source'
+          }
+        }
+      ]
+    });
+    industryGraphChart.resize();
+  });
+}
+
+function buildGraphCategories(nodes: IndustryGraphNode[]) {
+  const names: string[] = [];
+  nodes.forEach((node) => {
+    const name = node.trackCode || node.nodeCode || '未分组';
+    if (!names.includes(name)) names.push(name);
+  });
+  return (names.length ? names : ['未分组']).map((name) => ({ name }));
 }
 
 function openNodeDialog(row?: IndustryGraphNode) {
@@ -1294,7 +1665,20 @@ function resultStatusLabel(value: string) {
   return labels[value] || value || '-';
 }
 
-onMounted(refreshAll);
+function resizeIndustryGraphChart() {
+  industryGraphChart?.resize();
+}
+
+onMounted(() => {
+  refreshAll();
+  window.addEventListener('resize', resizeIndustryGraphChart);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeIndustryGraphChart);
+  industryGraphChart?.dispose();
+  industryGraphChart = null;
+});
 </script>
 
 <style scoped>
@@ -1415,6 +1799,20 @@ onMounted(refreshAll);
   font-size: 12px;
 }
 
+.graph-chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.industry-graph-chart {
+  width: 100%;
+  height: 520px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background: #fff;
+}
+
 @media (max-width: 768px) {
   .hero-content,
   .card-header {
@@ -1431,6 +1829,10 @@ onMounted(refreshAll);
   .memory-action {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .industry-graph-chart {
+    height: 420px;
   }
 }
 </style>
