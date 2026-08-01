@@ -453,7 +453,7 @@
               <template #default="{ row }">{{ graphNodeTypeLabel(row.nodeType) }}</template>
             </el-table-column>
             <el-table-column label="所属赛道" prop="trackCode" min-width="150">
-              <template #default="{ row }">{{ row.trackCode || '-' }}</template>
+              <template #default="{ row }">{{ row.trackCode ? graphTrackLabel(row.trackCode) : '-' }}</template>
             </el-table-column>
             <el-table-column label="关键词" prop="matchKeywords" min-width="260" show-overflow-tooltip />
             <el-table-column label="状态" width="90" align="center">
@@ -1360,20 +1360,21 @@ function renderIndustryGraphChart() {
     const categoryIndex = new Map(categories.map((item, index) => [item.name, index]));
     const nodes = enabledNodes.map((node) => {
       const degree = degreeMap.get(String(node.nodeId)) || 0;
-      const track = node.trackCode || node.nodeCode || '未分组';
+      const trackKey = node.trackCode || (node.nodeType === 'TRACK' ? node.nodeCode : '未分组');
+      const trackName = graphTrackLabel(trackKey);
       return {
         id: String(node.nodeId),
         name: node.nodeName,
         value: degree,
-        category: categoryIndex.get(track) || 0,
+        category: categoryIndex.get(trackName) || 0,
         symbolSize: Math.min(72, 30 + degree * 8),
         draggable: true,
         label: { show: degree >= 2 || node.nodeType === 'TRACK' },
         itemStyle: {
-          color: graphPalette[(categoryIndex.get(track) || 0) % graphPalette.length]
+          color: graphPalette[(categoryIndex.get(trackName) || 0) % graphPalette.length]
         },
         tooltip: {
-          formatter: `${node.nodeName}<br/>编码：${node.nodeCode}<br/>类型：${graphNodeTypeLabel(node.nodeType)}<br/>连接：${degree}`
+          formatter: `${node.nodeName}<br/>编码：${node.nodeCode}<br/>赛道：${trackName}<br/>类型：${graphNodeTypeLabel(node.nodeType)}<br/>连接：${degree}`
         }
       };
     });
@@ -1445,10 +1446,24 @@ function renderIndustryGraphChart() {
 function buildGraphCategories(nodes: IndustryGraphNode[]) {
   const names: string[] = [];
   nodes.forEach((node) => {
-    const name = node.trackCode || node.nodeCode || '未分组';
+    const key = node.trackCode || (node.nodeType === 'TRACK' ? node.nodeCode : '未分组');
+    const name = graphTrackLabel(key);
     if (!names.includes(name)) names.push(name);
   });
   return (names.length ? names : ['未分组']).map((name) => ({ name }));
+}
+
+function graphTrackLabel(trackCode?: string) {
+  const labels: Record<string, string> = {
+    TRACK_IC: '集成电路',
+    TRACK_BIOMED: '生物医药',
+    TRACK_SOFTWARE: '软件信息',
+    TRACK_SMART_MANUFACTURING: '智能制造',
+    TRACK_NEW_ENERGY: '新能源',
+    TRACK_FINANCE: '金融服务'
+  };
+  if (!trackCode) return '未分组';
+  return labels[trackCode] || trackCode;
 }
 
 function openNodeDialog(row?: IndustryGraphNode) {
