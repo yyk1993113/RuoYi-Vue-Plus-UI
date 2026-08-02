@@ -43,6 +43,122 @@
       <template #header>
         <div class="card-header">
           <div>
+            <div class="section-title">推荐功能开关</div>
+            <div class="section-note">保存到系统参数配置；默认关闭，开启后按开关逐步生效，不修改岗位、简历、投递主流程</div>
+          </div>
+          <el-button type="primary" :loading="switchSaving" @click="saveSwitchSettings">保存开关</el-button>
+        </div>
+      </template>
+      <el-alert
+        title="建议上线顺序：先开诊断和在线查询，再把精排设为 SHADOW，确认结果后再改 ON；Outbox / 行为记忆会增加异步事件和 MQ 压力。"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="mb-3"
+      />
+      <el-form v-loading="switchLoading" :model="switchForm" label-width="150px">
+        <el-row :gutter="18">
+          <el-col :xs="24" :lg="12">
+            <el-form-item label="精排模式">
+              <el-radio-group v-model="switchForm.rerankMode">
+                <el-radio-button value="OFF">关闭</el-radio-button>
+                <el-radio-button value="SHADOW">灰度观察</el-radio-button>
+                <el-radio-button value="ON">正式重排</el-radio-button>
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :lg="12">
+            <el-form-item label="事件灰度范围">
+              <el-radio-group v-model="switchForm.rolloutMode">
+                <el-radio-button value="NONE">不写事件</el-radio-button>
+                <el-radio-button value="ALLOWLIST">白名单</el-radio-button>
+                <el-radio-button value="ALL">全量</el-radio-button>
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="18">
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="诊断页面">
+              <el-switch v-model="switchForm.diagnosticsEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="手动测试">
+              <el-switch v-model="switchForm.diagnosticsTestEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="B/C端推荐查询">
+              <el-switch v-model="switchForm.onlineQueryEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="产业图谱">
+              <el-switch v-model="switchForm.industryGraphEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="白领/蓝领策略">
+              <el-switch v-model="switchForm.crowdStrategyEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="增强公式">
+              <el-switch v-model="switchForm.enhancedFormulaEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="企业分层">
+              <el-switch v-model="switchForm.companyTierEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="高校冷启动">
+              <el-switch v-model="switchForm.universityColdStartEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-divider content-position="left">异步向量与行为记忆</el-divider>
+        <el-row :gutter="18">
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="向量事件写入">
+              <el-switch v-model="switchForm.outboxWriteEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="向量MQ发布">
+              <el-switch v-model="switchForm.outboxPublisherEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="行为记忆写入">
+              <el-switch v-model="switchForm.behaviorOutboxWriteEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="行为MQ发布">
+              <el-switch v-model="switchForm.behaviorOutboxPublisherEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="离线刷新任务">
+              <el-switch v-model="switchForm.offlineRefreshEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12" :lg="6">
+            <el-form-item label="离线定时刷新">
+              <el-switch v-model="switchForm.offlineScheduleEnabled" active-text="开启" inactive-text="关闭" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+    </el-card>
+
+    <el-card shadow="hover" class="mb-4">
+      <template #header>
+        <div class="card-header">
+          <div>
             <div class="section-title">单条向量检索测试</div>
             <div class="section-note">只查询已经生成的向量，不修改岗位、简历、Outbox 或 ES 文档</div>
           </div>
@@ -712,6 +828,7 @@ import {
   createIndustryGraphNode,
   createRecommendationRefreshTask,
   createRecommendationUniversityColdStartRule,
+  getRecommendationSwitchSettings,
   getRecommendationMemoryStatus,
   getRecommendationDiagnosticsOverview,
   getRecommendationRerankWeights,
@@ -726,6 +843,7 @@ import {
   resumeRecommendationRefreshTask,
   runRecommendationSearchTest,
   updateRecommendationCompanyTierRule,
+  updateRecommendationSwitchSettings,
   updateRecommendationRerankWeights,
   updateRecommendationCrowdRule,
   updateIndustryGraphEdge,
@@ -746,6 +864,7 @@ import {
   type RecommendationMemoryStatusResult,
   type RecommendationRerankWeightConfig,
   type RecommendationRerankWeightRequest,
+  type RecommendationSwitchSettings,
   type RecommendationRefreshTaskRequest,
   type RecommendationRefreshTaskRow,
   type RecommendationRefreshTaskStatus,
@@ -759,6 +878,8 @@ import {
 type TagType = TagProps['type'];
 
 const overviewLoading = ref(false);
+const switchLoading = ref(false);
+const switchSaving = ref(false);
 const tableLoading = ref(false);
 const testLoading = ref(false);
 const memoryLoading = ref(false);
@@ -831,6 +952,24 @@ const refreshForm = reactive<RecommendationRefreshTaskRequest>({
   refreshMode: 'INCREMENTAL',
   changedAfter: '',
   batchSize: 50
+});
+const switchForm = reactive<RecommendationSwitchSettings>({
+  diagnosticsEnabled: false,
+  diagnosticsTestEnabled: false,
+  onlineQueryEnabled: false,
+  rerankMode: 'OFF',
+  industryGraphEnabled: false,
+  crowdStrategyEnabled: false,
+  enhancedFormulaEnabled: false,
+  companyTierEnabled: false,
+  universityColdStartEnabled: false,
+  rolloutMode: 'NONE',
+  outboxWriteEnabled: false,
+  outboxPublisherEnabled: false,
+  behaviorOutboxWriteEnabled: false,
+  behaviorOutboxPublisherEnabled: false,
+  offlineRefreshEnabled: false,
+  offlineScheduleEnabled: false
 });
 const refreshTasks = ref<RecommendationRefreshTaskRow[]>([]);
 const refreshTaskTotal = ref(0);
@@ -1049,6 +1188,40 @@ async function loadOverview() {
   }
 }
 
+async function loadSwitchSettings() {
+  switchLoading.value = true;
+  try {
+    const response: any = await getRecommendationSwitchSettings();
+    Object.assign(switchForm, response.data || {});
+  } finally {
+    switchLoading.value = false;
+  }
+}
+
+async function saveSwitchSettings() {
+  const risky = switchForm.rerankMode === 'ON' || switchForm.rolloutMode === 'ALL';
+  if (risky) {
+    try {
+      await ElMessageBox.confirm(
+        '你选择了正式重排或全量事件，保存后会影响推荐排序或增加异步处理压力。确认继续吗？',
+        '确认开启推荐能力',
+        { type: 'warning', confirmButtonText: '确认保存', cancelButtonText: '取消' }
+      );
+    } catch {
+      return;
+    }
+  }
+  switchSaving.value = true;
+  try {
+    const response: any = await updateRecommendationSwitchSettings({ ...switchForm });
+    Object.assign(switchForm, response.data || {});
+    ElMessage.success('推荐开关已保存');
+    await Promise.all([loadOverview(), loadRerankWeights()]);
+  } finally {
+    switchSaving.value = false;
+  }
+}
+
 async function loadOutbox() {
   if (!overview.value?.diagnosticsEnabled) {
     outboxRows.value = [];
@@ -1066,7 +1239,7 @@ async function loadOutbox() {
 }
 
 async function refreshAll() {
-  await loadOverview();
+  await Promise.all([loadSwitchSettings(), loadOverview()]);
   await Promise.all([
     loadOutbox(),
     loadRerankWeights(),

@@ -123,6 +123,25 @@ export interface RecommendationRerankWeightConfig {
   mode: 'OFF' | 'SHADOW' | 'ON';
 }
 
+export interface RecommendationSwitchSettings {
+  diagnosticsEnabled: boolean;
+  diagnosticsTestEnabled: boolean;
+  onlineQueryEnabled: boolean;
+  rerankMode: 'OFF' | 'SHADOW' | 'ON';
+  industryGraphEnabled: boolean;
+  crowdStrategyEnabled: boolean;
+  enhancedFormulaEnabled: boolean;
+  companyTierEnabled: boolean;
+  universityColdStartEnabled: boolean;
+  rolloutMode: 'NONE' | 'ALLOWLIST' | 'ALL';
+  outboxWriteEnabled: boolean;
+  outboxPublisherEnabled: boolean;
+  behaviorOutboxWriteEnabled: boolean;
+  behaviorOutboxPublisherEnabled: boolean;
+  offlineRefreshEnabled: boolean;
+  offlineScheduleEnabled: boolean;
+}
+
 export type RecommendationCrowdStrategy = 'GENERAL' | 'WHITE_COLLAR' | 'BLUE_COLLAR';
 export type RecommendationCrowdMatchField = 'JOB_NAME' | 'CATEGORY' | 'JOB_TYPE' | 'SALARY_UNIT';
 
@@ -249,9 +268,18 @@ export function getRecommendationMemoryStatus(data: RecommendationMemoryStatusRe
 }
 
 const rerankWeightUrl = '/admin/recommendation/rerank/weights';
+const switchUrl = '/admin/recommendation/switches';
 
 export function getRecommendationRerankWeights(strategyCode: RecommendationCrowdStrategy = 'GENERAL') {
   return request.get<RecommendationRerankWeightConfig>(rerankWeightUrl, { params: { strategyCode } });
+}
+
+export function getRecommendationSwitchSettings() {
+  return request.get<RecommendationSwitchSettings>(switchUrl);
+}
+
+export function updateRecommendationSwitchSettings(data: RecommendationSwitchSettings) {
+  return request.put<RecommendationSwitchSettings>(switchUrl, data);
 }
 
 const industryGraphUrl = '/admin/recommendation/industry-graph';
