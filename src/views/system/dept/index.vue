@@ -139,7 +139,7 @@
             <el-tooltip v-else :content="scope.row.companyId ? '查看企业完整资料' : '该历史企业节点尚未关联企业主体'" placement="top">
               <el-button link type="primary" icon="View" :disabled="!scope.row.companyId" @click="handleCompanyDetail(scope.row)">查看详情</el-button>
             </el-tooltip>
-            <el-tooltip v-if="isCompanyRoot(scope.row)" content="将企业部门和可登录人员同步到 OA" placement="top">
+            <el-tooltip v-if="isCompanyRoot(scope.row)" content="将企业部门和可登录人员同步到组织机构" placement="top">
               <el-button
                 v-hasPermi="['system:dept:add']"
                 v-hasRole="['superadmin', 'operations_manager', 'operator']"
@@ -150,7 +150,7 @@
                 :disabled="!scope.row.companyId"
                 @click="handleSyncCompanyToOa(scope.row)"
               >
-                同步OA
+                同步组织机构
               </el-button>
             </el-tooltip>
           </template>

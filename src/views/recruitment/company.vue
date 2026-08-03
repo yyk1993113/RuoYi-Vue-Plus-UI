@@ -1080,7 +1080,7 @@ function oaSyncNeedsAction(row: any): boolean {
 }
 
 function oaSyncActionLabel(row: any): string {
-  return String(row?.oaSyncStatus || '').toUpperCase() === 'FAILED' ? '重试同步OA' : '同步OA';
+  return String(row?.oaSyncStatus || '').toUpperCase() === 'FAILED' ? '重试同步组织机构' : '同步组织机构';
 }
 
 interface CertMaterialFile {
@@ -1995,7 +1995,7 @@ async function handleSyncCompanyToOa(row: any) {
   const companyKey = String(companyId ?? '');
   if (!companyId || syncingOaCompanyIds.value.has(companyKey)) return;
   try {
-    await ElMessageBox.confirm(`确认将“${row.companyName || '该企业'}”的组织和人员同步到 OA 吗？`, '同步OA', {
+    await ElMessageBox.confirm(`确认将“${row.companyName || '该企业'}”的组织和人员同步到组织机构吗？`, '同步组织机构', {
       confirmButtonText: '确认同步',
       cancelButtonText: '取消',
       type: 'warning'
