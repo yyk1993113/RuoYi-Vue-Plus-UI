@@ -274,6 +274,15 @@
             <el-tag v-else type="info">正常</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="OA同步" width="125" align="center">
+          <template #default="{ row }">
+            <el-tooltip v-if="row.oaSyncError" :content="row.oaSyncError" placement="top">
+              <el-tag :type="oaSyncStatusMeta(row).type">{{ oaSyncStatusMeta(row).label }}</el-tag>
+            </el-tooltip>
+            <el-tag v-else :type="oaSyncStatusMeta(row).type">{{ oaSyncStatusMeta(row).label }}</el-tag>
+            <div v-if="row.oaSyncTime" class="text-secondary oa-sync-time">{{ row.oaSyncTime }}</div>
+          </template>
+        </el-table-column>
         <el-table-column label="注册时间" prop="createTime" width="160" align="center" />
         <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
@@ -296,12 +305,12 @@
                       <!-- 人员：已认证企业的人员管理入口，置于菜单最上方（行为待接，后端接口待补） -->
                       <el-dropdown-item v-if="row.status === '1'" icon="User" @click="handleStaff(row)">人员</el-dropdown-item>
                       <el-dropdown-item
-                        v-if="['1', '3'].includes(String(row.status)) && canCompanyAudit"
+                        v-if="['1', '3'].includes(String(row.status)) && canCompanyAudit && oaSyncNeedsAction(row)"
                         icon="Connection"
                         :disabled="syncingOaCompanyIds.has(String(row.companyId))"
                         @click="handleSyncCompanyToOa(row)"
                       >
-                        {{ syncingOaCompanyIds.has(String(row.companyId)) ? '同步中...' : '同步OA' }}
+                        {{ syncingOaCompanyIds.has(String(row.companyId)) ? '同步中...' : oaSyncActionLabel(row) }}
                       </el-dropdown-item>
                       <el-dropdown-item v-if="row.status === '0' && canCompanyAudit" icon="CircleCheck" @click="handleAudit(row, '1')">
                         审核通过
@@ -1050,6 +1059,29 @@ const canCompanyAudit = computed(() =>
 const canCompanyChangeStatus = computed(() =>
   hasPermissionOrLegacyRole('recruitment:company:changeStatus', ['superadmin', 'operations_manager', 'operator'])
 );
+
+function oaSyncStatusMeta(row: any): { label: string; type: 'success' | 'warning' | 'danger' | 'info' } {
+  switch (String(row?.oaSyncStatus || '').toUpperCase()) {
+    case 'SUCCESS':
+      return { label: '已同步', type: 'success' };
+    case 'SYNCING':
+      return { label: '同步中', type: 'warning' };
+    case 'FAILED':
+      return { label: '同步失败', type: 'danger' };
+    case 'PENDING':
+      return { label: '待同步', type: 'warning' };
+    default:
+      return { label: '未同步', type: 'info' };
+  }
+}
+
+function oaSyncNeedsAction(row: any): boolean {
+  return String(row?.oaSyncStatus || '').toUpperCase() !== 'SUCCESS';
+}
+
+function oaSyncActionLabel(row: any): string {
+  return String(row?.oaSyncStatus || '').toUpperCase() === 'FAILED' ? '重试同步OA' : '同步OA';
+}
 
 interface CertMaterialFile {
   kind: 'image' | 'doc';
@@ -1975,6 +2007,9 @@ async function handleSyncCompanyToOa(row: any) {
     ElMessage.success(
       `OA同步完成：部门新增${Number(result.departmentCreated || 0)}、更新${Number(result.departmentUpdated || 0)}；人员新增${Number(result.userCreated || 0)}、更新${Number(result.userUpdated || 0)}`
     );
+    await loadData();
+  } catch (error: any) {
+    ElMessage.error(error?.message || 'OA同步失败，请稍后重试');
   } finally {
     const next = new Set(syncingOaCompanyIds.value);
     next.delete(companyKey);
