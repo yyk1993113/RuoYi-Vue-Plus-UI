@@ -305,7 +305,7 @@
                       <!-- 人员：已认证企业的人员管理入口，置于菜单最上方（行为待接，后端接口待补） -->
                       <el-dropdown-item v-if="row.status === '1'" icon="User" @click="handleStaff(row)">人员</el-dropdown-item>
                       <el-dropdown-item
-                        v-if="['1', '3'].includes(String(row.status)) && canCompanyAudit && oaSyncNeedsAction(row)"
+                        v-if="['1', '3'].includes(String(row.status)) && canCompanyChangeStatus && oaSyncNeedsAction(row)"
                         icon="Connection"
                         :disabled="syncingOaCompanyIds.has(String(row.companyId))"
                         @click="handleSyncCompanyToOa(row)"
@@ -1068,6 +1068,8 @@ function oaSyncStatusMeta(row: any): { label: string; type: 'success' | 'warning
       return { label: '同步中', type: 'warning' };
     case 'FAILED':
       return { label: '同步失败', type: 'danger' };
+    case 'PARTIAL':
+      return { label: '需人工核对', type: 'danger' };
     case 'PENDING':
       return { label: '待同步', type: 'warning' };
     default:
@@ -1080,7 +1082,7 @@ function oaSyncNeedsAction(row: any): boolean {
 }
 
 function oaSyncActionLabel(row: any): string {
-  return String(row?.oaSyncStatus || '').toUpperCase() === 'FAILED' ? '重试同步组织机构' : '同步组织机构';
+  return ['FAILED', 'PARTIAL'].includes(String(row?.oaSyncStatus || '').toUpperCase()) ? '核对后重试同步' : '同步组织机构';
 }
 
 interface CertMaterialFile {
@@ -2008,8 +2010,9 @@ async function handleSyncCompanyToOa(row: any) {
   try {
     const response = await syncCompanyOrganizationToOa(companyId);
     const result = response.data || {};
+    const oaResult = result.oa || {};
     ElMessage.success(
-      `OA同步完成：部门新增${Number(result.departmentCreated || 0)}、更新${Number(result.departmentUpdated || 0)}；人员新增${Number(result.userCreated || 0)}、更新${Number(result.userUpdated || 0)}`
+      `OA同步完成：部门新增${Number(oaResult.departmentCreated || 0)}、更新${Number(oaResult.departmentUpdated || 0)}；人员新增${Number(oaResult.userCreated || 0)}、更新${Number(oaResult.userUpdated || 0)}`
     );
     await loadData();
   } catch (error: any) {
