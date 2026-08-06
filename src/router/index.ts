@@ -124,12 +124,12 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         meta: { title: '岗位管理', icon: 'job' }
       },
       {
-        // 后台菜单通过数据库将该页面挂到“岗位管理”下；这里保留同一路由供动态路由加载页面组件。
+        // 后台菜单通过数据库将该页面排在“岗位管理”之后；这里保留同一路由供动态路由加载页面组件。
         path: 'finance-task',
         component: () => import('@/views/recruitment/finance-task.vue'),
         name: 'RecruitmentFinanceTask',
         permissions: ['recruitment:financeTask:list'],
-        meta: { title: '财税任务审核', icon: 'job', activeMenu: '/recruitment/job' }
+        meta: { title: '财税任务审核', icon: 'job' }
       },
       {
         // 代发岗位整页：不在侧栏展示，从「岗位管理」的新增/复制发布入口进入；复制发布走 query.copyFrom=jobId
