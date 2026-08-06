@@ -124,14 +124,6 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         meta: { title: '岗位管理', icon: 'job' }
       },
       {
-        // 后台菜单通过数据库将该页面排在“岗位管理”之后；这里保留同一路由供动态路由加载页面组件。
-        path: 'finance-task',
-        component: () => import('@/views/recruitment/finance-task.vue'),
-        name: 'RecruitmentFinanceTask',
-        permissions: ['recruitment:financeTask:list'],
-        meta: { title: '财税任务审核', icon: 'job' }
-      },
-      {
         // 代发岗位整页：不在侧栏展示，从「岗位管理」的新增/复制发布入口进入；复制发布走 query.copyFrom=jobId
         path: 'job-publish',
         component: () => import('@/views/recruitment/job-publish.vue'),
@@ -183,6 +175,22 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         name: 'RecruitmentPromotionReward',
         permissions: ['recruitment:promotionReward:list'],
         meta: { title: '推广奖励', icon: 'money' }
+      }
+    ]
+  },
+  {
+    path: '/finance',
+    component: Layout,
+    name: 'FinanceManagement',
+    permissions: ['recruitment:financeTask:list'],
+    meta: { title: '财税管理', icon: 'money' },
+    children: [
+      {
+        path: 'finance-task',
+        component: () => import('@/views/recruitment/finance-task.vue'),
+        name: 'FinanceTaskReview',
+        permissions: ['recruitment:financeTask:list'],
+        meta: { title: '财税任务审核', icon: 'job' }
       }
     ]
   }
