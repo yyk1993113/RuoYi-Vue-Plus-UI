@@ -1405,6 +1405,52 @@ export function listJob(query: JobQuery) {
   return request.get<any>(`${baseUrl}/job/list`, { params: query });
 }
 
+// ========== 财税任务审核 ===========
+
+export interface FinanceTaskReviewVO {
+  id?: number;
+  tenantId?: string;
+  sourceSystem?: string;
+  sourceTaskNo?: string;
+  sourceRevision?: string;
+  taskName?: string;
+  taskType?: string;
+  description?: string;
+  workAddress?: string;
+  workStartAt?: string;
+  workEndAt?: string;
+  recruitRequired?: number;
+  pricingMode?: string;
+  budgetAmount?: number | string;
+  currency?: string;
+  salaryUnit?: string;
+  salaryMin?: number | string;
+  salaryMax?: number | string;
+  acceptanceRuleJson?: string;
+  reviewStatus?: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'SUPERSEDED' | string;
+  reviewRemark?: string;
+  reviewUserName?: string;
+  reviewTime?: string;
+  version?: number;
+  createTime?: string;
+}
+
+export interface FinanceTaskReviewQuery {
+  pageNum?: number;
+  pageSize?: number;
+  sourceTaskNo?: string;
+  taskName?: string;
+  taskType?: string;
+  reviewStatus?: string;
+}
+
+export interface FinanceTaskAuditForm {
+  id: number;
+  expectedVersion: number;
+  status: 'APPROVED' | 'REJECTED';
+  remark?: string;
+}
+
 /** 独立查询南京产业标签，不改变岗位列表接口。 */
 export function listNanjingIndustryTags() {
   return request.get<NanjingIndustryTagOptionVO[]>(`${baseUrl}/nanjing-tags`);
@@ -1435,6 +1481,18 @@ export function getJobFullDetail(jobId: number | string) {
 
 export function auditJob(data: { jobId: number; status: string; remark?: string }) {
   return request.post(`${baseUrl}/job/audit`, data);
+}
+
+export function listFinanceTaskReview(query: FinanceTaskReviewQuery) {
+  return request.get<any>(`${baseUrl}/finance-task/list`, { params: query });
+}
+
+export function getFinanceTaskReview(id: number | string) {
+  return request.get<FinanceTaskReviewVO>(`${baseUrl}/finance-task/${id}`);
+}
+
+export function auditFinanceTaskReview(data: FinanceTaskAuditForm) {
+  return request.post(`${baseUrl}/finance-task/audit`, data);
 }
 
 export function batchAuditJob(data: { jobIds: number[]; status: string }) {
