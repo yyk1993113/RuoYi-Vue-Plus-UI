@@ -1413,6 +1413,8 @@ export interface FinanceTaskReviewVO {
   sourceSystem?: string;
   sourceTaskNo?: string;
   sourceRevision?: string;
+  syncUserId?: string;
+  syncUserName?: string;
   taskName?: string;
   taskType?: string;
   description?: string;

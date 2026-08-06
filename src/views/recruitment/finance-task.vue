@@ -64,6 +64,8 @@
         <el-descriptions v-if="currentTask" :column="2" border>
           <el-descriptions-item label="来源任务号">{{ currentTask.sourceTaskNo || '-' }}</el-descriptions-item>
           <el-descriptions-item label="来源版本">{{ currentTask.sourceRevision || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="财税推送人">{{ currentTask.syncUserName || currentTask.syncUserId || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="接收时间">{{ currentTask.createTime || '-' }}</el-descriptions-item>
           <el-descriptions-item label="任务名称">{{ currentTask.taskName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="任务类型">{{ currentTask.taskType || '-' }}</el-descriptions-item>
           <el-descriptions-item label="工作地点">{{ currentTask.workAddress || '-' }}</el-descriptions-item>
@@ -74,6 +76,8 @@
           <el-descriptions-item label="审核状态">
             <el-tag :type="statusMeta(currentTask.reviewStatus).type">{{ statusMeta(currentTask.reviewStatus).label }}</el-tag>
           </el-descriptions-item>
+          <el-descriptions-item label="审核人">{{ currentTask.reviewUserName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="审核时间">{{ currentTask.reviewTime || '-' }}</el-descriptions-item>
           <el-descriptions-item label="任务说明" :span="2">{{ currentTask.description || '-' }}</el-descriptions-item>
           <el-descriptions-item label="审核意见" :span="2">{{ currentTask.reviewRemark || '-' }}</el-descriptions-item>
         </el-descriptions>

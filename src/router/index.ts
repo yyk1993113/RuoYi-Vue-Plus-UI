@@ -185,23 +185,6 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         meta: { title: '推广奖励', icon: 'money' }
       }
     ]
-  },
-  {
-    // 财税管理是独立后台模块；服务端菜单负责三级侧栏结构，此路由提供同路径组件兜底。
-    path: '/finance',
-    component: Layout,
-    name: 'FinanceManagement',
-    permissions: ['finance:qualification:list'],
-    meta: { title: '财税管理', icon: 'money' },
-    children: [
-      {
-        path: 'qualification/review',
-        component: () => import('@/views/finance/qualification/review.vue'),
-        name: 'FinanceQualificationReview',
-        permissions: ['finance:qualification:list'],
-        meta: { title: '认证审核', icon: 'documentation' }
-      }
-    ]
   }
 ];
 

@@ -15,8 +15,7 @@ const defaultSqlFiles = [
   '../RuoYi-Vue-Plus/script/sql/ry_rec_promoter_menu.sql',
   '../RuoYi-Vue-Plus/script/sql/ry_rec_promoter_workbench_menu.sql',
   '../RuoYi-Vue-Plus/script/sql/update/recruitment_admin_menu_structure_fix.sql',
-  '../RuoYi-Vue-Plus/script/sql/update/system_menu_route_component_cleanup.sql',
-  '../RuoYi-Vue-Plus-chat-company-name-fix/ruoyi-admin/src/main/resources/db/migration/V202608062200__create_finance_qualification_review_menu.sql'
+  '../RuoYi-Vue-Plus/script/sql/update/system_menu_route_component_cleanup.sql'
 ].map((file) => path.resolve(uiRoot, file));
 
 const sqlFiles = (process.argv.slice(2).length ? process.argv.slice(2).map((file) => path.resolve(file)) : defaultSqlFiles).filter((file) =>
