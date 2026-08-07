@@ -28,7 +28,9 @@
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column label="来源任务号" prop="sourceTaskNo" min-width="180" show-overflow-tooltip />
         <el-table-column label="任务名称" prop="taskName" min-width="180" show-overflow-tooltip />
-        <el-table-column label="任务类型" prop="taskType" width="130" />
+        <el-table-column label="任务类型" width="130">
+          <template #default="{ row }">{{ taskTypeLabel(row.taskType) }}</template>
+        </el-table-column>
         <el-table-column label="工作地点" prop="workAddress" min-width="160" show-overflow-tooltip />
         <el-table-column label="招聘人数" prop="recruitRequired" width="90" align="center" />
         <el-table-column label="预算" width="130" align="right">
@@ -61,26 +63,49 @@
 
     <el-dialog v-model="detailVisible" title="财税任务详情" width="760px" append-to-body>
       <div v-loading="detailLoading">
-        <el-descriptions v-if="currentTask" :column="2" border>
-          <el-descriptions-item label="来源任务号">{{ currentTask.sourceTaskNo || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="来源版本">{{ currentTask.sourceRevision || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="财税推送人">{{ currentTask.syncUserName || currentTask.syncUserId || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="接收时间">{{ currentTask.createTime || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="任务名称">{{ currentTask.taskName || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="任务类型">{{ currentTask.taskType || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="工作地点">{{ currentTask.workAddress || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="招聘人数">{{ currentTask.recruitRequired ?? '-' }}</el-descriptions-item>
-          <el-descriptions-item label="工作开始">{{ currentTask.workStartAt || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="工作结束">{{ currentTask.workEndAt || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="预算">{{ formatAmount(currentTask.budgetAmount, currentTask.currency) }}</el-descriptions-item>
-          <el-descriptions-item label="审核状态">
+        <template v-if="currentTask">
+          <el-descriptions :column="3" border>
+          <el-descriptions-item label="任务编号">{{ currentTask.sourceTaskNo || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="任务类型">{{ taskTypeLabel(currentTask.taskType) }}</el-descriptions-item>
+          <el-descriptions-item label="任务状态">
             <el-tag :type="statusMeta(currentTask.reviewStatus).type">{{ statusMeta(currentTask.reviewStatus).label }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="审核人">{{ currentTask.reviewUserName || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="审核时间">{{ currentTask.reviewTime || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="任务说明" :span="2">{{ currentTask.description || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="审核意见" :span="2">{{ currentTask.reviewRemark || '-' }}</el-descriptions-item>
-        </el-descriptions>
+          <el-descriptions-item label="计价方式">{{ pricingModeLabel(currentTask.pricingMode) }}</el-descriptions-item>
+          <el-descriptions-item label="任务预算">{{ formatAmount(currentTask.budgetAmount, currentTask.currency) }}</el-descriptions-item>
+          <el-descriptions-item label="已验收金额">{{ formatAmount(currentTask.acceptedAmount, currentTask.currency) }}</el-descriptions-item>
+          <el-descriptions-item label="招聘人数">{{ currentTask.recruitRequired ?? '-' }}</el-descriptions-item>
+          <el-descriptions-item label="创建人">{{ currentTask.syncUserName || currentTask.sourceCreatedBy || currentTask.syncUserId || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间">{{ currentTask.sourceCreatedAt || currentTask.createTime || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="工作开始时间">{{ currentTask.workStartAt || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="工作结束时间">{{ currentTask.workEndAt || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="是否开启招聘">{{ currentTask.recruitmentEnabled == null ? '-' : currentTask.recruitmentEnabled ? '是' : '否' }}</el-descriptions-item>
+          <el-descriptions-item label="工作地点" :span="3">{{ currentTask.workAddress || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="任务描述" :span="3">{{ currentTask.description || '-' }}</el-descriptions-item>
+          </el-descriptions>
+
+          <el-divider content-position="left">薪资配置</el-divider>
+          <el-descriptions :column="3" border>
+            <el-descriptions-item label="薪资单位">{{ salaryUnitLabel(currentTask.salaryUnit) }}</el-descriptions-item>
+            <el-descriptions-item label="薪资下限">{{ formatAmount(currentTask.salaryMin, currentTask.currency) }}</el-descriptions-item>
+            <el-descriptions-item label="薪资上限">{{ formatAmount(currentTask.salaryMax, currentTask.currency) }}</el-descriptions-item>
+          </el-descriptions>
+
+          <el-divider content-position="left">同步与审核信息</el-divider>
+          <el-descriptions :column="3" border>
+            <el-descriptions-item label="来源版本">{{ currentTask.sourceRevision || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="财税推送人">{{ currentTask.syncUserName || currentTask.syncUserId || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="接收时间">{{ currentTask.createTime || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="审核人">{{ currentTask.reviewUserName || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="审核时间">{{ currentTask.reviewTime || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="审核意见" :span="3">{{ currentTask.reviewRemark || '-' }}</el-descriptions-item>
+          </el-descriptions>
+
+          <el-divider content-position="left">规则配置</el-divider>
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="验收规则">{{ currentTask.acceptanceRuleJson || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="计价规则">{{ currentTask.pricingRuleJson || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </template>
       </div>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
@@ -153,6 +178,32 @@ const statusOptions = [
   { value: 'SUPERSEDED', label: '已被新版本替代' }
 ];
 
+const taskTypeLabels: Record<string, string> = {
+  ACTIVITY: '活动执行',
+  COMMISSION: '销售佣金',
+  OUTSOURCING: '项目外包',
+  DELIVERY: '配送骑手',
+  CUSTOMER_SERVICE: '客服外包',
+  TECH_PROMOTION: '技术推广'
+};
+
+const pricingModeLabels: Record<string, string> = {
+  HOURLY: '按工时',
+  PIECE: '按计件',
+  FIXED: '固定金额',
+  MONTHLY: '按月结算',
+  COMMISSION: '底薪 + 提成',
+  CUSTOM: '自定义'
+};
+
+const salaryUnitLabels: Record<string, string> = {
+  HOUR: '元/小时',
+  DAY: '元/天',
+  PIECE: '元/件',
+  MONTH: '元/月',
+  PROJECT: '元/项目'
+};
+
 const auditRules = computed<FormRules>(() => ({
   status: [{ required: true, message: '请选择审核结果', trigger: 'change' }],
   remark: [
@@ -179,9 +230,26 @@ function statusMeta(status?: string) {
   return meta[status || ''] || { label: status || '-', type: 'info' as const };
 }
 
+function taskTypeLabel(taskType?: string) {
+  if (!taskType) return '-';
+  return taskTypeLabels[taskType] || taskType;
+}
+
+function pricingModeLabel(pricingMode?: string) {
+  if (!pricingMode) return '-';
+  return pricingModeLabels[pricingMode] || pricingMode;
+}
+
+function salaryUnitLabel(salaryUnit?: string) {
+  if (!salaryUnit) return '-';
+  return salaryUnitLabels[salaryUnit] || salaryUnit;
+}
+
 function formatAmount(value?: number | string, currency?: string) {
   if (value === null || value === undefined || value === '') return '-';
-  return `${currency || 'CNY'} ${value}`;
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return String(value);
+  return currency === 'CNY' || !currency ? `¥${amount.toFixed(2)}` : `${currency} ${amount.toFixed(2)}`;
 }
 
 async function loadData() {

@@ -1413,6 +1413,8 @@ export interface FinanceTaskReviewVO {
   sourceSystem?: string;
   sourceTaskNo?: string;
   sourceRevision?: string;
+  sourceCreatedBy?: string;
+  sourceCreatedAt?: string;
   syncUserId?: string;
   syncUserName?: string;
   taskName?: string;
@@ -1424,11 +1426,14 @@ export interface FinanceTaskReviewVO {
   recruitRequired?: number;
   pricingMode?: string;
   budgetAmount?: number | string;
+  acceptedAmount?: number | string;
   currency?: string;
   salaryUnit?: string;
   salaryMin?: number | string;
   salaryMax?: number | string;
   acceptanceRuleJson?: string;
+  pricingRuleJson?: string;
+  recruitmentEnabled?: boolean;
   reviewStatus?: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'SUPERSEDED' | string;
   reviewRemark?: string;
   reviewUserName?: string;
