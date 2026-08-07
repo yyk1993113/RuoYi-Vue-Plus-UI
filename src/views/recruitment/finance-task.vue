@@ -41,6 +41,11 @@
             <el-tag :type="statusMeta(row.reviewStatus).type">{{ statusMeta(row.reviewStatus).label }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="任务状态" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag :type="taskStatusMeta(row.taskStatus, row.reviewStatus).type">{{ taskStatusMeta(row.taskStatus, row.reviewStatus).label }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="同步时间" prop="createTime" width="180" />
         <el-table-column label="操作" width="190" fixed="right" align="center">
           <template #default="{ row }">
@@ -68,7 +73,7 @@
           <el-descriptions-item label="任务编号">{{ currentTask.sourceTaskNo || '-' }}</el-descriptions-item>
           <el-descriptions-item label="任务类型">{{ taskTypeLabel(currentTask.taskType) }}</el-descriptions-item>
           <el-descriptions-item label="任务状态">
-            <el-tag :type="statusMeta(currentTask.reviewStatus).type">{{ statusMeta(currentTask.reviewStatus).label }}</el-tag>
+            <el-tag :type="taskStatusMeta(currentTask.taskStatus, currentTask.reviewStatus).type">{{ taskStatusMeta(currentTask.taskStatus, currentTask.reviewStatus).label }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="计价方式">{{ pricingModeLabel(currentTask.pricingMode) }}</el-descriptions-item>
           <el-descriptions-item label="任务预算">{{ formatAmount(currentTask.budgetAmount, currentTask.currency) }}</el-descriptions-item>
@@ -93,6 +98,9 @@
           <el-divider content-position="left">同步与审核信息</el-divider>
           <el-descriptions :column="3" border>
             <el-descriptions-item label="来源版本">{{ currentTask.sourceRevision || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="审核状态">
+              <el-tag :type="statusMeta(currentTask.reviewStatus).type">{{ statusMeta(currentTask.reviewStatus).label }}</el-tag>
+            </el-descriptions-item>
             <el-descriptions-item label="财税推送人">{{ currentTask.syncUserName || currentTask.syncUserId || '-' }}</el-descriptions-item>
             <el-descriptions-item label="接收时间">{{ currentTask.createTime || '-' }}</el-descriptions-item>
             <el-descriptions-item label="审核人">{{ currentTask.reviewUserName || '-' }}</el-descriptions-item>
@@ -228,6 +236,20 @@ function statusMeta(status?: string) {
     SUPERSEDED: { label: '已被替代', type: 'info' }
   };
   return meta[status || ''] || { label: status || '-', type: 'info' as const };
+}
+
+function taskStatusMeta(taskStatus?: string, reviewStatus?: string) {
+  const inferred = taskStatus || (reviewStatus === 'APPROVED'
+    ? 'IN_PROGRESS'
+    : reviewStatus === 'REJECTED' ? 'DRAFT' : reviewStatus);
+  const meta: Record<string, { label: string; type: 'warning' | 'success' | 'danger' | 'info' }> = {
+    DRAFT: { label: '草稿', type: 'info' },
+    PENDING_REVIEW: { label: '待审核', type: 'warning' },
+    IN_PROGRESS: { label: '进行中', type: 'success' },
+    PAUSED: { label: '已暂停', type: 'warning' },
+    ENDED: { label: '已结束', type: 'info' }
+  };
+  return meta[inferred || ''] || { label: inferred || '-', type: 'info' as const };
 }
 
 function taskTypeLabel(taskType?: string) {

@@ -1419,6 +1419,7 @@ export interface FinanceTaskReviewVO {
   syncUserName?: string;
   taskName?: string;
   taskType?: string;
+  taskStatus?: 'DRAFT' | 'PENDING_REVIEW' | 'IN_PROGRESS' | 'PAUSED' | 'ENDED' | string;
   description?: string;
   workAddress?: string;
   workStartAt?: string;
