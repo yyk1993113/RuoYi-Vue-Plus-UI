@@ -66,65 +66,72 @@
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="loadData" />
     </el-card>
 
-    <el-dialog v-model="detailVisible" title="财税任务详情" width="760px" append-to-body>
+    <el-dialog v-model="detailVisible" title="财税任务详情" width="900px" append-to-body>
       <div v-loading="detailLoading">
         <template v-if="currentTask">
-          <el-descriptions :column="3" border>
-          <el-descriptions-item label="任务编号">{{ currentTask.sourceTaskNo || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="任务类型">{{ taskTypeLabel(currentTask.taskType) }}</el-descriptions-item>
-          <el-descriptions-item label="任务状态">
-            <el-tag :type="taskStatusMeta(currentTask.taskStatus, currentTask.reviewStatus).type">{{ taskStatusMeta(currentTask.taskStatus, currentTask.reviewStatus).label }}</el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="计价方式">{{ pricingModeLabel(currentTask.pricingMode) }}</el-descriptions-item>
-          <el-descriptions-item label="任务预算">{{ formatAmount(currentTask.budgetAmount, currentTask.currency) }}</el-descriptions-item>
-          <el-descriptions-item label="已验收金额">{{ formatAmount(currentTask.acceptedAmount, currentTask.currency) }}</el-descriptions-item>
-          <el-descriptions-item label="招聘人数">{{ currentTask.recruitRequired ?? '-' }}</el-descriptions-item>
-          <el-descriptions-item label="创建人">{{ currentTask.syncUserName || currentTask.sourceCreatedBy || currentTask.syncUserId || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="创建时间">{{ currentTask.sourceCreatedAt || currentTask.createTime || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="工作开始时间">{{ currentTask.workStartAt || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="工作结束时间">{{ currentTask.workEndAt || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="是否开启招聘">{{ currentTask.recruitmentEnabled == null ? '-' : currentTask.recruitmentEnabled ? '是' : '否' }}</el-descriptions-item>
-          <el-descriptions-item label="工作地点" :span="3">{{ currentTask.workAddress || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="任务概述" :span="3">{{ currentDescriptionSections.overview }}</el-descriptions-item>
-          <el-descriptions-item label="工作内容" :span="3">{{ currentDescriptionSections.content }}</el-descriptions-item>
-          <el-descriptions-item label="工作要求" :span="3">{{ currentDescriptionSections.requirements }}</el-descriptions-item>
-          <el-descriptions-item label="交付标准" :span="3">{{ currentDescriptionSections.deliveryStandard }}</el-descriptions-item>
-          </el-descriptions>
+          <el-tabs v-model="detailTab" class="finance-task-detail-tabs">
+            <el-tab-pane label="任务描述" name="info">
+              <el-descriptions :column="3" border>
+                <el-descriptions-item label="任务编号">{{ currentTask.sourceTaskNo || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="任务类型">{{ taskTypeLabel(currentTask.taskType) }}</el-descriptions-item>
+                <el-descriptions-item label="任务状态">
+                  <el-tag :type="taskStatusMeta(currentTask.taskStatus, currentTask.reviewStatus).type">{{ taskStatusMeta(currentTask.taskStatus, currentTask.reviewStatus).label }}</el-tag>
+                </el-descriptions-item>
+                <el-descriptions-item label="开始时间">{{ formatTaskDateTime(currentTask.workStartAt) }}</el-descriptions-item>
+                <el-descriptions-item label="结束时间">{{ formatTaskDateTime(currentTask.workEndAt) }}</el-descriptions-item>
+                <el-descriptions-item label="关联甲方">{{ currentTask.tenantId || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="招聘人数">{{ currentTask.recruitRequired ?? '-' }}</el-descriptions-item>
+                <el-descriptions-item label="是否开启招聘">{{ currentTask.recruitmentEnabled == null ? '-' : currentTask.recruitmentEnabled ? '是' : '否' }}</el-descriptions-item>
+                <el-descriptions-item label="工作地点" :span="3">{{ currentTask.workAddress || '-' }}</el-descriptions-item>
+              </el-descriptions>
 
-          <el-divider content-position="left">薪资配置</el-divider>
-          <el-descriptions :column="3" border>
-            <el-descriptions-item label="薪资单位">{{ salaryUnitLabel(currentTask.salaryUnit) }}</el-descriptions-item>
-            <el-descriptions-item label="薪资下限">{{ formatAmount(currentTask.salaryMin, currentTask.currency) }}</el-descriptions-item>
-            <el-descriptions-item label="薪资上限">{{ formatAmount(currentTask.salaryMax, currentTask.currency) }}</el-descriptions-item>
-          </el-descriptions>
+              <el-divider content-position="left">任务描述</el-divider>
+              <el-descriptions :column="1" border>
+                <el-descriptions-item label="任务概述">{{ currentDescriptionSections.overview }}</el-descriptions-item>
+                <el-descriptions-item label="工作内容">{{ currentDescriptionSections.content }}</el-descriptions-item>
+                <el-descriptions-item label="工作要求">{{ currentDescriptionSections.requirements }}</el-descriptions-item>
+                <el-descriptions-item label="交付标准">{{ currentDescriptionSections.deliveryStandard }}</el-descriptions-item>
+              </el-descriptions>
+            </el-tab-pane>
 
-          <el-divider content-position="left">同步与审核信息</el-divider>
-          <el-descriptions :column="3" border>
-            <el-descriptions-item label="来源版本">{{ currentTask.sourceRevision || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="审核状态">
-              <el-tag :type="statusMeta(currentTask.reviewStatus).type">{{ statusMeta(currentTask.reviewStatus).label }}</el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="财税推送人">{{ currentTask.syncUserName || currentTask.syncUserId || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="接收时间">{{ currentTask.createTime || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="审核人">{{ currentTask.reviewUserName || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="审核时间">{{ currentTask.reviewTime || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="审核意见" :span="3">{{ currentTask.reviewRemark || '-' }}</el-descriptions-item>
-          </el-descriptions>
+            <el-tab-pane label="结算规则" name="settlement">
+              <el-descriptions :column="3" border>
+                <el-descriptions-item label="计费方式">{{ currentSettlementRule.pricingMode }}</el-descriptions-item>
+                <el-descriptions-item label="计费单价 / 阶梯">{{ currentSettlementRule.priceRule }}</el-descriptions-item>
+                <el-descriptions-item label="薪资单位">{{ currentSettlementRule.salaryUnit }}</el-descriptions-item>
+                <el-descriptions-item label="结算周期">{{ currentSettlementRule.settlementCycle }}</el-descriptions-item>
+                <el-descriptions-item label="任务预算">{{ formatAmount(currentTask.budgetAmount, currentTask.currency) }}</el-descriptions-item>
+                <el-descriptions-item label="已验收金额">{{ formatAmount(currentTask.acceptedAmount, currentTask.currency) }}</el-descriptions-item>
+                <el-descriptions-item label="薪资下限">{{ formatAmount(currentTask.salaryMin, currentTask.currency) }}</el-descriptions-item>
+                <el-descriptions-item label="薪资上限">{{ formatAmount(currentTask.salaryMax, currentTask.currency) }}</el-descriptions-item>
+              </el-descriptions>
+              <el-divider content-position="left">结算条件说明</el-divider>
+              <el-card shadow="never">{{ currentSettlementRule.settlementCondition }}</el-card>
+            </el-tab-pane>
 
-          <el-divider content-position="left">结算规则</el-divider>
-          <el-descriptions :column="3" border>
-            <el-descriptions-item label="计费方式">{{ currentSettlementRule.pricingMode }}</el-descriptions-item>
-            <el-descriptions-item label="计费单价 / 阶梯">{{ currentSettlementRule.priceRule }}</el-descriptions-item>
-            <el-descriptions-item label="薪资单位">{{ currentSettlementRule.salaryUnit }}</el-descriptions-item>
-            <el-descriptions-item label="结算周期">{{ currentSettlementRule.settlementCycle }}</el-descriptions-item>
-            <el-descriptions-item label="结算条件说明" :span="2">{{ currentSettlementRule.settlementCondition }}</el-descriptions-item>
-          </el-descriptions>
+            <el-tab-pane label="同步与审核" name="audit">
+              <el-descriptions :column="3" border>
+                <el-descriptions-item label="创建人">{{ currentTask.syncUserName || currentTask.sourceCreatedBy || currentTask.syncUserId || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="创建时间">{{ formatTaskDateTime(currentTask.sourceCreatedAt || currentTask.createTime) }}</el-descriptions-item>
+                <el-descriptions-item label="来源版本">{{ currentTask.sourceRevision || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="财税推送人">{{ currentTask.syncUserName || currentTask.syncUserId || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="接收时间">{{ formatTaskDateTime(currentTask.createTime) }}</el-descriptions-item>
+                <el-descriptions-item label="审核状态">
+                  <el-tag :type="statusMeta(currentTask.reviewStatus).type">{{ statusMeta(currentTask.reviewStatus).label }}</el-tag>
+                </el-descriptions-item>
+                <el-descriptions-item label="审核人">{{ currentTask.reviewUserName || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="审核时间">{{ formatTaskDateTime(currentTask.reviewTime) }}</el-descriptions-item>
+                <el-descriptions-item label="审核意见" :span="3">{{ currentTask.reviewRemark || '-' }}</el-descriptions-item>
+              </el-descriptions>
+            </el-tab-pane>
 
-          <el-divider content-position="left">原始规则</el-divider>
-          <el-descriptions :column="1" border>
-            <el-descriptions-item label="验收规则">{{ currentTask.acceptanceRuleJson || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="计价规则">{{ currentTask.pricingRuleJson || '-' }}</el-descriptions-item>
-          </el-descriptions>
+            <el-tab-pane label="原始规则" name="raw">
+              <el-descriptions :column="1" border>
+                <el-descriptions-item label="验收规则">{{ currentTask.acceptanceRuleJson || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="计价规则">{{ currentTask.pricingRuleJson || '-' }}</el-descriptions-item>
+              </el-descriptions>
+            </el-tab-pane>
+          </el-tabs>
         </template>
       </div>
       <template #footer>
@@ -173,6 +180,7 @@ const tableData = ref<FinanceTaskReviewVO[]>([]);
 const currentTask = ref<FinanceTaskReviewVO | null>(null);
 const detailVisible = ref(false);
 const auditVisible = ref(false);
+const detailTab = ref('info');
 const auditFormRef = ref<FormInstance>();
 
 const queryParams = reactive({
@@ -328,6 +336,10 @@ function settlementCycleLabel(settlementCycle?: string) {
   return settlementCycleLabels[settlementCycle] || settlementCycle;
 }
 
+function formatTaskDateTime(value?: string) {
+  return value ? value.replace('T', ' ').slice(0, 19) : '-';
+}
+
 function formatAmount(value?: number | string, currency?: string) {
   if (value === null || value === undefined || value === '') return '-';
   const amount = Number(value);
@@ -363,6 +375,7 @@ function resetQuery() {
 async function handleDetail(row: FinanceTaskReviewVO) {
   if (!row.id) return;
   detailVisible.value = true;
+  detailTab.value = 'info';
   detailLoading.value = true;
   try {
     const res = await getFinanceTaskReview(row.id);
