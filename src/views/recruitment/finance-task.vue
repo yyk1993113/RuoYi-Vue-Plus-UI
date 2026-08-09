@@ -85,7 +85,10 @@
           <el-descriptions-item label="工作结束时间">{{ currentTask.workEndAt || '-' }}</el-descriptions-item>
           <el-descriptions-item label="是否开启招聘">{{ currentTask.recruitmentEnabled == null ? '-' : currentTask.recruitmentEnabled ? '是' : '否' }}</el-descriptions-item>
           <el-descriptions-item label="工作地点" :span="3">{{ currentTask.workAddress || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="任务描述" :span="3">{{ currentTask.description || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="任务概述" :span="3">{{ currentDescriptionSections.overview }}</el-descriptions-item>
+          <el-descriptions-item label="工作内容" :span="3">{{ currentDescriptionSections.content }}</el-descriptions-item>
+          <el-descriptions-item label="工作要求" :span="3">{{ currentDescriptionSections.requirements }}</el-descriptions-item>
+          <el-descriptions-item label="交付标准" :span="3">{{ currentDescriptionSections.deliveryStandard }}</el-descriptions-item>
           </el-descriptions>
 
           <el-divider content-position="left">薪资配置</el-divider>
@@ -108,7 +111,16 @@
             <el-descriptions-item label="审核意见" :span="3">{{ currentTask.reviewRemark || '-' }}</el-descriptions-item>
           </el-descriptions>
 
-          <el-divider content-position="left">规则配置</el-divider>
+          <el-divider content-position="left">结算规则</el-divider>
+          <el-descriptions :column="3" border>
+            <el-descriptions-item label="计费方式">{{ currentSettlementRule.pricingMode }}</el-descriptions-item>
+            <el-descriptions-item label="计费单价 / 阶梯">{{ currentSettlementRule.priceRule }}</el-descriptions-item>
+            <el-descriptions-item label="薪资单位">{{ currentSettlementRule.salaryUnit }}</el-descriptions-item>
+            <el-descriptions-item label="结算周期">{{ currentSettlementRule.settlementCycle }}</el-descriptions-item>
+            <el-descriptions-item label="结算条件说明" :span="2">{{ currentSettlementRule.settlementCondition }}</el-descriptions-item>
+          </el-descriptions>
+
+          <el-divider content-position="left">原始规则</el-divider>
           <el-descriptions :column="1" border>
             <el-descriptions-item label="验收规则">{{ currentTask.acceptanceRuleJson || '-' }}</el-descriptions-item>
             <el-descriptions-item label="计价规则">{{ currentTask.pricingRuleJson || '-' }}</el-descriptions-item>
@@ -212,6 +224,13 @@ const salaryUnitLabels: Record<string, string> = {
   PROJECT: '元/项目'
 };
 
+const settlementCycleLabels: Record<string, string> = {
+  DAILY: '每日结算',
+  WEEKLY: '每周结算',
+  MONTHLY: '按月结算（次月5日前发放）',
+  ON_COMPLETION: '完成后结算'
+};
+
 const auditRules = computed<FormRules>(() => ({
   status: [{ required: true, message: '请选择审核结果', trigger: 'change' }],
   remark: [
@@ -227,6 +246,43 @@ const auditRules = computed<FormRules>(() => ({
     }
   ]
 }));
+
+const currentDescriptionSections = computed(() => {
+  const task = currentTask.value;
+  return {
+    overview: task?.taskOverview || task?.description || '-',
+    content: task?.workContent || '-',
+    requirements: task?.workRequirements || '-',
+    deliveryStandard: task?.deliveryStandard || '-'
+  };
+});
+
+const currentSettlementRule = computed(() => {
+  const task = currentTask.value;
+  const fallback = {
+    pricingMode: pricingModeLabel(task?.pricingMode),
+    priceRule: task?.pricingRuleJson || '-',
+    salaryUnit: salaryUnitLabel(task?.salaryUnit),
+    settlementCycle: '-',
+    settlementCondition: '-'
+  };
+  if (!task?.pricingRuleJson) return fallback;
+
+  try {
+    const parsed = JSON.parse(task.pricingRuleJson) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object') return fallback;
+    const priceRule = parsed.priceRule ?? parsed.pricingRule;
+    return {
+      pricingMode: typeof parsed.pricingMode === 'string' ? pricingModeLabel(parsed.pricingMode) : fallback.pricingMode,
+      priceRule: priceRule == null ? fallback.priceRule : String(priceRule),
+      salaryUnit: typeof parsed.salaryUnit === 'string' ? salaryUnitLabel(parsed.salaryUnit) : fallback.salaryUnit,
+      settlementCycle: typeof parsed.settlementCycle === 'string' ? settlementCycleLabel(parsed.settlementCycle) : fallback.settlementCycle,
+      settlementCondition: parsed.settlementCondition == null ? fallback.settlementCondition : String(parsed.settlementCondition)
+    };
+  } catch {
+    return fallback;
+  }
+});
 
 function statusMeta(status?: string) {
   const meta: Record<string, { label: string; type: 'warning' | 'success' | 'danger' | 'info' }> = {
@@ -265,6 +321,11 @@ function pricingModeLabel(pricingMode?: string) {
 function salaryUnitLabel(salaryUnit?: string) {
   if (!salaryUnit) return '-';
   return salaryUnitLabels[salaryUnit] || salaryUnit;
+}
+
+function settlementCycleLabel(settlementCycle?: string) {
+  if (!settlementCycle) return '-';
+  return settlementCycleLabels[settlementCycle] || settlementCycle;
 }
 
 function formatAmount(value?: number | string, currency?: string) {

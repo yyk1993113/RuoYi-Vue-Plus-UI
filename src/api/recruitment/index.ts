@@ -1421,6 +1421,10 @@ export interface FinanceTaskReviewVO {
   taskType?: string;
   taskStatus?: 'DRAFT' | 'PENDING_REVIEW' | 'IN_PROGRESS' | 'PAUSED' | 'ENDED' | string;
   description?: string;
+  taskOverview?: string;
+  workContent?: string;
+  workRequirements?: string;
+  deliveryStandard?: string;
   workAddress?: string;
   workStartAt?: string;
   workEndAt?: string;
