@@ -178,6 +178,37 @@
                 </div>
               </div>
             </el-tab-pane>
+
+            <el-tab-pane label="实名与签约" name="signing">
+              <div class="detail-tab-pane signing-pane" v-loading="sourceDetailLoading">
+                <div class="signing-note">
+                  <span>⚠</span>
+                  <div><strong>实名与签约须知：</strong>实名认证与合同签署需前置到任务详情阶段，避免发放时因合规未完成导致失败。</div>
+                </div>
+                <div class="signing-summary-grid">
+                  <div class="signing-summary-card is-success"><strong>{{ signingSummary.signedRealName }}</strong><span>已实名+已签约</span></div>
+                  <div class="signing-summary-card is-warning"><strong>{{ signingSummary.realNamePending }}</strong><span>已实名 · 待签约</span></div>
+                  <div class="signing-summary-card is-danger"><strong>{{ signingSummary.unsigned }}</strong><span>未实名 · 未签约</span></div>
+                  <div class="signing-summary-card is-total"><strong>{{ signingSummary.total }}</strong><span>总人数</span></div>
+                </div>
+                <el-table :data="detailParticipants" border stripe empty-text="暂无参与人员">
+                  <el-table-column label="姓名" prop="name" min-width="110" />
+                  <el-table-column label="手机号" prop="phone" min-width="130" />
+                  <el-table-column label="角色" min-width="90">
+                    <template #default="{ row }">{{ row.role || '零工' }}</template>
+                  </el-table-column>
+                  <el-table-column label="实名状态" min-width="100">
+                    <template #default="{ row }"><el-tag size="small" :type="realNameStatusMeta(row.realNameStatus).type">{{ realNameStatusMeta(row.realNameStatus).label }}</el-tag></template>
+                  </el-table-column>
+                  <el-table-column label="签约状态" min-width="100">
+                    <template #default="{ row }"><el-tag size="small" :type="signStatusMeta(row.signStatus).type">{{ signStatusMeta(row.signStatus).label }}</el-tag></template>
+                  </el-table-column>
+                  <el-table-column label="加入方式" min-width="100">
+                    <template #default="{ row }">{{ row.joinMethod || '任务关联' }}</template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </el-tab-pane>
           </el-tabs>
         </template>
       </div>
@@ -362,6 +393,17 @@ const currentSettlementRule = computed(() => {
 const detailParticipants = computed(() => sourceDetail.value.participants || []);
 const detailDeliverables = computed(() => sourceDetail.value.deliverables || []);
 const missingDeliverables = computed(() => deliverableGroups.filter(group => group.required && !filesForCategory(group.key).length));
+const signingSummary = computed(() => {
+  const workers = detailParticipants.value;
+  const signedRealName = workers.filter(worker => worker.signStatus === 'SIGNED' && worker.realNameStatus === 'VERIFIED').length;
+  const realNamePending = workers.filter(worker => worker.realNameStatus === 'VERIFIED' && worker.signStatus !== 'SIGNED').length;
+  return {
+    signedRealName,
+    realNamePending,
+    unsigned: Math.max(0, workers.length - signedRealName - realNamePending),
+    total: workers.length
+  };
+});
 
 function statusMeta(status?: string) {
   const meta: Record<string, { label: string; type: 'warning' | 'success' | 'danger' | 'info' }> = {
@@ -862,12 +904,65 @@ loadData();
   font-size: 12px;
 }
 
+.signing-note {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid #8de0b0;
+  border-left: 3px solid #16a05d;
+  border-radius: 10px;
+  color: #214334;
+  background: #ecfff2;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.signing-note strong {
+  color: #d4380d;
+}
+
+.signing-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 20px;
+}
+
+.signing-summary-card {
+  display: flex;
+  min-height: 114px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+  border-radius: 10px;
+  background: #f7f8fa;
+}
+
+.signing-summary-card strong {
+  font-size: 24px;
+}
+
+.signing-summary-card span {
+  color: #86909c;
+  font-size: 12px;
+}
+
+.signing-summary-card.is-success strong { color: #11a347; }
+.signing-summary-card.is-warning strong { color: #f08a00; }
+.signing-summary-card.is-danger strong { color: #f04444; }
+.signing-summary-card.is-total strong { color: #8793a4; }
+
 @media (max-width: 900px) {
   .task-detail-summary,
   .settlement-detail-grid,
   .participant-grid,
   .deliverable-grid {
     grid-template-columns: 1fr;
+  }
+
+  .signing-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

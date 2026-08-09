@@ -1452,6 +1452,8 @@ export interface FinanceTaskParticipantVO {
   gigWorkerNo?: string;
   name: string;
   phone?: string;
+  role?: string;
+  joinMethod?: string;
   taskNo?: string;
   signStatus?: string;
   realNameStatus?: string;
