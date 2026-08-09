@@ -1447,6 +1447,35 @@ export interface FinanceTaskReviewVO {
   createTime?: string;
 }
 
+export interface FinanceTaskParticipantVO {
+  id: number;
+  gigWorkerNo?: string;
+  name: string;
+  phone?: string;
+  taskNo?: string;
+  signStatus?: string;
+  realNameStatus?: string;
+  accountStatus?: string;
+  status?: string;
+}
+
+export type FinanceTaskDeliverableCategory = 'ATTENDANCE' | 'RESULT' | 'ACCEPTANCE' | 'SUPPLEMENT';
+
+export interface FinanceTaskDeliverableVO {
+  id: number;
+  category: FinanceTaskDeliverableCategory;
+  fileName: string;
+  contentType?: string;
+  size?: number;
+  createdAt?: string;
+}
+
+export interface FinanceTaskSourceDetailVO {
+  tenantName?: string;
+  participants: FinanceTaskParticipantVO[];
+  deliverables: FinanceTaskDeliverableVO[];
+}
+
 export interface FinanceTaskReviewQuery {
   pageNum?: number;
   pageSize?: number;
@@ -1501,6 +1530,16 @@ export function listFinanceTaskReview(query: FinanceTaskReviewQuery) {
 
 export function getFinanceTaskReview(id: number | string) {
   return request.get<FinanceTaskReviewVO>(`${baseUrl}/finance-task/${id}`);
+}
+
+export function getFinanceTaskSourceDetail(id: number | string) {
+  return request.get<FinanceTaskSourceDetailVO>(`${baseUrl}/finance-task/${id}/source-detail`);
+}
+
+export function downloadFinanceTaskDeliverable(id: number | string, fileId: number | string) {
+  return request.get<Blob, Blob>(`${baseUrl}/finance-task/${id}/deliverables/${fileId}/download`, {
+    responseType: 'blob'
+  });
 }
 
 export function auditFinanceTaskReview(data: FinanceTaskAuditForm) {
