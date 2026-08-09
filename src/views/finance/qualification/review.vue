@@ -82,12 +82,51 @@
           <el-descriptions-item label="企业名称" :span="2">{{ detailData.application.companyName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="统一社会信用代码">{{ detailData.application.creditCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="法定代表人">{{ detailData.application.legalPersonName || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="法人证件">{{ detailData.application.legalPersonIdMasked || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="联系电话">{{ maskPhone(detailData.application.contactPhone) }}</el-descriptions-item>
+          <el-descriptions-item label="法人证件">
+            <span class="sensitive-value">
+              {{ sensitiveText('legalPersonId', detailData.application.legalPersonIdMasked) }}
+              <el-button
+                v-if="detailData.application.legalPersonIdMasked"
+                v-hasPermi="['finance:qualification:query']"
+                class="sensitive-eye-button"
+                link
+                type="primary"
+                :icon="sensitiveVisible.legalPersonId ? 'Hide' : 'View'"
+                @click="toggleSensitive('legalPersonId')"
+              />
+            </span>
+          </el-descriptions-item>
+          <el-descriptions-item label="联系电话">
+            <span class="sensitive-value">
+              {{ sensitiveText('contactPhone', maskPhone(detailData.application.contactPhone)) }}
+              <el-button
+                v-if="detailData.application.contactPhone"
+                v-hasPermi="['finance:qualification:query']"
+                class="sensitive-eye-button"
+                link
+                type="primary"
+                :icon="sensitiveVisible.contactPhone ? 'Hide' : 'View'"
+                @click="toggleSensitive('contactPhone')"
+              />
+            </span>
+          </el-descriptions-item>
           <el-descriptions-item label="注册地址" :span="2">{{ detailData.application.registeredAddress || '-' }}</el-descriptions-item>
           <el-descriptions-item label="开户银行">{{ detailData.application.bankName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="开户名称">{{ detailData.application.accountName || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="银行账号">{{ detailData.application.bankAccountMasked || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="银行账号">
+            <span class="sensitive-value">
+              {{ sensitiveText('bankAccountNo', detailData.application.bankAccountMasked) }}
+              <el-button
+                v-if="detailData.application.bankAccountMasked"
+                v-hasPermi="['finance:qualification:query']"
+                class="sensitive-eye-button"
+                link
+                type="primary"
+                :icon="sensitiveVisible.bankAccountNo ? 'Hide' : 'View'"
+                @click="toggleSensitive('bankAccountNo')"
+              />
+            </span>
+          </el-descriptions-item>
           <el-descriptions-item label="联行号">{{ detailData.application.cnapsCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="申请状态">
             <el-tag :type="statusMeta(detailData.application.status).type">{{ statusMeta(detailData.application.status).label }}</el-tag>
@@ -98,7 +137,9 @@
 
         <el-divider content-position="left">认证材料</el-divider>
         <el-table :data="detailData.files" border>
-          <el-table-column label="材料类型" prop="fileType" width="190" />
+          <el-table-column label="材料类型" width="190">
+            <template #default="{ row }">{{ fileTypeLabel(row.fileType) }}</template>
+          </el-table-column>
           <el-table-column label="文件名称" prop="fileName" min-width="220" show-overflow-tooltip />
           <el-table-column label="材料状态" width="120" align="center">
             <template #default="{ row }">{{ fileStatusLabel(row.reviewStatus) }}</template>
@@ -126,9 +167,8 @@
       <el-form label-width="100px">
         <el-form-item label="审核结果">
           <el-radio-group v-model="auditForm.decision">
-            <el-radio label="APPROVE">通过</el-radio>
-            <el-radio label="REJECT">驳回</el-radio>
-            <el-radio label="SUPPLEMENT">补充材料</el-radio>
+            <el-radio label="APPROVE">审核通过</el-radio>
+            <el-radio label="REJECT">审核不通过</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="审核意见" :required="auditForm.decision !== 'APPROVE'">
@@ -160,7 +200,7 @@ const statusOptions = [
   { value: 'PENDING_REVIEW', label: '待审核' },
   { value: 'APPROVED', label: '已通过' },
   { value: 'REJECTED', label: '已驳回' },
-  { value: 'SUPPLEMENT', label: '待补充材料' }
+  { value: 'SUPPLEMENT_REQUIRED', label: '待补充材料' }
 ];
 
 const query = reactive({ status: 'PENDING_REVIEW', keyword: '' });
@@ -171,10 +211,16 @@ const detailVisible = ref(false);
 const detailLoading = ref(false);
 const detailTenantId = ref('');
 const detailData = ref<FinanceQualificationDetail>();
+type SensitiveKey = 'legalPersonId' | 'contactPhone' | 'bankAccountNo';
+const sensitiveVisible = reactive<Record<SensitiveKey, boolean>>({
+  legalPersonId: false,
+  contactPhone: false,
+  bankAccountNo: false
+});
 const auditVisible = ref(false);
 const submitting = ref(false);
 const auditTarget = ref<FinanceQualificationApplicationRow>();
-const auditForm = reactive<{ decision: 'APPROVE' | 'REJECT' | 'SUPPLEMENT'; remark: string }>({
+const auditForm = reactive<{ decision: 'APPROVE' | 'REJECT'; remark: string }>({
   decision: 'APPROVE',
   remark: ''
 });
@@ -218,6 +264,9 @@ async function openDetail(row: FinanceQualificationApplicationRow) {
   detailVisible.value = true;
   detailLoading.value = true;
   detailData.value = undefined;
+  sensitiveVisible.legalPersonId = false;
+  sensitiveVisible.contactPhone = false;
+  sensitiveVisible.bankAccountNo = false;
   try {
     const response: any = await getFinanceQualificationDetail(row.tenantId, row.application.id);
     detailData.value = response?.data || response;
@@ -238,7 +287,7 @@ async function submitAudit() {
   const remark = auditForm.remark.trim();
   if (!target) return;
   if (auditForm.decision !== 'APPROVE' && !remark) {
-    ElMessage.warning('驳回或补充材料时必须填写审核意见');
+    ElMessage.warning('审核不通过时必须填写审核意见');
     return;
   }
   submitting.value = true;
@@ -277,13 +326,51 @@ function statusMeta(status?: string) {
     PENDING_REVIEW: { label: '待审核', type: 'warning' },
     APPROVED: { label: '已通过', type: 'success' },
     REJECTED: { label: '已驳回', type: 'danger' },
-    SUPPLEMENT: { label: '待补充材料', type: 'info' }
+    SUPPLEMENT_REQUIRED: { label: '待补充材料', type: 'info' }
   };
   return meta[status || ''] || { label: status || '-', type: 'info' as const };
 }
 
 function fileStatusLabel(status?: string) {
   return status === 'APPROVED' ? '已通过' : status === 'REJECTED' ? '已驳回' : '待核验';
+}
+
+function sensitiveRawValue(field: SensitiveKey) {
+  const application = detailData.value?.application as any;
+  if (!application) return '';
+  return field === 'legalPersonId'
+    ? application.legalPersonId
+    : field === 'contactPhone'
+      ? application.contactPhoneFull || application.contactPhone
+      : application.bankAccountNo;
+}
+
+function sensitiveText(field: SensitiveKey, maskedValue?: string) {
+  return sensitiveVisible[field] ? sensitiveRawValue(field) || maskedValue || '-' : maskedValue || '-';
+}
+
+function toggleSensitive(field: SensitiveKey) {
+  if (sensitiveVisible[field]) {
+    sensitiveVisible[field] = false;
+    return;
+  }
+  const value = sensitiveRawValue(field);
+  if (!value || /\*/.test(value)) {
+    ElMessage.warning('当前接口仅返回脱敏信息，暂无法查看完整内容');
+    return;
+  }
+  sensitiveVisible[field] = true;
+}
+
+const fileTypeLabels: Record<string, string> = {
+  BUSINESS_LICENSE: '营业执照',
+  BANK_ACCOUNT_CERT: '银行开户证明',
+  AUTHORIZATION_LETTER: '授权委托书',
+  COMPANY_SEAL: '公司印章'
+};
+
+function fileTypeLabel(fileType?: string) {
+  return fileType ? fileTypeLabels[fileType] || fileType : '-';
 }
 
 function formatDate(value?: string) {
@@ -304,5 +391,15 @@ onMounted(loadApplications);
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.sensitive-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sensitive-eye-button {
+  padding: 0;
 }
 </style>
