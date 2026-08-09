@@ -151,7 +151,6 @@ import {
   listFinanceQualificationApplications,
   previewFinanceQualificationFile,
   reviewFinanceQualification,
-  type FinanceQualificationApplication,
   type FinanceQualificationApplicationRow,
   type FinanceQualificationDetail,
   type FinanceQualificationFile
