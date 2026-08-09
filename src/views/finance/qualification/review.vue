@@ -76,13 +76,14 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="detailVisible" title="开户与认证申请详情" width="900px" append-to-body>
+    <el-dialog v-model="detailVisible" title="开户与认证申请详情" width="1000px" append-to-body>
       <div v-if="detailData" v-loading="detailLoading">
+        <el-divider content-position="left">企业信息</el-divider>
         <el-descriptions :column="2" border>
           <el-descriptions-item label="企业名称" :span="2">{{ detailData.application.companyName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="统一社会信用代码">{{ detailData.application.creditCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="法定代表人">{{ detailData.application.legalPersonName || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="法人证件">
+          <el-descriptions-item label="法人身份证号">
             <span class="sensitive-value">
               {{ sensitiveText('legalPersonId', detailData.application.legalPersonIdMasked) }}
               <el-button
@@ -96,6 +97,8 @@
               />
             </span>
           </el-descriptions-item>
+          <el-descriptions-item label="注册资本">{{ formatCapital(detailData.application.registeredCapital) }}</el-descriptions-item>
+          <el-descriptions-item label="成立日期">{{ detailData.application.establishmentDate || '-' }}</el-descriptions-item>
           <el-descriptions-item label="联系电话">
             <span class="sensitive-value">
               {{ sensitiveText('contactPhone', maskPhone(detailData.application.contactPhone)) }}
@@ -110,9 +113,14 @@
               />
             </span>
           </el-descriptions-item>
+          <el-descriptions-item label="企业邮箱">{{ detailData.application.contactEmail || '-' }}</el-descriptions-item>
           <el-descriptions-item label="注册地址" :span="2">{{ detailData.application.registeredAddress || '-' }}</el-descriptions-item>
+        </el-descriptions>
+
+        <el-divider content-position="left">账户与结算</el-divider>
+        <el-descriptions :column="2" border>
           <el-descriptions-item label="开户银行">{{ detailData.application.bankName || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="开户名称">{{ detailData.application.accountName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="银行账户名">{{ detailData.application.accountName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="银行账号">
             <span class="sensitive-value">
               {{ sensitiveText('bankAccountNo', detailData.application.bankAccountMasked) }}
@@ -128,21 +136,42 @@
             </span>
           </el-descriptions-item>
           <el-descriptions-item label="联行号">{{ detailData.application.cnapsCode || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="来款银行">{{ detailData.application.incomingBankName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="来款账号">{{ detailData.application.incomingAccountMasked || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="客户模式">{{ settlementModeLabel(detailData.application.settlementMode) }}</el-descriptions-item>
+          <el-descriptions-item label="开户方案">{{ detailData.application.accountScheme || '-' }}</el-descriptions-item>
+        </el-descriptions>
+
+        <el-divider content-position="left">认证信息</el-divider>
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="认证来源">{{ sourceTypeLabel(detailData.application.sourceType) }}</el-descriptions-item>
+          <el-descriptions-item label="外部认证引用">{{ detailData.application.sourceReference || '-' }}</el-descriptions-item>
           <el-descriptions-item label="申请状态">
             <el-tag :type="statusMeta(detailData.application.status).type">{{ statusMeta(detailData.application.status).label }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="提交时间">{{ formatDate(detailData.application.submittedAt) }}</el-descriptions-item>
+          <el-descriptions-item label="审核时间">{{ formatDate(detailData.application.reviewedAt) }}</el-descriptions-item>
           <el-descriptions-item label="审核意见" :span="2">{{ detailData.application.reviewRemark || '-' }}</el-descriptions-item>
         </el-descriptions>
 
-        <el-divider content-position="left">认证材料</el-divider>
+        <el-divider content-position="left">资质文件</el-divider>
         <el-table :data="detailData.files" border>
           <el-table-column label="材料类型" width="190">
-            <template #default="{ row }">{{ fileTypeLabel(row.fileType) }}</template>
+            <template #default="{ row }">
+              {{ fileTypeLabel(row.fileType) }}
+              <el-tag v-if="row.required" class="ml-1" size="small" type="danger">必传</el-tag>
+            </template>
           </el-table-column>
           <el-table-column label="文件名称" prop="fileName" min-width="220" show-overflow-tooltip />
+          <el-table-column label="有效期至" width="130">
+            <template #default="{ row }">{{ row.validTo || '-' }}</template>
+          </el-table-column>
           <el-table-column label="材料状态" width="120" align="center">
-            <template #default="{ row }">{{ fileStatusLabel(row.reviewStatus) }}</template>
+            <template #default="{ row }">
+              <el-tooltip :disabled="!row.rejectReason" :content="row.rejectReason" placement="top">
+                <span>{{ fileStatusLabel(row.reviewStatus) }}</span>
+              </el-tooltip>
+            </template>
           </el-table-column>
           <el-table-column label="操作" width="100" align="center">
             <template #default="{ row }">
@@ -364,9 +393,11 @@ function toggleSensitive(field: SensitiveKey) {
 
 const fileTypeLabels: Record<string, string> = {
   BUSINESS_LICENSE: '营业执照',
-  BANK_ACCOUNT_CERT: '银行开户证明',
+  LEGAL_ID_FRONT: '法人身份证正面',
+  LEGAL_ID_BACK: '法人身份证反面',
+  BANK_ACCOUNT_CERT: '开户许可证/基本户证明',
   AUTHORIZATION_LETTER: '授权委托书',
-  COMPANY_SEAL: '公司印章'
+  COMPANY_SEAL: '企业公章印模'
 };
 
 function fileTypeLabel(fileType?: string) {
@@ -375,6 +406,28 @@ function fileTypeLabel(fileType?: string) {
 
 function formatDate(value?: string) {
   return value ? value.replace('T', ' ') : '-';
+}
+
+// 与财税中心开户认证页保持同一套业务文案，避免管理端直接展示枚举值。
+function settlementModeLabel(value?: string) {
+  const labels: Record<string, string> = {
+    SETTLEMENT: '结算客户（平台结算/发放）',
+    SELF_PAY: '非结算客户（企业自付发放）',
+    NONE: '非结算客户（暂不接发放）'
+  };
+  return labels[value || ''] || value || '-';
+}
+
+function sourceTypeLabel(value?: string) {
+  return value === 'OA_REUSED' ? 'OA/招聘系统已认证复用' : value === 'DIRECT' ? '本系统直接认证' : value || '-';
+}
+
+function formatCapital(value?: number | string) {
+  if (value == null || value === '') return '-';
+  const amount = Number(value);
+  return Number.isFinite(amount)
+    ? `¥${amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : String(value);
 }
 
 function maskPhone(value?: string) {
